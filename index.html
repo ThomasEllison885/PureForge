@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PureForge</title>
-<meta name="description" content="PureForge helps trade and property companies put a real process behind the work, then builds the internal software to run it — proposal generation, estimating tools, entry forms, and light client tracking, hosted and maintained for you.">
+<meta name="description" content="PureForge builds private hubs for trade and property companies: proposal generation, bilingual crew scopes, estimating tools and job tracking. Process first, software second. Hosted and maintained for you.">
 <meta property="og:title" content="PureForge — internal software for trade and property companies">
-<meta property="og:description" content="We map how your work actually gets done, then build the hub to run it: proposals, estimates, entry forms, tracking. Hosted and maintained for you.">
+<meta property="og:description" content="Proposals in your voice, crew scopes in English and Spanish, estimating that matches how you bid. Built on a hub already in daily use inside a working contractor.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.pureforge.dev/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231F4E68'/%3E%3Cg transform='translate(32,32) scale(0.9) translate(-32,-32)'%3E%3Cpath d='M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E">
@@ -264,14 +264,15 @@ section{scroll-margin-top:78px}
 /* facts */
 .origin{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(28px,4.5vw,56px);align-items:center}
 @media (max-width:900px){.origin{grid-template-columns:1fr;gap:28px}}
+@media (max-width:480px){.fact{grid-template-columns:1fr;gap:4px}}
 .origin blockquote{
   margin:0;font-family:var(--display);font-weight:600;font-size:clamp(1.15rem,2.1vw,1.42rem);
   line-height:1.34;letter-spacing:-.015em;border-left:3px solid var(--ember);padding-left:20px;
 }
 .origin .attrib{margin-top:14px;font-family:var(--mono);font-size:.75rem;color:var(--ink-3);letter-spacing:.04em;padding-left:23px}
 .facts{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)}
-.fact{display:grid;grid-template-columns:auto 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);align-items:baseline}
-.fact .lab{font-family:var(--mono);font-size:.71rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);min-width:96px;text-align:left}
+.fact{display:grid;grid-template-columns:118px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.fact .lab{font-family:var(--mono);font-size:.71rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);text-align:left}
 .fact p{font-size:.95rem;color:var(--ink-2)}
 
 /* cta */
@@ -296,6 +297,30 @@ section{scroll-margin-top:78px}
 .foot-bar a{text-decoration:none;color:var(--ink-3)}
 .foot-bar a:hover{color:var(--ink)}
 
+/* running-today marker + forward-looking list */
+.live-flag{
+  display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:.7rem;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ember);
+}
+.live-flag i{width:6px;height:6px;border-radius:50%;background:var(--ember);display:inline-block;flex:none}
+.cap.star{border-color:var(--line-strong)}
+.cap.star .tag{color:var(--ember)}
+.cap .lang{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.cap .lang span{
+  font-family:var(--mono);font-size:.72rem;padding:4px 9px;border-radius:6px;
+  background:var(--accent-soft);color:var(--accent);border:1px solid transparent;
+}
+.next-list{margin-top:34px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(28px,4vw,56px)}
+@media (max-width:820px){.next-list{grid-template-columns:1fr}}
+.next-item{padding:20px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.next-item h3{font-size:1.03rem}
+.next-item p{font-size:.95rem;color:var(--ink-2)}
+.next-item .k{font-family:var(--mono);font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+.note-line{
+  margin-top:30px;padding:16px 20px;border-left:3px solid var(--accent);
+  background:var(--surface-2);font-size:.96rem;color:var(--ink-2);border-radius:0 8px 8px 0;
+}
+
 @media (prefers-reduced-motion: reduce){
   *{transition:none !important;animation:none !important}
 }
@@ -308,7 +333,8 @@ section{scroll-margin-top:78px}
     <a class="brand" href="#top"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect class="plate" width="64" height="64" rx="13"/><g transform="translate(32,32) scale(0.9) translate(-32,-32)"><path class="anvil" d="M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z"/></g></svg>PureForge<span class="dev">.dev</span></a>
     <nav class="nav">
       <a class="hide-sm" href="#process">How we work</a>
-      <a class="hide-sm" href="#build">What we build</a>
+      <a class="hide-sm" href="#build">What it does</a>
+      <a class="hide-sm" href="#next">What’s possible</a>
       <a class="btn btn-primary btn-sm" href="#contact">Start a conversation</a>
     </nav>
   </div>
@@ -321,12 +347,12 @@ section{scroll-margin-top:78px}
       <div class="hero-copy">
         <span class="eyebrow">Process &amp; internal software for trade &amp; property companies</span>
         <h1>Your best proposal shouldn't live on one person's desktop.</h1>
-        <p class="lede">PureForge works out how your company actually does the job, puts a real process around it, and builds the software to run it. Your team logs in, fills in the job, and the proposal comes out written in your voice, on your paper — then gets tracked from draft to accepted instead of disappearing into somebody's sent folder.</p>
+        <p class="lede">PureForge helps trade and property companies turn how they actually work into a written process — then builds the software that runs it. Proposals in your voice. Crew scopes in English and Spanish. Estimates that match how you really bid. The point is hours back every week, and a company that doesn’t stall when one person is out.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#contact">Start a conversation</a>
           <a class="btn btn-ghost" href="#build">See what we build</a>
         </div>
-        <p class="hero-note">Hosted by us · Live on your own subdomain · No change to your website</p>
+        <p class="hero-note">Starts with a conversation, not a contract · Hosted by us · No change to your website</p>
       </div>
 
       <div class="mock" aria-hidden="true">
@@ -385,6 +411,7 @@ section{scroll-margin-top:78px}
       <div class="sec-intro">
         <h2>Software is the second half. The first half is the process.</h2>
         <p>Most small companies don't have a software problem. They have a process that works, lives entirely in three people's heads, and has never been said out loud. Automating the mess just gets you the mess faster — so we start by finding out how the work actually gets done, who touches it, and where the hours quietly go.</p>
+        <p>Written down, a process does three things at once. It gives you hours back every week. It makes the good version of the job repeatable instead of dependent on one person. And it turns the next hire from a six-month ramp into a few weeks. The software is how you make that stick.</p>
       </div>
 
       <div class="proc-grid">
@@ -419,51 +446,97 @@ section{scroll-margin-top:78px}
 
   <section class="sec" id="build" style="background:var(--surface);border-block:1px solid var(--line)">
     <div class="wrap">
-      <div class="rule-head"><span class="eyebrow">What we build</span><span class="line"></span></div>
+      <div class="rule-head"><span class="eyebrow">What it does</span><span class="line"></span></div>
       <div class="sec-intro">
-        <h2>One hub your team logs into. Built around the process you actually run.</h2>
-        <p>Not a platform you bend your business to fit. We start from your documents, your pricing, and your process, and build the software around them — then host it, run it, and change it as the business changes.</p>
+        <span class="live-flag"><i></i>Running today, not a roadmap</span>
+        <h2>Everything here is in daily use inside a working contractor.</h2>
+        <p>A dozen people log into it every day to write proposals, price work, and get scopes to the crew. It was built for one company&rsquo;s way of working, and the parts that generalize are what we build for yours.</p>
       </div>
 
       <div class="cap-lead" style="background:var(--surface-2)">
         <div>
           <span class="flag">The main thing</span>
           <h3>Proposal generation</h3>
-          <p>Your team picks the template, fills in the job, and the finished proposal comes out in your company's format and voice — scope language, exclusions, terms, and all. Saved as a draft they can edit, versioned when it changes, and tracked once it goes out.</p>
-          <p>The AI that drafts the language runs on our servers, under our key. Nothing to install, nothing for your people to configure.</p>
+          <p>Someone picks a template, fills in the job, and a finished Word document comes out in the company&rsquo;s format and voice &mdash; scope language, exclusions, inclusions, the lot. Editable afterward, because a proposal you can&rsquo;t adjust in the truck is useless.</p>
+          <p>Two things make it hold up over time. The legal and terms block lives in code rather than in the prompt, so it is identical on every proposal and the AI cannot quietly reword it. And the AI returns structured data against a fixed schema, not loose prose, so the document assembles the same way every time.</p>
         </div>
         <ul class="steplist">
-          <li><span class="k">01</span><span>Pick the template — reroof, siding, multifamily turn, whatever you actually sell.</span></li>
+          <li><span class="k">01</span><span>Pick the template &mdash; reroof, siding, turn, whatever you actually sell.</span></li>
           <li><span class="k">02</span><span>Fill in the job: property, scope, quantities, terms.</span></li>
-          <li><span class="k">03</span><span>The hub drafts it in your voice, on your letterhead.</span></li>
-          <li><span class="k">04</span><span>Edit, save, send. Status follows it to accepted or declined.</span></li>
+          <li><span class="k">03</span><span>Finished Word document, your format, your voice.</span></li>
+          <li><span class="k">04</span><span>Edit, send, track. Saved and logged against whoever made it.</span></li>
         </ul>
       </div>
 
       <div class="cap-grid">
-        <div class="cap">
-          <span class="tag">Estimating</span>
-          <h3>Estimating tools that match how you bid</h3>
-          <p>Unit pricing, takeoff math, markup and margin rules built to your numbers — so the estimate and the proposal come from the same place and can't drift apart.</p>
-          <ul><li>unit &amp; assembly pricing</li><li>markup rules</li><li>margin check</li><li>revision history</li></ul>
+        <div class="cap star">
+          <span class="tag">Crew scopes &mdash; the one people don&rsquo;t expect</span>
+          <h3>Upload the proposal, get the scope in English and Spanish</h3>
+          <p>Drop in the signed proposal and it writes the scope of work for the crew doing it &mdash; in both languages, side by side. No one retypes it, no one translates it in the parking lot, and the people swinging the hammers read it in the language they think in.</p>
+          <div class="lang"><span>English</span><span>Espa&ntilde;ol</span></div>
         </div>
         <div class="cap">
-          <span class="tag">Entry forms</span>
-          <h3>Structured forms instead of text threads</h3>
-          <p>Pre-project meeting checklists, site surveys, punch lists, change order requests, warranty intake. The process from the first half, turned into fields people actually fill in.</p>
-          <ul><li>required fields</li><li>photo upload</li><li>phone-friendly</li><li>exports</li></ul>
+          <span class="tag">Estimating</span>
+          <h3>Four trades, takeoff to priced workbook</h3>
+          <p>Roofing, siding, gutter and painting. Feed in the takeoff report, get a priced Excel workbook back. Rates and markups live on an admin screen the owner controls &mdash; not in a spreadsheet on one estimator&rsquo;s desktop.</p>
+          <ul><li>takeoff parsing</li><li>unit &amp; assembly pricing</li><li>markup rules</li><li>xlsx out</li></ul>
+        </div>
+        <div class="cap">
+          <span class="tag">Field &amp; pre-job</span>
+          <h3>Checklists and reports that produce a document</h3>
+          <p>Site visit reports, pre-mobilization checklists, punch lists, change order requests. Structured fields instead of a text thread, and a real document at the end that you can send to the client.</p>
+          <ul><li>required fields</li><li>photo upload</li><li>phone-friendly</li><li>Word output</li></ul>
         </div>
         <div class="cap">
           <span class="tag">Tracking</span>
-          <h3>A scaled-down CRM, not a second job</h3>
-          <p>Clients, properties, and jobs in one list, with proposal status attached. Enough to answer "where does this stand" without asking your team to feed a system that doesn't feed them back.</p>
-          <ul><li>client &amp; property records</li><li>draft / sent / accepted</li><li>owner &amp; date</li><li>simple reporting</li></ul>
+          <h3>Everything saved, logged, and findable</h3>
+          <p>Every document generated is stored in a shared vault with a log of who made it and when. Clients and properties in one searchable list. A live pipeline board the whole team edits at once, so &ldquo;where does this stand&rdquo; has one answer.</p>
+          <ul><li>document vault</li><li>client records</li><li>draft / sent / accepted</li><li>shared board</li></ul>
         </div>
-        <div class="cap">
-          <span class="tag">Follow-up</span>
-          <h3>Follow-up that fires on its own</h3>
-          <p>Scheduled emails and reminders so a sent proposal doesn't sit for three weeks because the person who sent it got pulled onto a roof.</p>
-          <ul><li>reminder schedules</li><li>templated emails</li><li>nudge on no-response</li><li>stops when accepted</li></ul>
+      </div>
+
+      <p class="note-line">Nothing here is a chatbot bolted onto a website. The AI runs on our servers, under our key, and its output lands inside a document your client would recognize. Your team never sees a prompt.</p>
+    </div>
+  </section>
+
+  <section class="sec" id="next">
+    <div class="wrap">
+      <div class="rule-head"><span class="eyebrow">What becomes possible</span><span class="line"></span></div>
+      <div class="sec-intro">
+        <h2>The build is the cheap part now. The question is what your business actually needs.</h2>
+        <p>Each of the following has been built at least once and works. None of it is sitting on a shelf waiting for you &mdash; it would be built around your process, the same as everything else. Listed here so you know what to ask for, because most people don&rsquo;t ask for what they don&rsquo;t know is possible.</p>
+      </div>
+
+      <div class="next-list">
+        <div class="next-item">
+          <span class="k">Training</span>
+          <h3>A curriculum that runs itself</h3>
+          <p>Weeks of structured training a new hire works through at their own pace, with roleplay against a realistic client, graded against a rubric, and sign-off for whoever&rsquo;s supervising them. Onboarding stops depending on who happens to have time.</p>
+        </div>
+        <div class="next-item">
+          <span class="k">Knowledge</span>
+          <h3>Ask the company a question</h3>
+          <p>Closed-book answers drawn only from your own approved material, so nobody gets a confident invention. Someone senior approves what goes in. Questions it couldn&rsquo;t answer get logged &mdash; and that list is your SOP backlog, written by your own team without anyone having to ask them.</p>
+        </div>
+        <div class="next-item">
+          <span class="k">Compliance</span>
+          <h3>Expiry dates that chase themselves</h3>
+          <p>Certificates of insurance read straight off the document, dates tracked, and a nudge before one lapses &mdash; instead of finding out when a trade partner is already on site.</p>
+        </div>
+        <div class="next-item">
+          <span class="k">Voice</span>
+          <h3>Output that gets closer to your best person</h3>
+          <p>Compare what the system drafted against what your best estimator actually sent, and feed the difference back in. The proposals sound more like your company in month six than they did in month one.</p>
+        </div>
+        <div class="next-item">
+          <span class="k">Follow-up</span>
+          <h3>The nudge that doesn&rsquo;t depend on remembering</h3>
+          <p>Scheduled reminders and templated emails so a sent proposal doesn&rsquo;t sit for three weeks because the person who sent it got pulled onto a roof. Stops on its own when the job is accepted.</p>
+        </div>
+        <div class="next-item">
+          <span class="k">Visibility</span>
+          <h3>Digests, recaps, and whether anyone is using it</h3>
+          <p>A daily digest of what moved and a weekly recap for leadership. Plus an honest adoption view for the owner &mdash; because software nobody opens is worse than no software, and you should be able to see that in week two, not year two.</p>
         </div>
       </div>
     </div>
@@ -471,30 +544,31 @@ section{scroll-margin-top:78px}
 
   <section class="sec" id="how">
     <div class="wrap">
-      <div class="rule-head"><span class="eyebrow">Getting started</span><span class="line"></span></div>
+      <div class="rule-head"><span class="eyebrow">How we work together</span><span class="line"></span></div>
       <div class="sec-intro">
-        <h2>Four steps, and none of them are yours to manage.</h2>
+        <h2>It starts with a conversation, not a contract.</h2>
+        <p>You will know what this costs and what it does before you commit to anything. Nobody builds software for you off a form submission.</p>
       </div>
       <div class="steps">
         <div class="step">
           <span class="n">01</span>
-          <h3>We learn how you work now</h3>
-          <p>A conversation with the people doing the job, and a look at the documents you send today.</p>
+          <h3>We strategize with you</h3>
+          <p>A working session with the owner. How the business actually runs, what your people spend their days on, where the time leaks, and what you want the company to look like in two years.</p>
         </div>
         <div class="step">
           <span class="n">02</span>
-          <h3>We write down the process</h3>
-          <p>One page: how a job goes from call to signed. You keep it whether or not we build anything.</p>
+          <h3>We show you where we&rsquo;d help</h3>
+          <p>A straight answer on what should be systemized, what software would earn its place, and what you should fix on paper first. Including the parts we&rsquo;d tell you not to build.</p>
         </div>
         <div class="step">
           <span class="n">03</span>
-          <h3>We build your hub</h3>
-          <p>Your templates, your fields, your branding, live at your own subdomain. A working version early, not at the end.</p>
+          <h3>You get a quote</h3>
+          <p>Scope and price in writing before anything gets built. You decide what&rsquo;s worth doing and what waits. No surprise invoices, no open-ended hourly.</p>
         </div>
         <div class="step">
           <span class="n">04</span>
-          <h3>We keep it running</h3>
-          <p>Hosting, updates, and changes as the business changes. You call, it gets fixed.</p>
+          <h3>We build it and keep it running</h3>
+          <p>A working version in front of you early, not at the end. Then hosting, updates, and changes as the business changes. You call, it gets fixed.</p>
         </div>
       </div>
     </div>
@@ -521,7 +595,7 @@ section{scroll-margin-top:78px}
       <div class="cta-panel">
         <div>
           <h2>Tell us how the job actually gets done.</h2>
-          <p>If you can describe the document your people recreate every week, or the handoff that keeps dropping, we can usually tell you on the first call whether this is worth doing. No pitch deck, no pricing sheet to sit through — we'd rather hear about the work.</p>
+          <p>If you can describe the document your people recreate every week, or the handoff that keeps dropping, we can usually tell you on the first call whether this is worth doing. That first conversation is a strategy session, not a demo — and you get a quote in writing before anything gets built. No pitch deck, no pricing sheet to sit through. We'd rather hear about the work.</p>
         </div>
         <div class="contact-list">
           <div class="contact-row">
@@ -530,7 +604,7 @@ section{scroll-margin-top:78px}
           </div>
           <div class="contact-row">
             <span class="lab">What to include</span>
-            <p style="font-size:.95rem;color:var(--ink-2)">Your trade, roughly how many people would log in, and the one part of the process that wastes the most time.</p>
+            <p style="font-size:.95rem;color:var(--ink-2)">Your trade, roughly how many people would log in, and the one part of the process that wastes the most time every week.</p>
           </div>
         </div>
       </div>
@@ -544,7 +618,8 @@ section{scroll-margin-top:78px}
     <span>PureForge — process &amp; internal software for trade &amp; property companies</span>
     <span class="spacer"></span>
     <a href="#process">How we work</a>
-    <a href="#build">What we build</a>
+    <a href="#build">What it does</a>
+    <a href="#next">What&rsquo;s possible</a>
     <a href="mailto:info@pureforge.dev">Contact</a>
   </div>
 </footer>
