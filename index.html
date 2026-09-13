@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PureForge</title>
-<meta name="description" content="PureForge helps growing trade and property companies write down how they work, then builds the software to run it: estimating, proposals, crew scopes in two languages, checklists, job tracking and training. Built and hosted for you.">
-<meta property="og:title" content="PureForge — internal software for trade and property companies">
+<meta name="description" content="PureForge helps growing trade and service companies write down how they work, then builds the software to run it: estimating, proposals, crew scopes in two languages, checklists, job tracking and training. Built and hosted for you.">
+<meta property="og:title" content="PureForge — process and internal software for trade and service companies">
 <meta property="og:description" content="Estimating, proposals, crew scopes in English and Spanish, checklists, job tracking and training. One place your team logs into. Built on a hub already in daily use inside a working contractor.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.pureforge.dev/">
@@ -322,6 +322,13 @@ section{scroll-margin-top:78px}
 .next-item h3{font-size:1.03rem}
 .next-item p{font-size:.95rem;color:var(--ink-2)}
 .next-item .k{font-family:var(--mono);font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+.measure-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.measure-list li{
+  padding:11px 0;border-bottom:1px solid var(--line);font-size:.95rem;color:var(--ink-2);
+  display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;
+}
+.measure-list li:last-child{border-bottom:none}
+.measure-list .m{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
 .note-line{
   margin-top:30px;padding:16px 20px;border-left:3px solid var(--accent);
   background:var(--surface-2);font-size:.96rem;color:var(--ink-2);border-radius:0 8px 8px 0;
@@ -352,9 +359,9 @@ section{scroll-margin-top:78px}
   <section class="hero">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <span class="eyebrow">Process &amp; internal software for trade &amp; property companies</span>
+        <span class="eyebrow">Process &amp; internal software for trade &amp; service companies</span>
         <h1>The way your best people work shouldn&rsquo;t live only in their heads.</h1>
-        <p class="lede">PureForge helps trade and property companies write down how they actually do the job, then builds the software that runs it. Estimates, proposals, crew scopes, checklists, job tracking and training &mdash; in one place your team logs into. You get hours back every week, and a company that keeps moving when someone is out.</p>
+        <p class="lede">PureForge helps trade and service companies write down how they actually do the job, then builds the software that runs it. Estimates, proposals, crew scopes, checklists, job tracking and training &mdash; in one place your team logs into. You get hours back every week, and a company that keeps moving when someone is out.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#contact">Start a conversation</a>
           <a class="btn btn-ghost" href="#build">See what it does</a>
@@ -500,10 +507,27 @@ section{scroll-margin-top:78px}
         <div class="cap">
           <span class="tag">Tracking</span>
           <h3>One answer to &ldquo;where does this stand&rdquo;</h3>
-          <p>Clients, properties and jobs in one searchable list. A shared board the whole team edits at once. Every document that gets made is saved with a record of who made it and when.</p>
+          <p>Clients, sites and jobs in one searchable list. A shared board the whole team edits at once. Every document that gets made is saved with a record of who made it and when, so the history of a job is one click instead of three phone calls.</p>
           <ul><li>client records</li><li>shared board</li><li>draft / sent / accepted</li><li>document storage</li></ul>
         </div>
 
+      </div>
+
+      <div class="cap-lead" style="background:var(--surface-2);margin-top:20px">
+        <div>
+          <span class="flag">Worth knowing</span>
+          <h3>When the hub is yours, it counts what you decide matters</h3>
+          <p>Software you buy off the shelf measures what the software company thought was important. Build your own and it tracks the handful of things you actually manage your business by.</p>
+          <p>Most companies only ever see the numbers that show up too late &mdash; revenue, margin, the year-end. Those tell you what already happened. The useful ones are the few things that happen first every week and tell you what&rsquo;s coming. Because your people are already doing the work inside the hub, those numbers come out of the normal day. Nobody has to keep a separate spreadsheet to produce them.</p>
+        </div>
+        <ul class="measure-list">
+          <li><span class="m"></span><span>Quotes out per person, per week</span></li>
+          <li><span class="m"></span><span>Days from site visit to quote sent</span></li>
+          <li><span class="m"></span><span>Open quotes with no follow-up in ten days</span></li>
+          <li><span class="m"></span><span>Work found on a visit that actually got quoted</span></li>
+          <li><span class="m"></span><span>Estimated cost against what the job really cost</span></li>
+          <li><span class="m"></span><span>Training finished before a new hire is on their own</span></li>
+        </ul>
       </div>
 
       <p class="note-line">None of this is a chatbot. Your team never sees a prompt and never has to learn anything about AI. They fill in a form and get a document back that your client would recognize.</p>
@@ -589,7 +613,7 @@ section{scroll-margin-top:78px}
     <div class="wrap origin">
       <div>
         <div class="rule-head"><span class="eyebrow">Where this came from</span><span class="line"></span></div>
-        <blockquote>PureForge started as an internal tool inside a working property services company, built because writing the same documents from scratch was costing real hours every week. It&rsquo;s in daily use there.</blockquote>
+        <blockquote>PureForge started as an internal tool inside a working contractor, built because writing the same documents from scratch was costing real hours every week. It&rsquo;s in daily use there.</blockquote>
         <p class="attrib">Built in the field, not in a demo</p>
       </div>
       <div class="facts">
@@ -626,7 +650,7 @@ section{scroll-margin-top:78px}
 
 <footer class="site-foot">
   <div class="wrap foot-bar">
-    <span>PureForge &mdash; process &amp; internal software for trade &amp; property companies</span>
+    <span>PureForge &mdash; process &amp; internal software for trade &amp; service companies</span>
     <span class="spacer"></span>
     <a href="#process">How we work</a>
     <a href="#build">What it does</a>
