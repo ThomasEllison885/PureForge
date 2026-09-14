@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridgeline Exteriors — Hub (PureForge demo)</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="A working demonstration of a PureForge hub, using an invented company and invented data.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231F4E68'/%3E%3Cg transform='translate(32,32) scale(0.9) translate(-32,-32)'%3E%3Cpath d='M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#EEF1F3; --surface:#FFFFFF; --surface-2:#F5F7F8; --sidebar:#14212A;
+  --sidebar-2:#1D2F3B; --sidebar-ink:#C6D4DC; --sidebar-ink-2:#7C93A1;
+  --ink:#13181C; --ink-2:#3C474E; --ink-3:#6B7A83;
+  --line:#D6DCE0; --line-2:#E6EAED;
+  --accent:#1F4E68; --accent-soft:#DCE8EE; --accent-ink:#FFFFFF;
+  --ember:#B4501F; --ember-soft:#F7E6DB;
+  --good:#2F6B4F; --good-soft:#DEEDE4;
+  --warn:#8A6A12; --warn-soft:#F6EDD4;
+  --radius:10px;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.015em}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+a{color:inherit}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- demo banner ---------- */
+.demobar{
+  background:var(--ember);color:#fff;font-family:var(--mono);font-size:.72rem;
+  letter-spacing:.08em;text-transform:uppercase;padding:7px 16px;text-align:center;
+}
+.demobar b{font-weight:600}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 32px)}
+@media (max-width:860px){.shell{grid-template-columns:1fr}}
+
+.side{background:var(--sidebar);color:var(--sidebar-ink);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+@media (max-width:860px){.side{padding:14px}}
+.side .co{display:flex;align-items:center;gap:11px;padding:0 8px}
+.side .co .logo{
+  width:36px;height:36px;border-radius:8px;background:var(--sidebar-2);flex:none;
+  display:grid;place-items:center;font-family:var(--display);font-weight:800;
+  font-size:.82rem;color:#fff;letter-spacing:.02em;
+}
+.side .co .nm{font-family:var(--display);font-weight:700;font-size:.95rem;color:#fff;line-height:1.2}
+.side .co .sub{font-family:var(--mono);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sidebar-ink-2);margin-top:3px}
+
+.side nav{display:flex;flex-direction:column;gap:2px}
+@media (max-width:860px){.side nav{flex-direction:row;flex-wrap:wrap;gap:6px}}
+.side nav button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:0;color:var(--sidebar-ink);padding:9px 10px;border-radius:7px;
+  font-size:.91rem;
+}
+@media (max-width:860px){.side nav button{width:auto;font-size:.85rem;padding:7px 10px}}
+.side nav button:hover{background:var(--sidebar-2);color:#fff}
+.side nav button[aria-current="page"]{background:var(--sidebar-2);color:#fff;font-weight:600}
+.side nav .ic{width:16px;height:16px;flex:none;opacity:.9}
+.side .who{margin-top:auto;border-top:1px solid var(--sidebar-2);padding-top:14px;display:flex;align-items:center;gap:10px}
+@media (max-width:860px){.side .who{display:none}}
+.side .who .av{width:30px;height:30px;border-radius:50%;background:var(--sidebar-2);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:.75rem;color:#fff}
+.side .who .n{font-size:.85rem;color:#fff}
+.side .who .r{font-family:var(--mono);font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--sidebar-ink-2)}
+
+.main{padding:26px clamp(16px,3vw,34px) 60px;min-width:0}
+.viewhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.viewhead h1{font-size:1.6rem;font-weight:800}
+.viewhead .sub{color:var(--ink-3);font-size:.93rem;margin-top:4px}
+.viewhead .right{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:8px;
+  padding:9px 16px;font-size:.9rem;font-weight:600;text-decoration:none;
+}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-g{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-g:hover{border-color:var(--ink-3)}
+
+/* ---------- cards / tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:24px}
+@media (max-width:1050px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px}
+.tile .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.tile .val{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1.1;margin-top:8px;font-variant-numeric:tabular-nums}
+.tile .note{font-size:.82rem;color:var(--ink-3);margin-top:6px}
+.tile .note.up{color:var(--good)}
+.tile .note.down{color:var(--ember)}
+.spark{margin-top:10px;display:block;width:100%;height:30px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.panel > header{
+  padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
+}
+.panel > header h2{font-size:1rem;font-weight:700}
+.panel > header .r{margin-left:auto;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.panel .body{padding:18px}
+.cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:960px){.cols{grid-template-columns:1fr}}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{
+  text-align:left;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:500;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+th.num{text-align:right}
+.who-cell{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.who-cell .av{
+  width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);font-family:var(--display);font-weight:700;font-size:.68rem;
+}
+.prop{font-weight:600}
+.sm{font-size:.8rem;color:var(--ink-3)}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.66rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;white-space:nowrap;
+}
+.chip::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.chip.accepted{background:var(--good-soft);color:var(--good)}
+.chip.sent{background:var(--accent-soft);color:var(--accent)}
+.chip.draft{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.chip.stale{background:var(--warn-soft);color:var(--warn)}
+.chip.declined{background:var(--ember-soft);color:var(--ember)}
+
+/* ---------- form ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-family:var(--mono);font-size:.67rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.field input,.field select,.field textarea{
+  font:inherit;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:var(--ink);width:100%;
+}
+.field textarea{min-height:74px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.row2{grid-template-columns:1fr}}
+.checks{display:flex;flex-wrap:wrap;gap:8px}
+.checks label{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;
+  padding:7px 11px;font-size:.87rem;background:var(--surface);cursor:pointer;
+}
+.checks input{accent-color:var(--accent)}
+
+/* ---------- generated document ---------- */
+.docout{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.docout .head{border-bottom:2px solid var(--accent);padding-bottom:12px;margin-bottom:16px;display:flex;align-items:flex-end;gap:12px}
+.docout .head .c{font-family:var(--display);font-weight:800;font-size:1.05rem}
+.docout .head .n{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+.docout h4{font-family:var(--mono);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 7px}
+.docout p{font-size:.9rem;color:var(--ink-2);margin-bottom:8px}
+.docout ul{margin:0 0 8px;padding-left:18px;font-size:.9rem;color:var(--ink-2)}
+.docout li{margin-bottom:4px}
+.bilingual{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+@media (max-width:760px){.bilingual{grid-template-columns:1fr}}
+.bilingual > div{padding:18px;background:var(--surface)}
+.bilingual > div:first-child{border-right:1px solid var(--line)}
+@media (max-width:760px){.bilingual > div:first-child{border-right:none;border-bottom:1px solid var(--line)}}
+.bilingual .lang{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);display:inline-block;padding:3px 9px;border-radius:999px;margin-bottom:12px}
+
+.working{display:flex;align-items:center;gap:11px;font-size:.9rem;color:var(--ink-2);padding:26px 0;justify-content:center}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+.actlist{display:flex;flex-direction:column}
+.act{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:.88rem}
+.act:last-child{border-bottom:none}
+.act .d{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px}
+.act .t{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);white-space:nowrap}
+.act b{font-weight:600}
+
+.progress{height:6px;background:var(--line-2);border-radius:999px;overflow:hidden;margin-top:8px}
+.progress span{display:block;height:100%;background:var(--accent);border-radius:999px}
+
+.callout{
+  font-size:.85rem;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent);
+  padding:12px 14px;border-radius:0 8px 8px 0;margin-top:16px;
+}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.minicard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.minicard h3{font-size:.98rem;font-weight:700;margin-bottom:6px}
+.minicard p{font-size:.87rem;color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<div class="demobar">
+  <b>Demonstration</b> &nbsp;·&nbsp; Ridgeline Exteriors is an invented company. Every name, number and document on this page is made up.
+</div>
+
+<div class="shell">
+
+  <aside class="side">
+    <div class="co">
+      <span class="logo">RE</span>
+      <div>
+        <div class="nm">Ridgeline Exteriors</div>
+        <div class="sub">Company hub</div>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <button data-view="dash" aria-current="page">Dashboard</button>
+      <button data-view="proposals">Proposals</button>
+      <button data-view="estimating">Estimating</button>
+      <button data-view="scopes">Crew scopes</button>
+      <button data-view="training">Training</button>
+      <button data-view="admin">Admin</button>
+    </nav>
+
+    <div class="who">
+      <span class="av">DM</span>
+      <div>
+        <div class="n">Dave Marchetti</div>
+        <div class="r">Owner</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ================= DASHBOARD ================= -->
+    <section class="view" id="view-dash">
+      <div class="viewhead">
+        <div>
+          <h1>Monday, 14 September</h1>
+          <p class="sub">Four quotes went out last week. Two are sitting without a follow-up.</p>
+        </div>
+        <div class="right">
+          <button class="btn btn-p" data-go="proposals-new">New proposal</button>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile">
+          <div class="lab">Quotes out · this week</div>
+          <div class="val">7</div>
+          <div class="note up">Up from 4 last week</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,22 20,20 40,24 60,16 80,18 100,12 120,6" fill="none" stroke="#1F4E68" stroke-width="2"/>
+            <circle cx="120" cy="6" r="3" fill="#1F4E68"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Site visit → quote</div>
+          <div class="val">1.8 <span style="font-size:1rem;font-weight:600;color:var(--ink-3)">days</span></div>
+          <div class="note up">Was 5.4 in March</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,6 20,9 40,8 60,14 80,17 100,21 120,24" fill="none" stroke="#2F6B4F" stroke-width="2"/>
+            <circle cx="120" cy="24" r="3" fill="#2F6B4F"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">No follow-up · 10+ days</div>
+          <div class="val">2</div>
+          <div class="note down">$84,200 sitting</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,14 20,10 40,16 60,12 80,20 100,18 120,15" fill="none" stroke="#B4501F" stroke-width="2"/>
+            <circle cx="120" cy="15" r="3" fill="#B4501F"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Found work quoted</div>
+          <div class="val">71%</div>
+          <div class="callout">Of service visits, last 30 days</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,24 20,22 40,19 60,17 80,13 100,11 120,9" fill="none" stroke="#1F4E68" stroke-width="2"/>
+            <circle cx="120" cy="9" r="3" fill="#1F4E68"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Needs attention</h2><span class="r">3 items</span></header>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Job</th><th>Owner</th><th>Status</th><th class="num">Value</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div class="prop">Maple Ridge — Building C reroof</div><div class="sm">Sent 14 days ago, no reply</div></td>
+                  <td><div class="who-cell"><span class="av">JT</span>Jim T.</div></td>
+                  <td><span class="chip stale">Gone quiet</span></td>
+                  <td class="num">$163,800</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Huntley Commons — siding, 3 bldgs</div><div class="sm">Sent 11 days ago, no reply</div></td>
+                  <td><div class="who-cell"><span class="av">AR</span>Ana R.</div></td>
+                  <td><span class="chip stale">Gone quiet</span></td>
+                  <td class="num">$84,200</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Carter St — gutter replacement</div><div class="sm">Draft started 6 days ago</div></td>
+                  <td><div class="who-cell"><span class="av">JT</span>Jim T.</div></td>
+                  <td><span class="chip draft">Unfinished draft</span></td>
+                  <td class="num">$11,450</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Recent activity</h2></header>
+          <div class="body">
+            <div class="actlist">
+              <div class="act"><span class="d"></span><span><b>Ana R.</b> generated a crew scope for Westbrook Apartments, English + Spanish</span><span class="t">8:42a</span></div>
+              <div class="act"><span class="d"></span><span><b>Jim T.</b> priced a siding takeoff — 14,200 sq ft</span><span class="t">Fri</span></div>
+              <div class="act"><span class="d"></span><span><b>Maple Ridge</b> Building B marked <b>accepted</b> — $147,300</span><span class="t">Fri</span></div>
+              <div class="act"><span class="d"></span><span><b>Dave M.</b> updated gutter pricing defaults</span><span class="t">Thu</span></div>
+              <div class="act"><span class="d"></span><span><b>Luis O.</b> finished week 3 of field PM training</span><span class="t">Thu</span></div>
+              <div class="act"><span class="d"></span><span><b>Ana R.</b> filed a site visit report for Carter St</span><span class="t">Wed</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PROPOSALS ================= -->
+    <section class="view" id="view-proposals" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Proposals</h1>
+          <p class="sub">Everything the team has sent, with where it stands.</p>
+        </div>
+        <div class="right">
+          <button class="btn btn-p" data-go="proposals-new">New proposal</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <header><h2>All proposals</h2><span class="r">Showing 8 of 214</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Number</th><th>Job</th><th>Owner</th><th>Status</th><th class="num">Value</th><th class="num">Age</th></tr></thead>
+            <tbody id="proposal-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= NEW PROPOSAL ================= -->
+    <section class="view" id="view-proposals-new" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>New proposal</h1>
+          <p class="sub">Fill in the job. The document comes out in Ridgeline's format and wording.</p>
+        </div>
+        <div class="right">
+          <button class="btn btn-g" data-go="proposals">Back to list</button>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Job details</h2></header>
+          <div class="body">
+            <div class="row2">
+              <div class="field"><label for="f-client">Client</label>
+                <input id="f-client" value="Westbrook Apartments"></div>
+              <div class="field"><label for="f-contact">Contact</label>
+                <input id="f-contact" value="Karen Beale, Property Manager"></div>
+            </div>
+            <div class="field"><label for="f-addr">Property address</label>
+              <input id="f-addr" value="1490 Westbrook Dr, Building 4"></div>
+            <div class="row2">
+              <div class="field"><label for="f-type">Property type</label>
+                <select id="f-type"><option>Apartment community</option><option>Condominium</option><option>Commercial</option><option>HOA</option></select></div>
+              <div class="field"><label for="f-tpl">Template</label>
+                <select id="f-tpl"><option>Standard</option><option>Comprehensive</option></select></div>
+            </div>
+            <div class="field"><label>Scope</label>
+              <div class="checks">
+                <label><input type="checkbox" checked> Tear-off</label>
+                <label><input type="checkbox" checked> Shingle roof</label>
+                <label><input type="checkbox"> TPO</label>
+                <label><input type="checkbox" checked> Gutters</label>
+                <label><input type="checkbox"> Siding</label>
+                <label><input type="checkbox" checked> Flashing</label>
+              </div>
+            </div>
+            <div class="field"><label for="f-notes">What the owner told you</label>
+              <textarea id="f-notes">Three units reporting ceiling stains after the August storms. Roof is 22 years old, second layer. Board wants it done before winter and asked about doing all four buildings over two seasons.</textarea></div>
+            <div class="row2">
+              <div class="field"><label for="f-qty">Squares</label><input id="f-qty" value="86"></div>
+              <div class="field"><label for="f-total">Contract total</label><input id="f-total" value="$74,900"></div>
+            </div>
+            <button class="btn btn-p" id="gen-btn" style="width:100%;justify-content:center">Generate proposal</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Document</h2><span class="r" id="gen-state">Not generated</span></header>
+          <div class="body">
+            <p class="sm" id="gen-empty">Fill in the job and press generate. The scope language, exclusions and terms come from Ridgeline's own templates — the wording is theirs, not a generic template.</p>
+            <div id="gen-working" hidden>
+              <div class="working"><span class="spin"></span> Writing the proposal…</div>
+            </div>
+            <div id="gen-out" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ESTIMATING ================= -->
+    <section class="view" id="view-estimating" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Estimating</h1>
+          <p class="sub">Takeoff in, priced workbook out. Rates come from the admin screen, not a spreadsheet.</p>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Roofing takeoff</h2><span class="r">From EagleView report</span></header>
+          <div class="body">
+            <div class="row2">
+              <div class="field"><label for="e-sq">Squares</label><input id="e-sq" value="86"></div>
+              <div class="field"><label for="e-pitch">Predominant pitch</label><input id="e-pitch" value="6/12"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="e-layers">Existing layers</label><select id="e-layers"><option>2</option><option>1</option><option>3</option></select></div>
+              <div class="field"><label for="e-ridge">Ridge / hip (lf)</label><input id="e-ridge" value="412"></div>
+            </div>
+            <div class="field"><label for="e-eave">Eave / rake (lf)</label><input id="e-eave" value="688"></div>
+            <button class="btn btn-p" id="price-btn" style="width:100%;justify-content:center">Price it</button>
+            <div class="callout">Change a rate once on the admin screen and every estimate after it uses the new number. Nobody is working from a stale copy.</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Priced estimate</h2><span class="r" id="price-state">Waiting</span></header>
+          <div class="body" style="padding:0">
+            <div id="price-empty" style="padding:18px"><p class="sm">Enter the takeoff numbers and press price it.</p></div>
+            <div id="price-working" hidden><div class="working"><span class="spin"></span> Calculating…</div></div>
+            <div id="price-out" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CREW SCOPES ================= -->
+    <section class="view" id="view-scopes" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Crew scopes</h1>
+          <p class="sub">The signed proposal becomes a work scope for the crew, in both languages.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Build a scope</h2></header>
+        <div class="body">
+          <div class="row2">
+            <div class="field"><label for="s-job">From proposal</label>
+              <select id="s-job">
+                <option>RE-2418 — Maple Ridge, Building C reroof</option>
+                <option>RE-2416 — Westbrook Apartments, Building 4</option>
+                <option>RE-2411 — Huntley Commons, siding</option>
+              </select></div>
+            <div class="field"><label for="s-crew">Crew lead</label><input id="s-crew" value="Luis Ontiveros"></div>
+          </div>
+          <button class="btn btn-p" id="scope-btn">Generate scope</button>
+        </div>
+      </div>
+
+      <div id="scope-working" hidden><div class="working"><span class="spin"></span> Writing the scope in English and Spanish…</div></div>
+      <div id="scope-out" hidden></div>
+    </section>
+
+    <!-- ================= TRAINING ================= -->
+    <section class="view" id="view-training" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Training</h1>
+          <p class="sub">New people work through it at their own pace. Their manager signs off.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Who's in training</h2></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Person</th><th>Track</th><th>Progress</th><th>Last sign-off</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="who-cell"><span class="av">LO</span><div><div class="prop">Luis Ontiveros</div><div class="sm">Started 22 Aug</div></div></div></td>
+                <td>Field PM — 4 weeks</td>
+                <td style="min-width:180px">Week 3 of 4<div class="progress"><span style="width:72%"></span></div></td>
+                <td class="sm">Dave M. · 2 days ago</td>
+              </tr>
+              <tr>
+                <td><div class="who-cell"><span class="av">BK</span><div><div class="prop">Brandon Kerr</div><div class="sm">Started 2 Sep</div></div></div></td>
+                <td>Sales — 12 weeks</td>
+                <td style="min-width:180px">Week 2 of 12<div class="progress"><span style="width:17%"></span></div></td>
+                <td class="sm">Ana R. · 5 days ago</td>
+              </tr>
+              <tr>
+                <td><div class="who-cell"><span class="av">MS</span><div><div class="prop">Marcus Steel</div><div class="sm">Started 4 Aug</div></div></div></td>
+                <td>Sales — 12 weeks</td>
+                <td style="min-width:180px">Week 6 of 12<div class="progress"><span style="width:50%"></span></div></td>
+                <td class="sm">Ana R. · yesterday</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="minicard">
+          <h3>Week 3 — Walking a roof with an owner</h3>
+          <p>What to photograph, what to say about decking before you know, and how to answer "how long will it last" without guessing. Ends with a written summary the PM reviews.</p>
+        </div>
+        <div class="minicard">
+          <h3>Practice conversation</h3>
+          <p>Brandon has run the "board wants three bids" scenario four times. Best score 78. Sticking point: gives a number too early. Ana can see the transcript.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ADMIN ================= -->
+    <section class="view" id="view-admin" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Admin</h1>
+          <p class="sub">Owner only. Rates, people, and whether anyone is actually using this.</p>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Pricing defaults</h2><span class="r">Last changed Thursday</span></header>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Item</th><th>Unit</th><th class="num">Rate</th><th class="num">Markup</th></tr></thead>
+              <tbody>
+                <tr><td>Tear-off, per layer</td><td class="sm">square</td><td class="num">$62.00</td><td class="num">22%</td></tr>
+                <tr><td>Architectural shingle</td><td class="sm">square</td><td class="num">$318.00</td><td class="num">24%</td></tr>
+                <tr><td>Synthetic underlayment</td><td class="sm">square</td><td class="num">$41.50</td><td class="num">24%</td></tr>
+                <tr><td>Ridge vent</td><td class="sm">lf</td><td class="num">$14.75</td><td class="num">26%</td></tr>
+                <tr><td>Drip edge</td><td class="sm">lf</td><td class="num">$4.20</td><td class="num">26%</td></tr>
+                <tr><td>Decking replacement</td><td class="sm">sheet</td><td class="num">$96.00</td><td class="num">20%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="margin-bottom:14px">
+            <header><h2>People</h2><span class="r">6 active</span></header>
+            <div class="tablewrap">
+              <table>
+                <tbody>
+                  <tr><td><div class="who-cell"><span class="av">DM</span>Dave Marchetti</div></td><td class="sm">Owner</td></tr>
+                  <tr><td><div class="who-cell"><span class="av">AR</span>Ana Reyes</div></td><td class="sm">Sales manager</td></tr>
+                  <tr><td><div class="who-cell"><span class="av">JT</span>Jim Trask</div></td><td class="sm">Estimator</td></tr>
+                  <tr><td><div class="who-cell"><span class="av">LO</span>Luis Ontiveros</div></td><td class="sm">Field PM · in training</td></tr>
+                  <tr><td><div class="who-cell"><span class="av">BK</span>Brandon Kerr</div></td><td class="sm">Sales · in training</td></tr>
+                  <tr><td><div class="who-cell"><span class="av">MS</span>Marcus Steel</div></td><td class="sm">Sales</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <header><h2>Is anyone using it</h2><span class="r">Last 30 days</span></header>
+            <div class="body">
+              <div class="actlist">
+                <div class="act"><span class="d"></span><span>Ana R. — <b>opened 24 days</b>, 19 documents</span><span class="t">daily</span></div>
+                <div class="act"><span class="d"></span><span>Jim T. — <b>opened 21 days</b>, 31 estimates</span><span class="t">daily</span></div>
+                <div class="act"><span class="d"></span><span>Marcus S. — <b>opened 9 days</b>, 4 documents</span><span class="t">patchy</span></div>
+                <div class="act"><span class="d"></span><span>Luis O. — <b>opened 18 days</b>, mostly training</span><span class="t">weekly</span></div>
+              </div>
+              <div class="callout">Marcus opened it nine days out of thirty. That is a conversation to have, and you can see it in month one instead of finding out at renewal.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+var PROPOSALS = [
+  ['RE-2418','Maple Ridge — Building C reroof','Maple Ridge Apartments','JT','Jim T.','stale','Gone quiet','$163,800','14d'],
+  ['RE-2417','Westbrook — Building 4 reroof','Westbrook Apartments','AR','Ana R.','draft','Draft','$74,900','1d'],
+  ['RE-2416','Maple Ridge — Building B reroof','Maple Ridge Apartments','JT','Jim T.','accepted','Accepted','$147,300','9d'],
+  ['RE-2415','Huntley Commons — siding, 3 bldgs','Huntley Commons','AR','Ana R.','stale','Gone quiet','$84,200','11d'],
+  ['RE-2414','Carter St — gutter replacement','Carter Street Duplexes','JT','Jim T.','draft','Draft','$11,450','6d'],
+  ['RE-2413','Fairview Court — roof repair','Fairview Court HOA','MS','Marcus S.','sent','Sent','$8,900','4d'],
+  ['RE-2412','Pinecrest — flashing & sealant','Pinecrest Condominiums','AR','Ana R.','accepted','Accepted','$22,140','16d'],
+  ['RE-2411','Oakmont Plaza — TPO section','Oakmont Plaza','MS','Marcus S.','declined','Declined','$96,500','28d']
+];
+
+var tbody = document.getElementById('proposal-rows');
+if (tbody) {
+  tbody.innerHTML = PROPOSALS.map(function (p) {
+    return '<tr>' +
+      '<td class="sm" style="font-family:var(--mono)">' + p[0] + '</td>' +
+      '<td><div class="prop">' + p[1] + '</div><div class="sm">' + p[2] + '</div></td>' +
+      '<td><div class="who-cell"><span class="av">' + p[3] + '</span>' + p[4] + '</div></td>' +
+      '<td><span class="chip ' + p[5] + '">' + p[6] + '</span></td>' +
+      '<td class="num">' + p[7] + '</td>' +
+      '<td class="num sm">' + p[8] + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+/* ---------------- routing ---------------- */
+function show(view) {
+  var views = document.querySelectorAll('.view');
+  for (var i = 0; i < views.length; i++) views[i].hidden = true;
+  var el = document.getElementById('view-' + view);
+  if (el) el.hidden = false;
+  var btns = document.querySelectorAll('#nav button');
+  var base = view.split('-')[0];
+  for (var j = 0; j < btns.length; j++) {
+    if (btns[j].getAttribute('data-view') === base) btns[j].setAttribute('aria-current', 'page');
+    else btns[j].removeAttribute('aria-current');
+  }
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+document.getElementById('nav').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-view]');
+  if (b) show(b.getAttribute('data-view'));
+});
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-go]');
+  if (b) show(b.getAttribute('data-go'));
+});
+
+/* ---------------- generate proposal ---------------- */
+document.getElementById('gen-btn').addEventListener('click', function () {
+  var empty = document.getElementById('gen-empty');
+  var work = document.getElementById('gen-working');
+  var out = document.getElementById('gen-out');
+  var state = document.getElementById('gen-state');
+  empty.hidden = true; out.hidden = true; work.hidden = false; state.textContent = 'Working';
+
+  setTimeout(function () {
+    work.hidden = true;
+    state.textContent = 'Generated · 1.9s';
+    out.hidden = false;
+    out.innerHTML =
+      '<div class="docout">' +
+        '<div class="head"><span class="c">Ridgeline Exteriors</span><span class="n">PROPOSAL RE-2419</span></div>' +
+        '<p style="font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02rem">Roof replacement — Westbrook Apartments, Building 4</p>' +
+        '<p class="sm">1490 Westbrook Dr · Karen Beale, Property Manager · 14 September 2026</p>' +
+        '<h4>The situation</h4>' +
+        '<p>Three units in Building 4 have reported ceiling staining following the August storm events. The existing roof is approximately 22 years old and carries a second layer of shingles, which is at the end of its service life and beyond the point where spot repair is a reasonable investment.</p>' +
+        '<h4>What we will do</h4>' +
+        '<ul>' +
+          '<li>Remove both existing layers down to the deck and inspect all sheathing.</li>' +
+          '<li>Replace deteriorated decking as found, billed at the unit rate shown below.</li>' +
+          '<li>Install synthetic underlayment, ice and water shield at all eaves and valleys.</li>' +
+          '<li>Install architectural shingles, new drip edge, and ridge vent throughout.</li>' +
+          '<li>Reset and seal all penetrations; replace pipe boots.</li>' +
+          '<li>Full magnet sweep of grounds and parking at the end of each work day.</li>' +
+        '</ul>' +
+        '<h4>Working around residents</h4>' +
+        '<p>Residents receive written notice 48 hours before work begins on their building. Work runs 7:30am to 5:00pm weekdays. Parking closest to the building will be coned off each morning and reopened each evening.</p>' +
+        '<h4>Phasing the remaining buildings</h4>' +
+        '<p>You asked about the other three buildings. We can hold this square-foot pricing through 31 March 2027 if the board decides to schedule them across two seasons.</p>' +
+        '<h4>Investment</h4>' +
+        '<p style="font-family:var(--display);font-weight:800;font-size:1.3rem;color:var(--ink)">$74,900</p>' +
+        '<p class="sm">Decking replacement beyond 8 sheets billed at $96.00 per sheet. Workmanship warranty 10 years, manufacturer warranty 30 years.</p>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+        '<button class="btn btn-p">Download Word file</button>' +
+        '<button class="btn btn-g">Save as draft</button>' +
+        '<button class="btn btn-g">Regenerate, comprehensive</button>' +
+      '</div>' +
+      '<div class="callout">The terms, warranty language and resident-notice paragraph are fixed in the system. The AI wrote the situation and scope from the job details — it cannot change the contract language.</div>';
+  }, 1900);
+});
+
+/* ---------------- price estimate ---------------- */
+document.getElementById('price-btn').addEventListener('click', function () {
+  var empty = document.getElementById('price-empty');
+  var work = document.getElementById('price-working');
+  var out = document.getElementById('price-out');
+  var state = document.getElementById('price-state');
+  empty.hidden = true; out.hidden = true; work.hidden = false; state.textContent = 'Calculating';
+
+  setTimeout(function () {
+    work.hidden = true; state.textContent = 'Priced';
+    out.hidden = false;
+    var rows = [
+      ['Tear-off, 2 layers', '172 sq', '$62.00', '$10,664'],
+      ['Architectural shingle', '86 sq', '$318.00', '$27,348'],
+      ['Synthetic underlayment', '86 sq', '$41.50', '$3,569'],
+      ['Ice &amp; water shield', '688 lf', '$3.10', '$2,133'],
+      ['Ridge vent', '412 lf', '$14.75', '$6,077'],
+      ['Drip edge', '688 lf', '$4.20', '$2,890'],
+      ['Decking allowance', '8 sheets', '$96.00', '$768'],
+      ['Disposal', '6 ea', '$540.00', '$3,240']
+    ];
+    out.innerHTML =
+      '<div class="tablewrap"><table><thead><tr><th>Line</th><th>Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td>' + r[0] + '</td><td class="sm">' + r[1] + '</td><td class="num sm">' + r[2] + '</td><td class="num">' + r[3] + '</td></tr>';
+      }).join('') +
+      '<tr><td colspan="3" style="font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)">Cost</td><td class="num">$56,689</td></tr>' +
+      '<tr><td colspan="3" style="font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)">Markup, blended 24%</td><td class="num">$18,211</td></tr>' +
+      '<tr><td colspan="3" style="font-family:var(--display);font-weight:800">Sell price</td><td class="num" style="font-family:var(--display);font-weight:800;font-size:1.05rem">$74,900</td></tr>' +
+      '</tbody></table></div>' +
+      '<div style="padding:16px 18px;display:flex;gap:10px;flex-wrap:wrap">' +
+        '<button class="btn btn-p">Download Excel</button>' +
+        '<button class="btn btn-g" data-go="proposals-new">Start a proposal from this</button>' +
+      '</div>';
+  }, 1400);
+});
+
+/* ---------------- crew scope ---------------- */
+document.getElementById('scope-btn').addEventListener('click', function () {
+  var work = document.getElementById('scope-working');
+  var out = document.getElementById('scope-out');
+  out.hidden = true; work.hidden = false;
+
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+    out.innerHTML =
+      '<div class="panel"><header><h2>Crew scope — Maple Ridge, Building C</h2><span class="r">Crew lead: Luis Ontiveros</span></header>' +
+      '<div class="bilingual">' +
+        '<div>' +
+          '<span class="lang">English</span>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Before you start</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+            '<li>Park in the south lot only. Do not block the fire lane.</li>' +
+            '<li>Residents were notified Tuesday. Work is 7:30am to 5:00pm.</li>' +
+            '<li>Dumpster goes on the plywood by the north stairwell.</li>' +
+          '</ul>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">The work</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+            '<li>Tear off two layers down to the deck.</li>' +
+            '<li>Photograph any soft or damaged decking before you cover it. Tell the PM before replacing more than 8 sheets.</li>' +
+            '<li>Ice and water shield at all eaves and valleys, 6 feet up from the eave.</li>' +
+            '<li>Synthetic underlayment, then architectural shingle.</li>' +
+            '<li>New drip edge and ridge vent. Replace all pipe boots.</li>' +
+          '</ul>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Before you leave each day</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0">' +
+            '<li>Magnet sweep the lot and the grass on all sides.</li>' +
+            '<li>Reopen the parking spaces.</li>' +
+            '<li>Send the PM three photos of the day\'s work.</li>' +
+          '</ul>' +
+        '</div>' +
+        '<div>' +
+          '<span class="lang">Espa&ntilde;ol</span>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Antes de empezar</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+            '<li>Estacione solo en el lote sur. No bloquee el carril de bomberos.</li>' +
+            '<li>Se notific&oacute; a los residentes el martes. El horario es de 7:30am a 5:00pm.</li>' +
+            '<li>El contenedor va sobre la madera junto a la escalera norte.</li>' +
+          '</ul>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">El trabajo</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+            '<li>Retire las dos capas hasta llegar a la cubierta de madera.</li>' +
+            '<li>Tome fotos de cualquier madera blanda o da&ntilde;ada antes de taparla. Avise al PM antes de reemplazar m&aacute;s de 8 hojas.</li>' +
+            '<li>Barrera de hielo y agua en todos los aleros y valles, 6 pies desde el alero.</li>' +
+            '<li>Fieltro sint&eacute;tico, luego teja arquitect&oacute;nica.</li>' +
+            '<li>Borde de goteo nuevo y ventilaci&oacute;n de cumbrera. Reemplace todas las botas de tuber&iacute;a.</li>' +
+          '</ul>' +
+          '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Antes de irse cada d&iacute;a</p>' +
+          '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0">' +
+            '<li>Pase el im&aacute;n por el estacionamiento y el c&eacute;sped por todos lados.</li>' +
+            '<li>Abra de nuevo los espacios de estacionamiento.</li>' +
+            '<li>Env&iacute;e al PM tres fotos del trabajo del d&iacute;a.</li>' +
+          '</ul>' +
+        '</div>' +
+      '</div></div>' +
+      '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+        '<button class="btn btn-p">Download Word file</button>' +
+        '<button class="btn btn-g">Text it to the crew lead</button>' +
+      '</div>';
+  }, 1600);
+});
+</script>
+</body>
+</html>
