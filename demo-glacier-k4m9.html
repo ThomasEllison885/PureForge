@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glacier Industrial — hub mockup by PureForge</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="A demonstration mockup built by PureForge. Not a Glacier Industrial system. All data invented.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231F4E68'/%3E%3Cg transform='translate(32,32) scale(0.9) translate(-32,-32)'%3E%3Cpath d='M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+
+:root{
+  --ground:#EEF1F3; --surface:#FFFFFF; --surface-2:#F5F7F8; --sidebar:#14212A;
+  --sidebar-2:#1D2F3B; --sidebar-ink:#C6D4DC; --sidebar-ink-2:#7C93A1;
+  --ink:#13181C; --ink-2:#3C474E; --ink-3:#6B7A83;
+  --line:#D6DCE0; --line-2:#E6EAED;
+  --accent:#1F4E68; --accent-soft:#DCE8EE; --accent-ink:#FFFFFF;
+  --ember:#B4501F; --ember-soft:#F7E6DB;
+  --good:#2F6B4F; --good-soft:#DEEDE4;
+  --warn:#8A6A12; --warn-soft:#F6EDD4;
+  --radius:10px;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.015em}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+a{color:inherit}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- demo banner ---------- */
+.demobar{
+  background:var(--ember);color:#fff;font-family:var(--mono);font-size:.72rem;
+  letter-spacing:.08em;text-transform:uppercase;padding:7px 16px;text-align:center;
+}
+.demobar b{font-weight:600}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 32px)}
+@media (max-width:860px){.shell{grid-template-columns:1fr}}
+
+.side{background:var(--sidebar);color:var(--sidebar-ink);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+@media (max-width:860px){.side{padding:14px}}
+.side .co{display:flex;align-items:center;gap:11px;padding:0 8px}
+.side .co .logo{
+  width:36px;height:36px;border-radius:8px;background:var(--sidebar-2);flex:none;
+  display:grid;place-items:center;font-family:var(--display);font-weight:800;
+  font-size:.82rem;color:#fff;letter-spacing:.02em;
+}
+.side .co .nm{font-family:var(--display);font-weight:700;font-size:.95rem;color:#fff;line-height:1.2}
+.side .co .sub{font-family:var(--mono);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sidebar-ink-2);margin-top:3px}
+
+.side nav{display:flex;flex-direction:column;gap:2px}
+@media (max-width:860px){.side nav{flex-direction:row;flex-wrap:wrap;gap:6px}}
+.side nav button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:0;color:var(--sidebar-ink);padding:9px 10px;border-radius:7px;
+  font-size:.91rem;
+}
+@media (max-width:860px){.side nav button{width:auto;font-size:.85rem;padding:7px 10px}}
+.side nav button:hover{background:var(--sidebar-2);color:#fff}
+.side nav button[aria-current="page"]{background:var(--sidebar-2);color:#fff;font-weight:600}
+.side nav .ic{width:16px;height:16px;flex:none;opacity:.9}
+.side .who{margin-top:auto;border-top:1px solid var(--sidebar-2);padding-top:14px;display:flex;align-items:center;gap:10px}
+@media (max-width:860px){.side .who{display:none}}
+.side .who .av{width:30px;height:30px;border-radius:50%;background:var(--sidebar-2);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:.75rem;color:#fff}
+.side .who .n{font-size:.85rem;color:#fff}
+.side .who .r{font-family:var(--mono);font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--sidebar-ink-2)}
+
+.main{padding:26px clamp(16px,3vw,34px) 60px;min-width:0}
+.viewhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.viewhead h1{font-size:1.6rem;font-weight:800}
+.viewhead .sub{color:var(--ink-3);font-size:.93rem;margin-top:4px}
+.viewhead .right{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:8px;
+  padding:9px 16px;font-size:.9rem;font-weight:600;text-decoration:none;
+}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-p:hover{filter:brightness(1.08)}
+.btn-g{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-g:hover{border-color:var(--ink-3)}
+
+/* ---------- cards / tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:24px}
+@media (max-width:1050px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px}
+.tile .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.tile .val{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1.1;margin-top:8px;font-variant-numeric:tabular-nums}
+.tile .note{font-size:.82rem;color:var(--ink-3);margin-top:6px}
+.tile .note.up{color:var(--good)}
+.tile .note.down{color:var(--ember)}
+.spark{margin-top:10px;display:block;width:100%;height:30px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.panel > header{
+  padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
+}
+.panel > header h2{font-size:1rem;font-weight:700}
+.panel > header .r{margin-left:auto;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.panel .body{padding:18px}
+.cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:960px){.cols{grid-template-columns:1fr}}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{
+  text-align:left;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:500;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+th.num{text-align:right}
+.who-cell{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.who-cell .av{
+  width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);font-family:var(--display);font-weight:700;font-size:.68rem;
+}
+.prop{font-weight:600}
+.sm{font-size:.8rem;color:var(--ink-3)}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.66rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;white-space:nowrap;
+}
+.chip::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.chip.accepted{background:var(--good-soft);color:var(--good)}
+.chip.sent{background:var(--accent-soft);color:var(--accent)}
+.chip.draft{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.chip.stale{background:var(--warn-soft);color:var(--warn)}
+.chip.declined{background:var(--ember-soft);color:var(--ember)}
+
+/* ---------- form ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-family:var(--mono);font-size:.67rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.field input,.field select,.field textarea{
+  font:inherit;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:var(--ink);width:100%;
+}
+.field textarea{min-height:74px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.row2{grid-template-columns:1fr}}
+.checks{display:flex;flex-wrap:wrap;gap:8px}
+.checks label{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;
+  padding:7px 11px;font-size:.87rem;background:var(--surface);cursor:pointer;
+}
+.checks input{accent-color:var(--accent)}
+
+/* ---------- generated document ---------- */
+.docout{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.docout .head{border-bottom:2px solid var(--accent);padding-bottom:12px;margin-bottom:16px;display:flex;align-items:flex-end;gap:12px}
+.docout .head .c{font-family:var(--display);font-weight:800;font-size:1.05rem}
+.docout .head .n{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+.docout h4{font-family:var(--mono);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 7px}
+.docout p{font-size:.9rem;color:var(--ink-2);margin-bottom:8px}
+.docout ul{margin:0 0 8px;padding-left:18px;font-size:.9rem;color:var(--ink-2)}
+.docout li{margin-bottom:4px}
+.bilingual{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+@media (max-width:760px){.bilingual{grid-template-columns:1fr}}
+.bilingual > div{padding:18px;background:var(--surface)}
+.bilingual > div:first-child{border-right:1px solid var(--line)}
+@media (max-width:760px){.bilingual > div:first-child{border-right:none;border-bottom:1px solid var(--line)}}
+.bilingual .lang{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);display:inline-block;padding:3px 9px;border-radius:999px;margin-bottom:12px}
+
+.working{display:flex;align-items:center;gap:11px;font-size:.9rem;color:var(--ink-2);padding:26px 0;justify-content:center}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+.actlist{display:flex;flex-direction:column}
+.act{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:.88rem}
+.act:last-child{border-bottom:none}
+.act .d{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px}
+.act .t{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);white-space:nowrap}
+.act b{font-weight:600}
+
+.progress{height:6px;background:var(--line-2);border-radius:999px;overflow:hidden;margin-top:8px}
+.progress span{display:block;height:100%;background:var(--accent);border-radius:999px}
+
+.callout{
+  font-size:.85rem;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent);
+  padding:12px 14px;border-radius:0 8px 8px 0;margin-top:16px;
+}
+.drop{
+  border:2px dashed var(--line-strong,#B6C1C8);border-radius:var(--radius);background:var(--surface-2);
+  padding:34px 22px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.drop .big{font-family:var(--display);font-weight:700;font-size:1.05rem}
+.drop .sm2{font-size:.86rem;color:var(--ink-3);max-width:44ch}
+.pdfchip{
+  display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+  border-radius:8px;padding:9px 13px;font-size:.88rem;
+}
+.pdfchip .ext{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;background:var(--ember-soft);color:var(--ember);padding:3px 6px;border-radius:4px;font-weight:600}
+.measgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+@media (max-width:900px){.measgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.meas{background:var(--surface);padding:14px 16px}
+.meas .l{font-family:var(--mono);font-size:.63rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.meas .v{font-family:var(--display);font-weight:800;font-size:1.25rem;margin-top:5px;font-variant-numeric:tabular-nums}
+.twoprice{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+@media (max-width:900px){.twoprice{grid-template-columns:1fr}}
+.pricehead{display:flex;align-items:baseline;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.pricehead h3{font-size:1rem;font-weight:700}
+.pricehead .tot{margin-left:auto;font-family:var(--display);font-weight:800;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.minicard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.minicard h3{font-size:.98rem;font-weight:700;margin-bottom:6px}
+.minicard p{font-size:.87rem;color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<div class="demobar">
+  <b>Demonstration built by PureForge</b> &nbsp;·&nbsp; Not a Glacier system. Every person, building, number and document below is invented.
+</div>
+
+<div class="shell">
+
+  <aside class="side">
+    <div class="co">
+      <span class="logo">GI</span>
+      <div>
+        <div class="nm">Glacier Industrial</div>
+        <div class="sub">Company hub &mdash; mockup</div>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <button data-view="dash" aria-current="page">Dashboard</button>
+      <button data-view="takeoff">Takeoff &amp; pricing</button>
+      <button data-view="recommend">Restore vs replace</button>
+      <button data-view="inspections">Inspections</button>
+      <button data-view="portfolio">Client portfolios</button>
+      <button data-view="scopes">Crew scopes</button>
+      <button data-view="warranty">Warranties</button>
+    </nav>
+
+    <div class="who">
+      <span class="av">&mdash;</span>
+      <div>
+        <div class="n">Sample user</div>
+        <div class="r">Owner view</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ================= DASHBOARD ================= -->
+    <section class="view" id="view-dash">
+      <div class="viewhead">
+        <div>
+          <h1>What a Glacier hub could look like</h1>
+          <p class="sub">Built around inspections, restoration recommendations, and portfolio budgeting &mdash; because that is where the hours go in commercial roofing.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 20px">
+        This is a mockup, not a product tour. The numbers are invented. What is real is the shape: these are the documents a commercial roofing contractor rebuilds every week, and every one of them can come out of a form instead of a blank page.
+      </div>
+
+      <div class="tiles">
+        <div class="tile">
+          <div class="lab">Inspections this month</div>
+          <div class="val">34</div>
+          <div class="note">Across 6 states</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,22 20,19 40,21 60,15 80,14 100,10 120,7" fill="none" stroke="#1F4E68" stroke-width="2"/><circle cx="120" cy="7" r="3" fill="#1F4E68"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Findings that became quotes</div>
+          <div class="val">68%</div>
+          <div class="note up">Was 41% before</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,25 20,23 40,20 60,16 80,13 100,11 120,8" fill="none" stroke="#2F6B4F" stroke-width="2"/><circle cx="120" cy="8" r="3" fill="#2F6B4F"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Restoration vs replacement</div>
+          <div class="val">62<span style="font-size:1rem;font-weight:600;color:var(--ink-3)">/38</span></div>
+          <div class="note">By contract value, 90 days</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="0" y="8" width="74" height="14" fill="#1F4E68"/><rect x="76" y="8" width="44" height="14" fill="#DCE8EE"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Warranties expiring · 90 days</div>
+          <div class="val">7</div>
+          <div class="note down">4 not yet contacted</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,12 20,15 40,11 60,17 80,13 100,16 120,14" fill="none" stroke="#B4501F" stroke-width="2"/><circle cx="120" cy="14" r="3" fill="#B4501F"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Open work</h2><span class="r">Invented data</span></header>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Building</th><th>What it is</th><th>Status</th><th class="num">Value</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div class="prop">Harbor Point Distribution</div><div class="sm">Columbus OH · 184,000 sq ft</div></td>
+                  <td>Restoration recommendation</td>
+                  <td><span class="chip sent">Sent</span></td>
+                  <td class="num">$412,600</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Sentinel Business Park, Bldg 3</div><div class="sm">Indianapolis IN · 61,500 sq ft</div></td>
+                  <td>Inspection findings quote</td>
+                  <td><span class="chip stale">No follow-up, 12d</span></td>
+                  <td class="num">$38,900</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Lakeside Medical Campus</div><div class="sm">Dayton OH · 3 buildings</div></td>
+                  <td>Five-year capital plan</td>
+                  <td><span class="chip draft">Draft</span></td>
+                  <td class="num">&mdash;</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Tri-State Cold Storage</div><div class="sm">Louisville KY · 92,000 sq ft</div></td>
+                  <td>Full replacement, TPO</td>
+                  <td><span class="chip accepted">Accepted</span></td>
+                  <td class="num">$1,146,000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Why these screens</h2></header>
+          <div class="body">
+            <div class="actlist">
+              <div class="act"><span class="d"></span><span><b>Restore vs replace</b> — the argument you make on nearly every job, written the same way every time</span><span class="t"></span></div>
+              <div class="act"><span class="d"></span><span><b>Inspections</b> — findings become a priced quote the same day instead of a note in a truck</span><span class="t"></span></div>
+              <div class="act"><span class="d"></span><span><b>Portfolios</b> — what a facility manager with nine roofs and one budget actually wants</span><span class="t"></span></div>
+              <div class="act"><span class="d"></span><span><b>Crew scopes</b> — the signed job turned into instructions, in two languages</span><span class="t"></span></div>
+              <div class="act"><span class="d"></span><span><b>Warranties</b> — coating warranties that expire quietly unless something is watching</span><span class="t"></span></div>
+            </div>
+            <div class="callout">Nothing here is guesswork about your business. It comes from what Glacier publishes: restoration, replacement, repair, inspection and maintenance, for facility and property managers.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAKEOFF ================= -->
+    <section class="view" id="view-takeoff" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Takeoff &amp; pricing</h1>
+          <p class="sub">Drop in the measurement report. Get a material list and both prices back.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        One uploaded report, two priced paths. The same file that prices a replacement prices the restoration beside it &mdash; which is the comparison a facility manager is really asking for.
+      </div>
+
+      <div class="panel" id="up-panel">
+        <header><h2>Measurement report</h2><span class="r">EagleView · Nearmap · drone survey · your own PDF</span></header>
+        <div class="body">
+          <div class="drop">
+            <span class="pdfchip"><span class="ext">PDF</span> EagleView Commercial — Harbor Point Distribution.pdf</span>
+            <p class="big">Drop a report here</p>
+            <p class="sm2">EagleView commercial reports, Nearmap, a drone survey, or a PDF from your own field measure. The hub reads the areas, lengths and counts off the report so nobody retypes them.</p>
+            <button class="btn btn-p" id="up-btn">Read this report</button>
+          </div>
+          <p class="sm" style="margin-top:12px;text-align:center">In this mockup the button produces sample output. It does not open the file.</p>
+        </div>
+      </div>
+
+      <div id="up-working" hidden><div class="working"><span class="spin"></span> Reading the report…</div></div>
+      <div id="up-out" hidden></div>
+    </section>
+
+    <!-- ================= RESTORE VS REPLACE ================= -->
+    <section class="view" id="view-recommend" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Restoration vs replacement</h1>
+          <p class="sub">The recommendation document, built from the inspection numbers instead of from the last one you wrote.</p>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>The roof</h2></header>
+          <div class="body">
+            <div class="field"><label for="g-bldg">Building</label><input id="g-bldg" value="Harbor Point Distribution"></div>
+            <div class="row2">
+              <div class="field"><label for="g-sf">Square feet</label><input id="g-sf" value="184,000"></div>
+              <div class="field"><label for="g-age">Age of system</label><input id="g-age" value="17 years"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="g-sys">Existing system</label>
+                <select id="g-sys"><option>EPDM, ballasted</option><option>TPO, mechanically attached</option><option>Modified bitumen</option><option>Built-up, gravel</option><option>Standing seam metal</option></select></div>
+              <div class="field"><label for="g-moist">Wet insulation</label>
+                <select id="g-moist"><option>Under 8% — restorable</option><option>8–20% — partial tear-off</option><option>Over 20% — replace</option></select></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="g-warr">Warranty wanted</label>
+                <select id="g-warr"><option>15 year</option><option>10 year</option><option>20 year</option></select></div>
+              <div class="field"><label for="g-budget">Client budget year</label><input id="g-budget" value="2027"></div>
+            </div>
+            <div class="field"><label for="g-notes">What the facility manager said</label>
+              <textarea id="g-notes">Two leaks over the pick line since spring. Corporate has asked for a capital number for next year and wants to know if they can get another decade without a tear-off. Operations cannot take shutdown days.</textarea></div>
+            <button class="btn btn-p" id="rec-btn" style="width:100%;justify-content:center">Build the recommendation</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Document</h2><span class="r" id="rec-state">Not generated</span></header>
+          <div class="body">
+            <p class="sm" id="rec-empty">This is the document that wins or loses a restoration job. Right now someone writes it from scratch, or copies the last one and hopes the numbers got changed.</p>
+            <div id="rec-working" hidden><div class="working"><span class="spin"></span> Writing the recommendation…</div></div>
+            <div id="rec-out" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= INSPECTIONS ================= -->
+    <section class="view" id="view-inspections" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Inspections</h1>
+          <p class="sub">Findings in the field become a priced quote before the technician gets back to the shop.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        This is the one with money in it. Every inspection turns up work that should be quoted. The gap between 41% and 68% of those findings becoming quotes is not effort — it is whether writing the quote takes four minutes or forty.
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Sentinel Business Park, Building 3</h2><span class="r">Inspected 2 days ago</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Finding</th><th>Location</th><th>Severity</th><th>Quote it</th></tr></thead>
+            <tbody>
+              <tr><td>Open lap seams, 40 lf</td><td class="sm">North field, grid C4–C7</td><td><span class="chip declined">Urgent</span></td><td><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" checked> Include</label></td></tr>
+              <tr><td>Failed pitch pans, 6 ea</td><td class="sm">Mechanical curbs, east</td><td><span class="chip stale">Soon</span></td><td><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" checked> Include</label></td></tr>
+              <tr><td>Clogged drains, 3 ea</td><td class="sm">Center bays</td><td><span class="chip stale">Soon</span></td><td><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" checked> Include</label></td></tr>
+              <tr><td>Punctures near RTU-4</td><td class="sm">Southwest corner</td><td><span class="chip declined">Urgent</span></td><td><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" checked> Include</label></td></tr>
+              <tr><td>Loose termination bar, 22 lf</td><td class="sm">West parapet</td><td><span class="chip sent">Monitor</span></td><td><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox"> Include</label></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="body" style="border-top:1px solid var(--line)">
+          <button class="btn btn-p" id="insp-btn">Quote the checked findings</button>
+        </div>
+      </div>
+
+      <div id="insp-working" hidden><div class="working"><span class="spin"></span> Pricing the findings…</div></div>
+      <div id="insp-out" hidden></div>
+    </section>
+
+    <!-- ================= PORTFOLIO ================= -->
+    <section class="view" id="view-portfolio" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Client portfolios</h1>
+          <p class="sub">Nine roofs, one budget, one page. What a facility manager is actually being asked for upstairs.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Meridian Property Group — 9 buildings</h2><span class="r">Invented client</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Building</th><th class="num">Sq ft</th><th class="num">Age</th><th>Condition</th><th>Recommended</th><th class="num">Budget year</th><th class="num">Estimate</th></tr></thead>
+            <tbody>
+              <tr><td>Meridian One</td><td class="num">96,400</td><td class="num">8</td><td><span class="chip accepted">Good</span></td><td class="sm">Maintain</td><td class="num">&mdash;</td><td class="num">$4,200/yr</td></tr>
+              <tr><td>Meridian Two</td><td class="num">72,100</td><td class="num">14</td><td><span class="chip stale">Fair</span></td><td class="sm">Restore</td><td class="num">2027</td><td class="num">$168,400</td></tr>
+              <tr><td>Harbor Point Distribution</td><td class="num">184,000</td><td class="num">17</td><td><span class="chip stale">Fair</span></td><td class="sm">Restore</td><td class="num">2027</td><td class="num">$412,600</td></tr>
+              <tr><td>Clearwater Flex A</td><td class="num">41,800</td><td class="num">21</td><td><span class="chip declined">Poor</span></td><td class="sm">Replace</td><td class="num">2027</td><td class="num">$523,000</td></tr>
+              <tr><td>Clearwater Flex B</td><td class="num">41,800</td><td class="num">21</td><td><span class="chip declined">Poor</span></td><td class="sm">Replace</td><td class="num">2028</td><td class="num">$523,000</td></tr>
+              <tr><td>Stonebridge Office</td><td class="num">55,200</td><td class="num">11</td><td><span class="chip accepted">Good</span></td><td class="sm">Maintain</td><td class="num">&mdash;</td><td class="num">$2,900/yr</td></tr>
+              <tr><td>Northfield Service Center</td><td class="num">28,600</td><td class="num">19</td><td><span class="chip stale">Fair</span></td><td class="sm">Restore</td><td class="num">2028</td><td class="num">$71,500</td></tr>
+              <tr><td>Airport Logistics 4</td><td class="num">120,000</td><td class="num">6</td><td><span class="chip accepted">Good</span></td><td class="sm">Maintain</td><td class="num">&mdash;</td><td class="num">$5,400/yr</td></tr>
+              <tr><td>Valley Cold Chain</td><td class="num">88,300</td><td class="num">16</td><td><span class="chip stale">Fair</span></td><td class="sm">Restore</td><td class="num">2029</td><td class="num">$201,900</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="minicard">
+          <h3>Why this wins the portfolio</h3>
+          <p>A facility manager who can walk into a budget meeting with this page keeps their job easier. The contractor who produced it is the one they call next year, and the year after.</p>
+        </div>
+        <div class="minicard">
+          <h3>What it costs to make today</h3>
+          <p>Nine site visits, a spreadsheet, and most of a weekend. From a hub it is nine inspection records already in the system, assembled into one document.</p>
+        </div>
+      </div>
+
+      <div class="callout">Restoration on the four fair roofs: <b>$854,400</b>. Replacing the same four instead: roughly <b>$2.1M</b>. That comparison, in writing, is the argument &mdash; and it is the same argument on every portfolio.</div>
+    </section>
+
+    <!-- ================= CREW SCOPES ================= -->
+    <section class="view" id="view-scopes" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Crew scopes</h1>
+          <p class="sub">The awarded job becomes instructions for the crew, in English and Spanish.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Build a scope</h2></header>
+        <div class="body">
+          <div class="row2">
+            <div class="field"><label for="gs-job">From job</label>
+              <select id="gs-job">
+                <option>Harbor Point Distribution — silicone restoration</option>
+                <option>Tri-State Cold Storage — TPO replacement</option>
+                <option>Sentinel Bldg 3 — repair package</option>
+              </select></div>
+            <div class="field"><label for="gs-crew">Crew lead</label><input id="gs-crew" value="Sample name"></div>
+          </div>
+          <button class="btn btn-p" id="gscope-btn">Generate scope</button>
+        </div>
+      </div>
+
+      <div id="gscope-working" hidden><div class="working"><span class="spin"></span> Writing the scope in English and Spanish…</div></div>
+      <div id="gscope-out" hidden></div>
+    </section>
+
+    <!-- ================= WARRANTIES ================= -->
+    <section class="view" id="view-warranty" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Warranties</h1>
+          <p class="sub">Coating and system warranties, and the inspections they depend on.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        Most restoration warranties require documented inspections to stay valid. Tracking that is a filing job today. It is also a reason to be on the roof again, which is how the next job gets found.
+      </div>
+
+      <div class="panel">
+        <header><h2>Coming due</h2><span class="r">Invented data</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Building</th><th>System</th><th>Term</th><th>Required inspection</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Riverbend Commerce Center</td><td class="sm">Silicone restoration</td><td class="sm">15 yr · ends 2034</td><td class="sm">Due in 22 days</td><td><span class="chip stale">Not scheduled</span></td></tr>
+              <tr><td>Pine Hollow Industrial</td><td class="sm">Acrylic restoration</td><td class="sm">10 yr · ends 2031</td><td class="sm">Due in 41 days</td><td><span class="chip sent">Scheduled</span></td></tr>
+              <tr><td>Gateway Fulfillment</td><td class="sm">TPO, 60 mil</td><td class="sm">20 yr · ends 2041</td><td class="sm">Due in 58 days</td><td><span class="chip stale">Not scheduled</span></td></tr>
+              <tr><td>Oak Ridge Manufacturing</td><td class="sm">Silicone restoration</td><td class="sm">15 yr · ends 2033</td><td class="sm">Due in 74 days</td><td><span class="chip sent">Scheduled</span></td></tr>
+              <tr><td>Beacon Flex Park</td><td class="sm">Acrylic restoration</td><td class="sm">10 yr · ends 2030</td><td class="sm">Overdue 9 days</td><td><span class="chip declined">At risk</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+function show(view) {
+  var views = document.querySelectorAll('.view');
+  for (var i = 0; i < views.length; i++) views[i].hidden = true;
+  var el = document.getElementById('view-' + view);
+  if (el) el.hidden = false;
+  var btns = document.querySelectorAll('#nav button');
+  for (var j = 0; j < btns.length; j++) {
+    if (btns[j].getAttribute('data-view') === view) btns[j].setAttribute('aria-current','page');
+    else btns[j].removeAttribute('aria-current');
+  }
+  window.scrollTo(0, 0);
+}
+document.getElementById('nav').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-view]');
+  if (b) show(b.getAttribute('data-view'));
+});
+
+/* ---- restoration recommendation ---- */
+document.getElementById('rec-btn').addEventListener('click', function () {
+  var empty = document.getElementById('rec-empty'), work = document.getElementById('rec-working'),
+      out = document.getElementById('rec-out'), state = document.getElementById('rec-state');
+  empty.hidden = true; out.hidden = true; work.hidden = false; state.textContent = 'Working';
+  setTimeout(function () {
+    work.hidden = true; state.textContent = 'Generated · 2.1s'; out.hidden = false;
+    out.innerHTML =
+    '<div class="docout">' +
+      '<div class="head"><span class="c">Glacier Industrial</span><span class="n">RECOMMENDATION · SAMPLE</span></div>' +
+      '<p style="font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02rem">Harbor Point Distribution &mdash; roof system recommendation</p>' +
+      '<p class="sm">184,000 sq ft · EPDM, ballasted, 17 years · Prepared for budget year 2027</p>' +
+
+      '<h4>What we found</h4>' +
+      '<p>Core samples returned moisture readings under 8 percent across the field, with wet insulation confined to two areas totalling roughly 2,400 square feet near the pick line. The membrane is weathered but intact. Seams are the primary failure point, not the field.</p>' +
+      '<p>In plain terms: this roof is a candidate for restoration. It does not need to come off.</p>' +
+
+      '<h4>The two options, side by side</h4>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:10px">' +
+        '<tr><th style="text-align:left;padding:7px 0;border-bottom:1px solid var(--line)">&nbsp;</th>' +
+          '<th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Restore</th>' +
+          '<th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Replace</th></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Cost</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$412,600</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$1,288,000</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Warranty</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">15 years</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">20 years</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Days on site</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">11</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">34</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Tear-off to landfill</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">None</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">~190 tons</td></tr>' +
+        '<tr><td style="padding:7px 0"><b>Cost per warranty year</b></td><td class="num" style="padding:7px 0"><b>$27,507</b></td><td class="num" style="padding:7px 0"><b>$64,400</b></td></tr>' +
+      '</table>' +
+
+      '<h4>Operations impact</h4>' +
+      '<p>You told us shutdown days are not available. Restoration is applied over the existing system with no tear-off, so there is no open roof at any point and no interior exposure. Work is staged so the pick line is never underneath active application.</p>' +
+
+      '<h4>What we would do</h4>' +
+      '<ul>' +
+        '<li>Remove and replace the 2,400 sq ft of wet insulation identified in the core sampling.</li>' +
+        '<li>Clean and prime the full field; reinforce all seams, penetrations and drains.</li>' +
+        '<li>Apply the coating system to manufacturer specification for a 15 year warranty.</li>' +
+        '<li>Final inspection with the manufacturer&rsquo;s representative before warranty issue.</li>' +
+      '</ul>' +
+
+      '<h4>What happens if you wait</h4>' +
+      '<p>Restoration stays available while the wet insulation stays under roughly 20 percent of the field. At the current rate of seam failure, that window closes in an estimated two to four years, at which point the only option is the replacement column.</p>' +
+
+      '<h4>Investment</h4>' +
+      '<p style="font-family:var(--display);font-weight:800;font-size:1.3rem;color:var(--ink)">$412,600</p>' +
+      '<p class="sm">Fifteen year manufacturer warranty. Annual inspection required to maintain coverage; included for the first three years.</p>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-p">Download Word file</button>' +
+      '<button class="btn btn-g">Add to Meridian portfolio plan</button>' +
+    '</div>' +
+    '<div class="callout">The cost-per-warranty-year line is the one that moves a budget committee, and it is the one people leave out when they are writing this at nine at night. In a hub it is always there, because it is calculated, not remembered.</div>';
+  }, 2100);
+});
+
+/* ---- inspection findings to quote ---- */
+document.getElementById('insp-btn').addEventListener('click', function () {
+  var work = document.getElementById('insp-working'), out = document.getElementById('insp-out');
+  out.hidden = true; work.hidden = false;
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+    out.innerHTML =
+    '<div class="panel"><header><h2>Repair quote — Sentinel Business Park, Building 3</h2><span class="r">From 4 findings</span></header>' +
+    '<div class="tablewrap"><table><thead><tr><th>Item</th><th>Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>' +
+      '<tr><td>Seam repair, reinforced</td><td class="sm">40 lf</td><td class="num sm">$46.00</td><td class="num">$1,840</td></tr>' +
+      '<tr><td>Pitch pan rebuild</td><td class="sm">6 ea</td><td class="num sm">$385.00</td><td class="num">$2,310</td></tr>' +
+      '<tr><td>Drain clearing &amp; reseal</td><td class="sm">3 ea</td><td class="num sm">$290.00</td><td class="num">$870</td></tr>' +
+      '<tr><td>Puncture repair, RTU-4 area</td><td class="sm">1 ls</td><td class="num sm">$2,150.00</td><td class="num">$2,150</td></tr>' +
+      '<tr><td>Mobilization</td><td class="sm">1 ea</td><td class="num sm">$1,400.00</td><td class="num">$1,400</td></tr>' +
+      '<tr><td colspan="3" style="font-family:var(--display);font-weight:800">Total</td><td class="num" style="font-family:var(--display);font-weight:800;font-size:1.05rem">$8,570</td></tr>' +
+    '</tbody></table></div>' +
+    '<div class="body" style="border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button class="btn btn-p">Send to facility manager</button>' +
+      '<button class="btn btn-g">Attach inspection photos</button>' +
+    '</div></div>' +
+    '<div class="callout">Four minutes, from findings already captured on the roof. The loose termination bar stayed unchecked and is logged for the next visit rather than forgotten.</div>';
+  }, 1500);
+});
+
+/* ---- crew scope ---- */
+document.getElementById('gscope-btn').addEventListener('click', function () {
+  var work = document.getElementById('gscope-working'), out = document.getElementById('gscope-out');
+  out.hidden = true; work.hidden = false;
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+    out.innerHTML =
+    '<div class="panel"><header><h2>Crew scope — Harbor Point Distribution</h2><span class="r">Silicone restoration</span></header>' +
+    '<div class="bilingual">' +
+      '<div><span class="lang">English</span>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Site rules</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+          '<li>Check in at the guard shack. Hard hat and vest at all times.</li>' +
+          '<li>Trucks stage in the north yard. Never block a dock door.</li>' +
+          '<li>The pick line runs underneath. Nothing gets dropped, ever.</li>' +
+        '</ul>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">The work</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+          '<li>Cut out and replace wet insulation in the two marked areas before anything else.</li>' +
+          '<li>Power wash the full field. It must be dry before primer.</li>' +
+          '<li>Reinforce every seam, drain and penetration. Photograph each one.</li>' +
+          '<li>Base coat, then top coat, at the mil thickness on the spec sheet. Do not thin it.</li>' +
+          '<li>Wet mil readings every 2,000 sq ft. Write them on the daily sheet.</li>' +
+        '</ul>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">End of day</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0">' +
+          '<li>Cover and secure all material. Wind comes across this roof hard.</li>' +
+          '<li>Send the PM the mil readings and three photos.</li>' +
+        '</ul>' +
+      '</div>' +
+      '<div><span class="lang">Espa&ntilde;ol</span>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Reglas del sitio</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+          '<li>Rep&oacute;rtese en la caseta de vigilancia. Casco y chaleco en todo momento.</li>' +
+          '<li>Los camiones se estacionan en el patio norte. Nunca bloquee una puerta de carga.</li>' +
+          '<li>La l&iacute;nea de producci&oacute;n est&aacute; abajo. No se deja caer nada, nunca.</li>' +
+        '</ul>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">El trabajo</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0 0 14px">' +
+          '<li>Corte y reemplace el aislamiento mojado en las dos &aacute;reas marcadas antes de cualquier otra cosa.</li>' +
+          '<li>Lave a presi&oacute;n todo el campo. Debe estar seco antes del primer.</li>' +
+          '<li>Refuerce cada costura, drenaje y penetraci&oacute;n. Tome foto de cada una.</li>' +
+          '<li>Capa base, luego capa final, al espesor indicado en la hoja de especificaciones. No lo diluya.</li>' +
+          '<li>Mida el espesor h&uacute;medo cada 2,000 pies cuadrados. Ap&uacute;ntelo en la hoja diaria.</li>' +
+        '</ul>' +
+        '<p style="font-family:var(--display);font-weight:700;margin-bottom:8px">Al final del d&iacute;a</p>' +
+        '<ul style="font-size:.9rem;color:var(--ink-2);padding-left:18px;margin:0">' +
+          '<li>Cubra y asegure todo el material. El viento pega fuerte en este techo.</li>' +
+          '<li>Env&iacute;e al PM las medidas de espesor y tres fotos.</li>' +
+        '</ul>' +
+      '</div>' +
+    '</div></div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-p">Download Word file</button>' +
+      '<button class="btn btn-g">Text it to the crew lead</button>' +
+    '</div>';
+  }, 1600);
+});
+/* ---- measurement report upload ---- */
+document.getElementById('up-btn').addEventListener('click', function () {
+  var work = document.getElementById('up-working'), out = document.getElementById('up-out');
+  out.hidden = true; work.hidden = false;
+
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+
+    function lines(rows) {
+      return '<div class="tablewrap"><table><thead><tr><th>Material</th><th>Qty</th><th class="num">Unit</th><th class="num">Amount</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td>' + r[0] + '</td><td class="sm">' + r[1] + '</td><td class="num sm">' + r[2] + '</td><td class="num">' + r[3] + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+
+    var restore = [
+      ['Roof cleaner / prep wash', '368 gal', '$18.40', '$6,771'],
+      ['Rust &amp; seam primer', '240 gal', '$52.00', '$12,480'],
+      ['Polyester reinforcing fabric, 6&quot;', '12,400 lf', '$0.62', '$7,688'],
+      ['Silicone base coat', '1,840 gal', '$41.50', '$76,360'],
+      ['Silicone top coat', '1,470 gal', '$41.50', '$61,005'],
+      ['Polyiso replacement, wet areas', '75 boards', '$34.00', '$2,550'],
+      ['Fasteners &amp; plates', '1,800 ea', '$0.46', '$828'],
+      ['Pitch pan sealant kits', '22 ea', '$38.00', '$836'],
+      ['Walkway granules', '12 bags', '$29.00', '$348']
+    ];
+
+    var replace = [
+      ['TPO membrane, 60 mil (10% waste)', '202,400 sf', '$1.34', '$271,216'],
+      ['Polyiso, 2 layers to R-30', '368,000 sf', '$0.94', '$345,920'],
+      ['Cover board, 1/2&quot;', '184,000 sf', '$0.58', '$106,720'],
+      ['Fasteners &amp; plates', '92,000 ea', '$0.46', '$42,320'],
+      ['Coated metal edge &amp; coping', '1,960 lf', '$14.20', '$27,832'],
+      ['Seam tape, adhesive, flashings', '1 ls', '$31,400', '$31,400'],
+      ['Tear-off disposal', '190 tons', '$92.00', '$17,480'],
+      ['Curb &amp; penetration flashing kits', '70 ea', '$148.00', '$10,360']
+    ];
+
+    out.innerHTML =
+      '<div class="panel" style="margin-bottom:18px">' +
+        '<header><h2>What the report gave us</h2><span class="r">Harbor Point Distribution</span></header>' +
+        '<div class="body" style="padding:0">' +
+          '<div class="measgrid">' +
+            '<div class="meas"><div class="l">Total roof area</div><div class="v">184,000 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">sf</span></div></div>' +
+            '<div class="meas"><div class="l">Roof sections</div><div class="v">3</div></div>' +
+            '<div class="meas"><div class="l">Perimeter</div><div class="v">1,960 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">lf</span></div></div>' +
+            '<div class="meas"><div class="l">Parapet, avg height</div><div class="v">28 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">in</span></div></div>' +
+            '<div class="meas"><div class="l">Penetrations</div><div class="v">61</div></div>' +
+            '<div class="meas"><div class="l">Drains</div><div class="v">14</div></div>' +
+            '<div class="meas"><div class="l">Curbs / RTUs</div><div class="v">9</div></div>' +
+            '<div class="meas"><div class="l">Predominant slope</div><div class="v">1/4:12</div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="twoprice">' +
+        '<div class="panel">' +
+          '<div class="pricehead"><h3>Restoration</h3><span class="tot">$412,600</span></div>' +
+          lines(restore) +
+          '<div class="body" style="border-top:1px solid var(--line)">' +
+            '<p class="sm">Material $168,866 · Labor &amp; equipment $198,734 · Overhead and margin $45,000</p>' +
+            '<p class="sm" style="margin-top:6px">Silicone at 1.5 gal per 100 sf base, 1.2 top. 15 year warranty.</p>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="panel">' +
+          '<div class="pricehead"><h3>Full replacement</h3><span class="tot">$1,288,000</span></div>' +
+          lines(replace) +
+          '<div class="body" style="border-top:1px solid var(--line)">' +
+            '<p class="sm">Material $853,248 · Labor &amp; equipment $321,752 · Overhead and margin $113,000</p>' +
+            '<p class="sm" style="margin-top:6px">60 mil TPO, mechanically attached, R-30. 20 year warranty.</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">' +
+        '<button class="btn btn-p" id="to-rec">Build the restore vs replace document</button>' +
+        '<button class="btn btn-g">Download both as Excel</button>' +
+        '<button class="btn btn-g">Send material list to the supplier</button>' +
+      '</div>' +
+
+      '<div class="callout">Both columns came off the same report. Today that is two separate takeoffs by two different people on two different afternoons, and the numbers rarely line up well enough to put side by side in front of a client.</div>';
+
+    var jump = document.getElementById('to-rec');
+    if (jump) jump.addEventListener('click', function () { show('recommend'); });
+  }, 2000);
+});
+
+</script>
+
+</body>
+</html>
