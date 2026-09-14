@@ -607,6 +607,7 @@ th.num{text-align:right}
   window.addEventListener('load', function () { if (lg.naturalWidth === 0) useFallback(); });
 })();
 function show(view) {
+  try { window.dispatchEvent(new CustomEvent('pf:view', { detail: view })); } catch (e) {}
   var views = document.querySelectorAll('.view');
   for (var i = 0; i < views.length; i++) views[i].hidden = true;
   var el = document.getElementById('view-' + view);
@@ -848,6 +849,88 @@ document.getElementById('up-btn').addEventListener('click', function () {
   }, 2000);
 });
 
+</script>
+
+<script>
+/* ============================================================
+   VIEW TRACKING
+
+   Paste your endpoint URL between the quotes below and tracking
+   turns on. Leave it empty and nothing is sent at all.
+
+   The plain link works fine. Because this page is unlisted and
+   only Glacier has it, every real view is Glacier — events are
+   labeled with the page name automatically.
+
+   Optional: add ?p=a-name to the link to label a specific person
+   e.g.  .../demo-glacier-k4m9.html?p=chris
+   Only worth it if you want to tell two people at the same
+   company apart.
+   ============================================================ */
+
+var PF_TRACK_URL = '';
+
+(function () {
+  if (!PF_TRACK_URL) return;
+
+  var KEY = 'pf_visitor', VKEY = 'pf_visits_' + location.pathname;
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var visitor = read(KEY);
+  if (!visitor) { visitor = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); store(KEY, visitor); }
+  var visitNo = (parseInt(read(VKEY) || '0', 10) || 0) + 1;
+  store(VKEY, String(visitNo));
+
+  var params = new URLSearchParams(location.search);
+  var started = Date.now();
+  var activeMs = 0, lastTick = Date.now();
+  var screens = {}, current = 'dash', currentSince = Date.now();
+
+  function markScreen(name) {
+    if (current) screens[current] = (screens[current] || 0) + Math.round((Date.now() - currentSince) / 1000);
+    current = name; currentSince = Date.now();
+  }
+  window.addEventListener('pf:view', function (e) { markScreen(e.detail); });
+
+  function payload(type) {
+    markScreen(current);
+    return {
+      type: type,
+      page: location.pathname,
+      person: params.get('p') || (location.pathname.split('/').pop() || 'demo').replace(/\.html$/, ''),
+      visitor: visitor,
+      visitNumber: visitNo,
+      secondsOnPage: Math.round((Date.now() - started) / 1000),
+      activeSeconds: Math.round(activeMs / 1000),
+      screenSeconds: screens,
+      referrer: document.referrer || '(direct)',
+      device: (window.innerWidth < 700 ? 'phone/tablet' : 'desktop') + ' ' + window.innerWidth + 'x' + window.innerHeight,
+      timezone: (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || '',
+      language: navigator.language || '',
+      at: new Date().toISOString()
+    };
+  }
+
+  function send(type, useBeacon) {
+    var body = JSON.stringify(payload(type));
+    try {
+      if (useBeacon && navigator.sendBeacon) { navigator.sendBeacon(PF_TRACK_URL, body); return; }
+      fetch(PF_TRACK_URL, { method: 'POST', mode: 'no-cors', keepalive: true,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: body }).catch(function () {});
+    } catch (e) {}
+  }
+
+  setInterval(function () {
+    var now = Date.now();
+    if (document.visibilityState === 'visible') activeMs += now - lastTick;
+    lastTick = now;
+  }, 1000);
+
+  send('open', false);
+  var hb = setInterval(function () { if (document.visibilityState === 'visible') send('heartbeat', false); }, 30000);
+  window.addEventListener('pagehide', function () { clearInterval(hb); send('close', true); });
+})();
 </script>
 
 </body>
