@@ -9,21 +9,21 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231F4E68'/%3E%3Cg transform='translate(32,32) scale(0.9) translate(-32,-32)'%3E%3Cpath d='M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 
 :root{
-  --ground:#EEF1F3; --surface:#FFFFFF; --surface-2:#F5F7F8; --sidebar:#14212A;
-  --sidebar-2:#1D2F3B; --sidebar-ink:#C6D4DC; --sidebar-ink-2:#7C93A1;
-  --ink:#13181C; --ink-2:#3C474E; --ink-3:#6B7A83;
-  --line:#D6DCE0; --line-2:#E6EAED;
-  --accent:#1F4E68; --accent-soft:#DCE8EE; --accent-ink:#FFFFFF;
+  --ground:#EBEEF0; --surface:#FFFFFF; --surface-2:#F4F8FB; --sidebar:#002642;
+  --sidebar-2:#003565; --sidebar-ink:#C9DCEA; --sidebar-ink-2:#7FA0B8;
+  --ink:#1B1B1B; --ink-2:#404040; --ink-3:#6E7B85;
+  --line:#D5DDE3; --line-2:#E7ECF0;
+  --accent:#003565; --accent-bright:#29ABE2; --accent-soft:#E6F4FF; --accent-ink:#FFFFFF;
   --ember:#B4501F; --ember-soft:#F7E6DB;
   --good:#2F6B4F; --good-soft:#DEEDE4;
   --warn:#8A6A12; --warn-soft:#F6EDD4;
   --radius:10px;
-  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
-  --body:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --display:"Montserrat","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Helvetica,Arial,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
@@ -52,7 +52,14 @@ a{color:inherit}
 
 .side{background:var(--sidebar);color:var(--sidebar-ink);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
 @media (max-width:860px){.side{padding:14px}}
-.side .co{display:flex;align-items:center;gap:11px;padding:0 8px}
+.side .co{display:flex;align-items:center;gap:11px;padding:0 8px;min-height:40px}
+.colog{width:100%;max-width:176px;height:auto;display:block;filter:brightness(0) invert(1)}
+.cofall .nm{font-family:var(--display);font-weight:800;font-size:1.12rem;color:#fff;letter-spacing:.02em;line-height:1}
+.cofall .sub2{font-family:var(--mono);font-size:.62rem;letter-spacing:.32em;text-transform:uppercase;color:var(--accent-bright);margin-top:4px}
+.cohub{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--sidebar-ink-2);padding:0 8px;margin-top:-14px;
+}
 .side .co .logo{
   width:36px;height:36px;border-radius:8px;background:var(--sidebar-2);flex:none;
   display:grid;place-items:center;font-family:var(--display);font-weight:800;
@@ -70,7 +77,7 @@ a{color:inherit}
 }
 @media (max-width:860px){.side nav button{width:auto;font-size:.85rem;padding:7px 10px}}
 .side nav button:hover{background:var(--sidebar-2);color:#fff}
-.side nav button[aria-current="page"]{background:var(--sidebar-2);color:#fff;font-weight:600}
+.side nav button[aria-current="page"]{background:var(--sidebar-2);color:#fff;font-weight:700;box-shadow:inset 3px 0 0 var(--accent-bright)}
 .side nav .ic{width:16px;height:16px;flex:none;opacity:.9}
 .side .who{margin-top:auto;border-top:1px solid var(--sidebar-2);padding-top:14px;display:flex;align-items:center;gap:10px}
 @media (max-width:860px){.side .who{display:none}}
@@ -80,7 +87,7 @@ a{color:inherit}
 
 .main{padding:26px clamp(16px,3vw,34px) 60px;min-width:0}
 .viewhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
-.viewhead h1{font-size:1.6rem;font-weight:800}
+.viewhead h1{font-size:1.6rem;font-weight:800;letter-spacing:-.01em}
 .viewhead .sub{color:var(--ink-3);font-size:.93rem;margin-top:4px}
 .viewhead .right{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
 
@@ -117,6 +124,7 @@ a{color:inherit}
 
 /* ---------- table ---------- */
 .tablewrap{overflow-x:auto}
+.tablewrap table{min-width:620px}
 table{width:100%;border-collapse:collapse;font-size:.9rem}
 th{
   text-align:left;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
@@ -165,7 +173,7 @@ th.num{text-align:right}
 
 /* ---------- generated document ---------- */
 .docout{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
-.docout .head{border-bottom:2px solid var(--accent);padding-bottom:12px;margin-bottom:16px;display:flex;align-items:flex-end;gap:12px}
+.docout .head{border-bottom:3px solid var(--accent-bright);padding-bottom:12px;margin-bottom:16px;display:flex;align-items:flex-end;gap:12px}
 .docout .head .c{font-family:var(--display);font-weight:800;font-size:1.05rem}
 .docout .head .n{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
 .docout h4{font-family:var(--mono);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 7px}
@@ -187,15 +195,15 @@ th.num{text-align:right}
 .actlist{display:flex;flex-direction:column}
 .act{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:.88rem}
 .act:last-child{border-bottom:none}
-.act .d{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px}
+.act .d{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);margin-top:6px}
 .act .t{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);white-space:nowrap}
 .act b{font-weight:600}
 
 .progress{height:6px;background:var(--line-2);border-radius:999px;overflow:hidden;margin-top:8px}
-.progress span{display:block;height:100%;background:var(--accent);border-radius:999px}
+.progress span{display:block;height:100%;background:var(--accent-bright);border-radius:999px}
 
 .callout{
-  font-size:.85rem;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent);
+  font-size:.85rem;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent-bright);
   padding:12px 14px;border-radius:0 8px 8px 0;margin-top:16px;
 }
 .drop{
@@ -236,12 +244,13 @@ th.num{text-align:right}
 
   <aside class="side">
     <div class="co">
-      <span class="logo">GI</span>
-      <div>
-        <div class="nm">Glacier Industrial</div>
-        <div class="sub">Company hub &mdash; mockup</div>
+      <img id="co-logo" class="colog" src="logos/glacier-ind-logo.png" alt="Glacier Industrial">
+      <div id="co-fallback" class="cofall" hidden>
+        <div class="nm">GLACIER</div>
+        <div class="sub2">Industrial</div>
       </div>
     </div>
+    <div class="cohub">Company hub &mdash; mockup</div>
 
     <nav id="nav">
       <button data-view="dash" aria-current="page">Dashboard</button>
@@ -582,6 +591,14 @@ th.num{text-align:right}
 </div>
 
 <script>
+(function () {
+  var lg = document.getElementById('co-logo'), fb = document.getElementById('co-fallback');
+  if (!lg || !fb) return;
+  function useFallback() { lg.hidden = true; fb.hidden = false; }
+  lg.addEventListener('error', useFallback);
+  if (lg.complete && lg.naturalWidth === 0) useFallback();
+  window.addEventListener('load', function () { if (lg.naturalWidth === 0) useFallback(); });
+})();
 function show(view) {
   var views = document.querySelectorAll('.view');
   for (var i = 0; i < views.length; i++) views[i].hidden = true;
