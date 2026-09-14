@@ -6,7 +6,7 @@
 <title>PureForge</title>
 <meta name="description" content="PureForge helps growing trade and service companies write down how they work, then builds the software to run it: estimating, proposals, crew scopes in two languages, checklists, job tracking and training. Built and hosted for you.">
 <meta property="og:title" content="PureForge — process and internal software for trade and service companies">
-<meta property="og:description" content="Estimating, proposals, crew scopes in English and Spanish, checklists, job tracking and training. One place your team logs into. Built on a hub already in daily use inside a working contractor.">
+<meta property="og:description" content="Estimating, proposals, crew scopes in English and Spanish, checklists, job tracking and training. One place your team logs into. Built on a hub already in daily use inside a working construction services company.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.pureforge.dev/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%231F4E68'/%3E%3Cg transform='translate(32,32) scale(0.9) translate(-32,-32)'%3E%3Cpath d='M5 22 Q11 15 18 15 L59 15 L59 26 L51 26 L45 33 L45 39 L54 44 L54 49 L14 49 L14 44 L23 39 L23 33 L17 26 Q10 25 5 22 Z' fill='%23ffffff'/%3E%3C/g%3E%3C/svg%3E">
@@ -322,6 +322,33 @@ section{scroll-margin-top:78px}
 .next-item h3{font-size:1.03rem}
 .next-item p{font-size:.95rem;color:var(--ink-2)}
 .next-item .k{font-family:var(--mono);font-size:.7rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+[hidden]{display:none !important}
+
+/* client portfolio (hidden until there is at least one) */
+.client-grid{margin-top:34px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+@media (max-width:1000px){.client-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.client-grid{grid-template-columns:1fr}}
+.client{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:24px;display:flex;flex-direction:column;gap:14px;
+}
+.client .idbar{display:flex;align-items:center;gap:12px}
+.client .logo{
+  width:44px;height:44px;border-radius:8px;flex:none;object-fit:contain;
+  background:var(--surface-2);border:1px solid var(--line);padding:4px;
+}
+.client .initials{
+  width:44px;height:44px;border-radius:8px;flex:none;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);
+  font-family:var(--display);font-weight:800;font-size:.95rem;letter-spacing:-.01em;
+}
+.client .nm{font-family:var(--display);font-weight:700;font-size:1rem;letter-spacing:-.01em}
+.client .tr{font-family:var(--mono);font-size:.69rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+.client .res{
+  font-family:var(--display);font-weight:700;font-size:1.1rem;line-height:1.25;
+  letter-spacing:-.015em;color:var(--ink);
+}
+.client .qt{font-size:.95rem;color:var(--ink-2);border-left:3px solid var(--accent-soft);padding-left:14px}
 .measure-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .measure-list li{
   padding:11px 0;border-bottom:1px solid var(--line);font-size:.95rem;color:var(--ink-2);
@@ -463,7 +490,7 @@ section{scroll-margin-top:78px}
       <div class="rule-head"><span class="eyebrow">What it does</span><span class="line"></span></div>
       <div class="sec-intro">
         <span class="live-flag"><i></i>Running today, not a roadmap</span>
-        <h2>Everything here is in daily use inside a working contractor.</h2>
+        <h2>Everything here is in daily use inside a working construction services company.</h2>
         <p>A dozen people log in every day to price work, write proposals, get scopes to the crew, and see where jobs stand. Pick the parts that fit your business. You are not buying all of it.</p>
       </div>
 
@@ -577,6 +604,16 @@ section{scroll-margin-top:78px}
     </div>
   </section>
 
+  <section class="sec" id="clients" hidden style="background:var(--surface);border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="rule-head"><span class="eyebrow">Who we work with</span><span class="line"></span></div>
+      <div class="sec-intro">
+        <h2>Companies running on PureForge.</h2>
+      </div>
+      <div class="client-grid" id="client-grid"></div>
+    </div>
+  </section>
+
   <section class="sec" id="how">
     <div class="wrap">
       <div class="rule-head"><span class="eyebrow">How we work together</span><span class="line"></span></div>
@@ -613,7 +650,7 @@ section{scroll-margin-top:78px}
     <div class="wrap origin">
       <div>
         <div class="rule-head"><span class="eyebrow">Where this came from</span><span class="line"></span></div>
-        <blockquote>PureForge started as an internal tool inside a working contractor, built because writing the same documents from scratch was costing real hours every week. It&rsquo;s in daily use there.</blockquote>
+        <blockquote>PureForge started as an internal tool inside a working construction services company, built because writing the same documents from scratch was costing real hours every week. It&rsquo;s in daily use there.</blockquote>
         <p class="attrib">Built in the field, not in a demo</p>
       </div>
       <div class="facts">
@@ -658,6 +695,73 @@ section{scroll-margin-top:78px}
     <a href="mailto:info@pureforge.dev">Contact</a>
   </div>
 </footer>
+
+<script>
+/* ----------------------------------------------------------------
+   CLIENT LIST
+
+   The "Companies running on PureForge" section stays completely
+   hidden while this list is empty. Add a client and it appears.
+
+   To add one: delete the // from the front of each line in the
+   block below, fill in the details, save, and push.
+
+   logo is optional. Leave it out and their initials are used.
+   To use a logo, put the file in a "logos" folder next to
+   index.html and write it as  logo: "logos/theirname.svg"
+------------------------------------------------------------------ */
+
+const PUREFORGE_CLIENTS = [
+
+  // {
+  //   name:   "Glacier Roofing",
+  //   trade:  "Commercial roofing",
+  //   result: "Saved 14 hours a week on proposals",
+  //   quote:  "It's like we found time nobody knew we had.",
+  //   logo:   "logos/glacier.svg"
+  // },
+
+];
+
+/* --- nothing below here needs editing --- */
+(function () {
+  var section = document.getElementById('clients');
+  var grid = document.getElementById('client-grid');
+  if (!section || !grid) return;
+
+  var list = (typeof PUREFORGE_CLIENTS !== 'undefined' && Array.isArray(PUREFORGE_CLIENTS))
+    ? PUREFORGE_CLIENTS.filter(function (c) { return c && c.name; })
+    : [];
+
+  if (!list.length) { section.hidden = true; return; }
+
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function initials(name) {
+    return String(name).trim().split(/\s+/).slice(0, 2)
+      .map(function (w) { return w.charAt(0).toUpperCase(); }).join('');
+  }
+
+  grid.innerHTML = list.map(function (c) {
+    var badge = c.logo
+      ? '<img class="logo" src="' + esc(c.logo) + '" alt="' + esc(c.name) + ' logo">'
+      : '<span class="initials" aria-hidden="true">' + esc(initials(c.name)) + '</span>';
+    return '<div class="client">' +
+      '<div class="idbar">' + badge +
+        '<div><div class="nm">' + esc(c.name) + '</div>' +
+        (c.trade ? '<div class="tr">' + esc(c.trade) + '</div>' : '') +
+        '</div></div>' +
+      (c.result ? '<p class="res">' + esc(c.result) + '</p>' : '') +
+      (c.quote ? '<p class="qt">&ldquo;' + esc(c.quote) + '&rdquo;</p>' : '') +
+      '</div>';
+  }).join('');
+
+  section.hidden = false;
+})();
+</script>
 
 </body>
 </html>
