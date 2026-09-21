@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Urban Kraft — hub mockup by PureForge</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="A demonstration mockup built by PureForge. Not an Urban Kraft system. All data invented.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+
+:root{
+  --ground:#F1EDE7; --surface:#FFFFFF; --surface-2:#FAF6F1; --sidebar:#1E1B18;
+  --sidebar-2:#332E28; --sidebar-ink:#D9D2C8; --sidebar-ink-2:#948C80;
+  --ink:#1B1B1B; --ink-2:#403C37; --ink-3:#7A736A;
+  --line:#DED6CB; --line-2:#EBE5DC;
+  --accent:#5B4632; --accent-bright:#B8873F; --accent-soft:#F6EDDD; --accent-ink:#FFFFFF;
+  --ember:#A5482A; --ember-soft:#F6E3DA;
+  --good:#4A6B4F; --good-soft:#E2EBE2;
+  --warn:#8A6A12; --warn-soft:#F6EDD4;
+  --radius:10px;
+  --display:"Montserrat","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);color:var(--ink);font-family:var(--body);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.015em}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+a{color:inherit}
+[hidden]{display:none !important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ---------- demo banner ---------- */
+.demobar{
+  background:var(--ember);color:#fff;font-family:var(--mono);font-size:.72rem;
+  letter-spacing:.08em;text-transform:uppercase;padding:7px 16px;text-align:center;
+}
+.demobar b{font-weight:600}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 32px)}
+@media (max-width:860px){.shell{grid-template-columns:1fr}}
+
+.side{background:var(--sidebar);color:var(--sidebar-ink);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+@media (max-width:860px){.side{padding:14px}}
+.side .co{display:flex;align-items:center;gap:11px;padding:0 8px;min-height:40px}
+.colog{width:100%;max-width:176px;height:auto;display:block;filter:brightness(0) invert(1)}
+.cofall .nm{font-family:var(--display);font-weight:800;font-size:1.12rem;color:#fff;letter-spacing:.04em;line-height:1}
+.cofall .sub2{font-family:var(--mono);font-size:.62rem;letter-spacing:.26em;text-transform:uppercase;color:var(--accent-bright);margin-top:5px}
+.cohub{
+  font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--sidebar-ink-2);padding:0 8px;margin-top:-14px;
+}
+
+.side nav{display:flex;flex-direction:column;gap:2px}
+@media (max-width:860px){.side nav{flex-direction:row;flex-wrap:wrap;gap:6px}}
+.side nav button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:0;color:var(--sidebar-ink);padding:9px 10px;border-radius:7px;
+  font-size:.91rem;
+}
+@media (max-width:860px){.side nav button{width:auto;font-size:.85rem;padding:7px 10px}}
+.side nav button:hover{background:var(--sidebar-2);color:#fff}
+.side nav button[aria-current="page"]{background:var(--sidebar-2);color:#fff;font-weight:700;box-shadow:inset 3px 0 0 var(--accent-bright)}
+.side .who{margin-top:auto;border-top:1px solid var(--sidebar-2);padding-top:14px;display:flex;align-items:center;gap:10px}
+@media (max-width:860px){.side .who{display:none}}
+.side .who .av{width:30px;height:30px;border-radius:50%;background:var(--sidebar-2);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:.72rem;color:#fff}
+.side .who .n{font-size:.85rem;color:#fff}
+.side .who .r{font-family:var(--mono);font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--sidebar-ink-2)}
+
+.main{padding:26px clamp(16px,3vw,34px) 60px;min-width:0}
+.viewhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.viewhead h1{font-size:1.6rem;font-weight:800;letter-spacing:-.01em}
+.viewhead .sub{color:var(--ink-3);font-size:.93rem;margin-top:4px}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:8px;
+  padding:9px 16px;font-size:.9rem;font-weight:600;text-decoration:none;
+}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-p:hover{filter:brightness(1.12)}
+.btn-g{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-g:hover{border-color:var(--ink-3)}
+
+/* ---------- cards / tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:24px}
+@media (max-width:1050px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 18px}
+.tile .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.tile .val{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1.1;margin-top:8px;font-variant-numeric:tabular-nums}
+.tile .note{font-size:.82rem;color:var(--ink-3);margin-top:6px}
+.tile .note.up{color:var(--good)}
+.tile .note.down{color:var(--ember)}
+.spark{margin-top:10px;display:block;width:100%;height:30px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.panel > header{
+  padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+@media (max-width:620px){
+  .panel > header .r{margin-left:0;flex-basis:100%}
+  .pricehead{flex-wrap:wrap}
+  .pricehead .tot{margin-left:0;flex-basis:100%}
+}
+.panel > header h2{font-size:1rem;font-weight:700}
+.panel > header .r{margin-left:auto;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.panel .body{padding:18px}
+.cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:960px){.cols{grid-template-columns:1fr}}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto}
+.tablewrap table{min-width:620px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{
+  text-align:left;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:500;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+th.num{text-align:right}
+.prop{font-weight:600}
+.sm{font-size:.8rem;color:var(--ink-3)}
+.over{color:var(--ember);font-weight:600}
+.under{color:var(--good);font-weight:600}
+
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.66rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px;white-space:nowrap;
+}
+.chip::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.chip.accepted{background:var(--good-soft);color:var(--good)}
+.chip.sent{background:var(--accent-soft);color:var(--accent)}
+.chip.draft{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.chip.stale{background:var(--warn-soft);color:var(--warn)}
+.chip.declined{background:var(--ember-soft);color:var(--ember)}
+
+/* ---------- form ---------- */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-family:var(--mono);font-size:.67rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.field input,.field select,.field textarea{
+  font:inherit;font-size:.92rem;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:var(--ink);width:100%;
+}
+.field textarea{min-height:74px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.row2{grid-template-columns:1fr}}
+.checks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.checks label{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;
+  padding:7px 11px;font-size:.87rem;background:var(--surface);cursor:pointer;
+}
+.checks input{accent-color:var(--accent)}
+
+/* ---------- generated document ---------- */
+.docout{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.docout .head{border-bottom:3px solid var(--accent-bright);padding-bottom:12px;margin-bottom:16px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.docout .head .c{font-family:var(--display);font-weight:800;font-size:1.05rem;letter-spacing:.03em}
+.docout .head .n{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+.docout h4{font-family:var(--mono);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:16px 0 7px}
+.docout p{font-size:.9rem;color:var(--ink-2);margin-bottom:8px}
+.docout ul{margin:0 0 8px;padding-left:18px;font-size:.9rem;color:var(--ink-2)}
+.docout li{margin-bottom:4px}
+.docout .sigrow{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+@media (max-width:620px){.docout .sigrow{grid-template-columns:1fr}}
+.docout .sigline{border-bottom:1px solid var(--ink-3);height:26px}
+.docout .siglab{font-family:var(--mono);font-size:.64rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-top:6px}
+
+.working{display:flex;align-items:center;gap:11px;font-size:.9rem;color:var(--ink-2);padding:26px 0;justify-content:center}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+.actlist{display:flex;flex-direction:column}
+.act{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:.88rem}
+.act:last-child{border-bottom:none}
+.act .d{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);margin-top:6px}
+.act b{font-weight:600}
+
+.callout{
+  font-size:.85rem;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent-bright);
+  padding:12px 14px;border-radius:0 8px 8px 0;margin-top:16px;
+}
+.measgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+@media (max-width:900px){.measgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.meas{background:var(--surface);padding:14px 16px}
+.meas .l{font-family:var(--mono);font-size:.63rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.meas .v{font-family:var(--display);font-weight:800;font-size:1.25rem;margin-top:5px;font-variant-numeric:tabular-nums}
+.twoprice{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+@media (max-width:900px){.twoprice{grid-template-columns:1fr}}
+.pricehead{display:flex;align-items:baseline;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.pricehead h3{font-size:1rem;font-weight:700}
+.pricehead .tot{margin-left:auto;font-family:var(--display);font-weight:800;font-size:1.15rem;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.minicard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.minicard h3{font-size:.98rem;font-weight:700;margin-bottom:6px}
+.minicard p{font-size:.87rem;color:var(--ink-2)}
+.sched{display:flex;flex-direction:column;gap:0;font-size:.88rem}
+.sched .wk{display:grid;grid-template-columns:90px 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line-2)}
+.sched .wk:last-child{border-bottom:none}
+.sched .w{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<div class="demobar">
+  <b>Demonstration built by PureForge</b> &nbsp;·&nbsp; Not an Urban Kraft system. Every client, job, number and document below is invented.
+</div>
+
+<div class="shell">
+
+  <aside class="side">
+    <div class="co">
+      <img id="co-logo" class="colog" src="logos/urbankraft-logo.png" alt="Urban Kraft">
+      <div id="co-fallback" class="cofall" hidden>
+        <div class="nm">URBAN KRAFT</div>
+        <div class="sub2">Home Renovations</div>
+      </div>
+    </div>
+    <div class="cohub">Company hub &mdash; mockup</div>
+
+    <nav id="nav">
+      <button data-view="dash" aria-current="page">Dashboard</button>
+      <button data-view="estimate">Estimate a job</button>
+      <button data-view="proposal">Proposal</button>
+      <button data-view="selections">Selections &amp; allowances</button>
+      <button data-view="changes">Change orders</button>
+      <button data-view="pipeline">Pipeline</button>
+    </nav>
+
+    <div class="who">
+      <span class="av">UK</span>
+      <div>
+        <div class="n">Owner</div>
+        <div class="r">Owner view</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ================= DASHBOARD ================= -->
+    <section class="view" id="view-dash">
+      <div class="viewhead">
+        <div>
+          <h1>What an Urban Kraft hub could look like</h1>
+          <p class="sub">Built around the estimate, the proposal, and what happens to the numbers after the job sells &mdash; because in custom work that is where the hours and the margin go.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 20px">
+        This is a mockup, not a product tour. Every number is invented. What is real is the shape: these are the documents a custom kitchen, bath and basement builder rebuilds on every job, and every one of them can come out of a form instead of a blank page.
+      </div>
+
+      <div class="tiles">
+        <div class="tile">
+          <div class="lab">Proposals out</div>
+          <div class="val">$486,200</div>
+          <div class="note">6 jobs waiting on an answer</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,23 20,20 40,21 60,16 80,13 100,11 120,8" fill="none" stroke="#5B4632" stroke-width="2"/><circle cx="120" cy="8" r="3" fill="#5B4632"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Proposals accepted</div>
+          <div class="val">41%</div>
+          <div class="note up">Was 33% before</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,25 20,23 40,21 60,17 80,14 100,12 120,9" fill="none" stroke="#4A6B4F" stroke-width="2"/><circle cx="120" cy="9" r="3" fill="#4A6B4F"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Time to write one</div>
+          <div class="val">25 <span style="font-size:1rem;font-weight:600;color:var(--ink-3)">min</span></div>
+          <div class="note">Was most of an evening</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <rect x="0" y="8" width="26" height="14" fill="#5B4632"/><rect x="28" y="8" width="92" height="14" fill="#E4DACB"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <div class="lab">Allowance overages not billed</div>
+          <div class="val">$14,300</div>
+          <div class="note down">Across 4 open jobs</div>
+          <svg class="spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <polyline points="0,20 20,18 40,15 60,16 80,12 100,10 120,7" fill="none" stroke="#A5482A" stroke-width="2"/><circle cx="120" cy="7" r="3" fill="#A5482A"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>Open work</h2><span class="r">Invented data</span></header>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Job</th><th>What it is</th><th>Status</th><th class="num">Value</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div class="prop">Weatherstone Court</div><div class="sm">Kitchen &middot; full remodel &middot; 320 sq ft</div></td>
+                  <td>In build &mdash; week 3 of 9</td>
+                  <td><span class="chip accepted">Accepted</span></td>
+                  <td class="num">$135,568</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Old Yankee Trace</div><div class="sm">Primary bath &middot; tub-to-shower</div></td>
+                  <td>Proposal with the client</td>
+                  <td><span class="chip sent">Sent 4d ago</span></td>
+                  <td class="num">$68,400</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Rosewood Lane</div><div class="sm">Basement &middot; full finish + bath</div></td>
+                  <td>Proposal with the client</td>
+                  <td><span class="chip stale">No follow-up, 9d</span></td>
+                  <td class="num">$94,750</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Sugar Maple Drive</div><div class="sm">Kitchen &middot; layout &amp; lighting plan</div></td>
+                  <td>Design consult booked</td>
+                  <td><span class="chip draft">Draft</span></td>
+                  <td class="num">&mdash;</td>
+                </tr>
+                <tr>
+                  <td><div class="prop">Clyo Road</div><div class="sm">Powder room &middot; plumbing relocation</div></td>
+                  <td>Signed, starts in October</td>
+                  <td><span class="chip accepted">Accepted</span></td>
+                  <td class="num">$21,300</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Why these screens</h2></header>
+          <div class="body">
+            <div class="actlist">
+              <div class="act"><span class="d"></span><span><b>Estimate a job</b> &mdash; the takeoff and the pricing in one place, so two versions of the same kitchen come out side by side</span></div>
+              <div class="act"><span class="d"></span><span><b>Proposal</b> &mdash; the scope, the allowances and the exclusions, written the same careful way every time</span></div>
+              <div class="act"><span class="d"></span><span><b>Selections &amp; allowances</b> &mdash; what the homeowner actually picked against what you allowed, while there is still time to do something about it</span></div>
+              <div class="act"><span class="d"></span><span><b>Change orders</b> &mdash; signed and priced in an afternoon instead of argued about at the end</span></div>
+              <div class="act"><span class="d"></span><span><b>Pipeline</b> &mdash; every job from first call to final walkthrough, on one page, without asking anybody</span></div>
+            </div>
+            <div class="callout">Nothing here is a guess about your business. It follows what Urban Kraft says it does: listen to why the space is not working, bring options from the field and from designers and suppliers, then build it.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ESTIMATE ================= -->
+    <section class="view" id="view-estimate" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Estimate a job</h1>
+          <p class="sub">Enter the job once. Get an itemized estimate and a second version at upgraded selections, priced off the same takeoff.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        In custom work the client almost always asks for the other number. Today that is a second evening in the spreadsheet, and the two versions rarely line up well enough to put in front of someone on the same page.
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>The job</h2><span class="r">Weatherstone Court &mdash; kitchen</span></header>
+        <div class="body">
+          <div class="row2">
+            <div class="field"><label for="e-client">Client</label><input id="e-client" value="Weatherstone Court &mdash; M. &amp; J. R."></div>
+            <div class="field"><label for="e-type">Project type</label>
+              <select id="e-type">
+                <option>Kitchen &mdash; full remodel</option>
+                <option>Kitchen &mdash; cabinet refresh &amp; counters</option>
+                <option>Primary bath &mdash; full remodel</option>
+                <option>Guest bath / powder room</option>
+                <option>Tub-to-shower conversion</option>
+                <option>Basement finish &mdash; with bath</option>
+              </select></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="e-sf">Room square feet</label><input id="e-sf" value="320"></div>
+            <div class="field"><label for="e-cab">Cabinet boxes</label><input id="e-cab" value="22"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="e-top">Countertop square feet</label><input id="e-top" value="74"></div>
+            <div class="field"><label for="e-tile">Backsplash square feet</label><input id="e-tile" value="62"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="e-floor">Flooring to refinish</label><input id="e-floor" value="620 sq ft &mdash; existing red oak"></div>
+            <div class="field"><label for="e-house">House age</label><input id="e-house" value="1974 &mdash; plaster over lath in part"></div>
+          </div>
+          <div class="field"><label>Scope</label></div>
+          <div class="checks">
+            <label><input type="checkbox" checked> Remove wall to dining</label>
+            <label><input type="checkbox" checked> Relocate sink &amp; dishwasher</label>
+            <label><input type="checkbox" checked> New island with seating</label>
+            <label><input type="checkbox" checked> Lighting plan</label>
+            <label><input type="checkbox" checked> Temporary kitchen</label>
+            <label><input type="checkbox"> Window enlargement</label>
+            <label><input type="checkbox"> Pantry build-out</label>
+          </div>
+          <div class="field"><label for="e-notes">What they told you at the walkthrough</label>
+            <textarea id="e-notes">Two cooks, three kids, everybody ends up in the kitchen and there is nowhere to stand. She wants the wall to the dining room gone and a real island. He wants it done before the holidays. They have been saving for this for four years and have looked at a lot of pictures.</textarea></div>
+          <button class="btn btn-p" id="est-btn" style="width:100%;justify-content:center">Price this job</button>
+          <p class="sm" style="margin-top:12px;text-align:center">In this mockup the button produces sample output from fixed rates.</p>
+        </div>
+      </div>
+
+      <div id="est-working" hidden><div class="working"><span class="spin"></span> Pricing both versions&hellip;</div></div>
+      <div id="est-out" hidden></div>
+    </section>
+
+    <!-- ================= PROPOSAL ================= -->
+    <section class="view" id="view-proposal" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Proposal</h1>
+          <p class="sub">The estimate becomes the document the homeowner reads, in Urban Kraft&rsquo;s voice, with the exclusions intact.</p>
+        </div>
+      </div>
+
+      <div class="cols">
+        <div class="panel">
+          <header><h2>What goes in it</h2></header>
+          <div class="body">
+            <div class="field"><label for="p-job">From estimate</label>
+              <select id="p-job">
+                <option>Weatherstone Court &mdash; kitchen, as specified &mdash; $135,568</option>
+                <option>Weatherstone Court &mdash; kitchen, upgraded selections &mdash; $183,529</option>
+                <option>Old Yankee Trace &mdash; primary bath &mdash; $68,400</option>
+              </select></div>
+            <div class="row2">
+              <div class="field"><label for="p-len">Length</label>
+                <select id="p-len"><option>Standard</option><option>Comprehensive</option></select></div>
+              <div class="field"><label for="p-start">Target start</label><input id="p-start" value="October 13"></div>
+            </div>
+            <div class="row2">
+              <div class="field"><label for="p-weeks">Build weeks</label><input id="p-weeks" value="9"></div>
+              <div class="field"><label for="p-terms">Payment terms</label>
+                <select id="p-terms"><option>Deposit + 4 draws</option><option>Deposit + 3 draws</option><option>Deposit + monthly</option></select></div>
+            </div>
+            <div class="field"><label for="p-voice">Anything specific to say back to them</label>
+              <textarea id="p-voice">They are nervous about living through it with three kids. Say plainly how the temporary kitchen works and which two weeks are the loud ones.</textarea></div>
+            <button class="btn btn-p" id="prop-btn" style="width:100%;justify-content:center">Write the proposal</button>
+            <div class="callout">The legal terms and the exclusions are fixed text in the system, not something the draft writes fresh each time. Those two sections are the ones that get thinned out at nine at night, and they are the ones that decide whether the last ten percent of the job is a fight.</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <header><h2>Document</h2><span class="r" id="prop-state">Not generated</span></header>
+          <div class="body">
+            <p class="sm" id="prop-empty">This is the document that wins or loses the job. Right now it gets written from scratch, or the last one gets copied and somebody hopes every number got changed.</p>
+            <div id="prop-working" hidden><div class="working"><span class="spin"></span> Writing the proposal&hellip;</div></div>
+            <div id="prop-out" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SELECTIONS ================= -->
+    <section class="view" id="view-selections" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Selections &amp; allowances</h1>
+          <p class="sub">What they picked, against what you allowed, while there is still time to do something about it.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        This is the screen with money in it. On custom work the job is usually sold well and then given back a thousand dollars at a time at the tile shop. The overage is not the problem &mdash; finding out about it in November is.
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Weatherstone Court &mdash; kitchen</h2><span class="r">Week 3 of 9 &middot; invented data</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Category</th><th>What they chose</th><th class="num">Allowance</th><th class="num">Actual</th><th class="num">Difference</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="prop">Cabinetry</td><td class="sm">Painted maple, added glass uppers</td><td class="num">$25,300</td><td class="num">$27,900</td><td class="num over">+$2,600</td><td><span class="chip declined">Over</span></td></tr>
+              <tr><td class="prop">Countertops</td><td class="sm">Quartzite slab, mitered edge</td><td class="num">$6,808</td><td class="num">$9,140</td><td class="num over">+$2,332</td><td><span class="chip declined">Over</span></td></tr>
+              <tr><td class="prop">Backsplash tile</td><td class="sm">Ceramic subway, stacked</td><td class="num">$1,364</td><td class="num">$1,290</td><td class="num under">&minus;$74</td><td><span class="chip accepted">Selected</span></td></tr>
+              <tr><td class="prop">Plumbing fixtures</td><td class="sm">Unlacquered brass, pot filler added</td><td class="num">$2,400</td><td class="num">$3,880</td><td class="num over">+$1,480</td><td><span class="chip declined">Over</span></td></tr>
+              <tr><td class="prop">Lighting fixtures</td><td class="sm">Still at the showroom</td><td class="num">$2,850</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td><span class="chip stale">Due in 6 days</span></td></tr>
+              <tr><td class="prop">Cabinet hardware</td><td class="sm">Satin brass pulls, 38 ea</td><td class="num">$684</td><td class="num">$612</td><td class="num under">&minus;$72</td><td><span class="chip accepted">Selected</span></td></tr>
+              <tr><td class="prop">Appliances</td><td class="sm">Package held at the appliance dealer</td><td class="num">$9,500</td><td class="num">$9,500</td><td class="num">&mdash;</td><td><span class="chip accepted">At allowance</span></td></tr>
+              <tr>
+                <td colspan="4" style="font-family:var(--display);font-weight:800">Reconciled to date</td>
+                <td class="num over" style="font-family:var(--display);font-weight:800;font-size:1.05rem">+$6,266</td>
+                <td><span class="chip stale">Not yet billed</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="body" style="border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-p" id="sel-to-co">Write the change order</button>
+          <button class="btn btn-g">Send the selections sheet to the client</button>
+          <button class="btn btn-g">Remind about lighting</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="minicard">
+          <h3>What this is worth</h3>
+          <p>Six thousand dollars on one kitchen, found in week three instead of at the final walkthrough. Across four open jobs it is the $14,300 on the dashboard &mdash; money that was earned and then quietly written off.</p>
+        </div>
+        <div class="minicard">
+          <h3>What the client sees</h3>
+          <p>The same sheet, without your cost side. Homeowners are far easier about an overage they approved in week three than one they discover on the final invoice, and it is the single biggest source of bad reviews in remodeling.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CHANGE ORDERS ================= -->
+    <section class="view" id="view-changes" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Change orders</h1>
+          <p class="sub">Priced, written and signed while the work is still in front of you.</p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Weatherstone Court &mdash; kitchen</h2><span class="r">Contract $135,568</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>No.</th><th>What changed</th><th>Raised</th><th class="num">Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td class="sm">CO-01</td><td>Rotted subfloor at the old sink wall &mdash; replace 44 sq ft</td><td class="sm">Week 1</td><td class="num">$1,180</td><td><span class="chip accepted">Signed</span></td></tr>
+              <tr><td class="sm">CO-02</td><td>Knob-and-tube found in the soffit &mdash; replace two circuits</td><td class="sm">Week 2</td><td class="num">$2,340</td><td><span class="chip accepted">Signed</span></td></tr>
+              <tr><td class="sm">CO-03</td><td>Add pot filler rough-in and shut-off</td><td class="sm">Week 2</td><td class="num">$890</td><td><span class="chip sent">Sent</span></td></tr>
+              <tr><td class="sm">CO-04</td><td>Allowance reconciliation through Sept 18</td><td class="sm">Week 3</td><td class="num">$6,266</td><td><span class="chip draft">Draft</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>Write one</h2></header>
+        <div class="body">
+          <div class="row2">
+            <div class="field"><label for="c-kind">What happened</label>
+              <select id="c-kind">
+                <option>Allowance reconciliation</option>
+                <option>Concealed condition found in demo</option>
+                <option>Client-requested addition</option>
+                <option>Structural or code requirement</option>
+              </select></div>
+            <div class="field"><label for="c-who">Raised by</label><input id="c-who" value="Lead carpenter"></div>
+          </div>
+          <div class="field"><label for="c-notes">In plain words</label>
+            <textarea id="c-notes">Cabinetry, countertops and plumbing fixtures all came in above the allowance after the showroom visits. Backsplash and hardware came in under. Lighting is still open. Reconcile what is known now so nothing stacks up at the end.</textarea></div>
+          <button class="btn btn-p" id="co-btn">Generate change order</button>
+        </div>
+      </div>
+
+      <div id="co-working" hidden><div class="working"><span class="spin"></span> Writing the change order&hellip;</div></div>
+      <div id="co-out" hidden></div>
+    </section>
+
+    <!-- ================= PIPELINE ================= -->
+    <section class="view" id="view-pipeline" hidden>
+      <div class="viewhead">
+        <div>
+          <h1>Pipeline</h1>
+          <p class="sub">Every job from the first phone call to the final walkthrough, on one page, without asking anybody.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin:0 0 18px">
+        The tracker is not about looking organized. It is about the jobs that go quiet. A proposal sitting nine days with no follow-up is the most expensive line on this page.
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <header><h2>All work</h2><span class="r">Invented data</span></header>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Job</th><th>Stage</th><th class="num">Value</th><th>Last touch</th><th>Next step</th></tr></thead>
+            <tbody>
+              <tr><td><div class="prop">Weatherstone Court</div><div class="sm">Kitchen, full remodel</div></td><td><span class="chip accepted">In build &middot; wk 3</span></td><td class="num">$135,568</td><td class="sm">Yesterday</td><td class="sm">Lighting selections due Friday</td></tr>
+              <tr><td><div class="prop">Clyo Road</div><div class="sm">Powder room</div></td><td><span class="chip accepted">Signed</span></td><td class="num">$21,300</td><td class="sm">3 days ago</td><td class="sm">Order vanity, start Oct 6</td></tr>
+              <tr><td><div class="prop">Old Yankee Trace</div><div class="sm">Primary bath</div></td><td><span class="chip sent">Proposal sent</span></td><td class="num">$68,400</td><td class="sm">4 days ago</td><td class="sm">Call Thursday</td></tr>
+              <tr><td><div class="prop">Rosewood Lane</div><div class="sm">Basement finish + bath</div></td><td><span class="chip stale">Sent, gone quiet</span></td><td class="num">$94,750</td><td class="sm">9 days ago</td><td class="sm">Follow up today</td></tr>
+              <tr><td><div class="prop">Sugar Maple Drive</div><div class="sm">Kitchen, design phase</div></td><td><span class="chip draft">Design consult</span></td><td class="num">&mdash;</td><td class="sm">2 days ago</td><td class="sm">Layout options back to her</td></tr>
+              <tr><td><div class="prop">Miamisburg &mdash; Sandalwood</div><div class="sm">Tub-to-shower conversion</div></td><td><span class="chip draft">Estimating</span></td><td class="num">&mdash;</td><td class="sm">Today</td><td class="sm">Price it, send by Wednesday</td></tr>
+              <tr><td><div class="prop">Spring Valley Pike</div><div class="sm">Kitchen, cabinet refresh</div></td><td><span class="chip declined">Declined</span></td><td class="num">$44,100</td><td class="sm">3 weeks ago</td><td class="sm">Went with a lower bid &mdash; logged</td></tr>
+              <tr><td><div class="prop">Normandy Ridge</div><div class="sm">Guest bath</div></td><td><span class="chip accepted">Complete</span></td><td class="num">$38,900</td><td class="sm">Last month</td><td class="sm">Ask for photos and a review</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="minicard">
+          <h3>Why the declined row stays</h3>
+          <p>Spring Valley Pike went to a lower bid. Logged with the reason, ten of those tell you something about your pricing that no single job can. Thrown away, they tell you nothing.</p>
+        </div>
+        <div class="minicard">
+          <h3>Why the complete row stays</h3>
+          <p>Finished jobs are the next jobs. Photos and a review, asked for in the week after the walkthrough instead of three months later, is the cheapest marketing in this business.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  var lg = document.getElementById('co-logo'), fb = document.getElementById('co-fallback');
+  if (!lg || !fb) return;
+  function useFallback() { lg.hidden = true; fb.hidden = false; }
+  lg.addEventListener('error', useFallback);
+  if (lg.complete && lg.naturalWidth === 0) useFallback();
+  window.addEventListener('load', function () { if (lg.naturalWidth === 0) useFallback(); });
+})();
+
+function show(view) {
+  try { window.dispatchEvent(new CustomEvent('pf:view', { detail: view })); } catch (e) {}
+  var views = document.querySelectorAll('.view');
+  for (var i = 0; i < views.length; i++) views[i].hidden = true;
+  var el = document.getElementById('view-' + view);
+  if (el) el.hidden = false;
+  var btns = document.querySelectorAll('#nav button');
+  for (var j = 0; j < btns.length; j++) {
+    if (btns[j].getAttribute('data-view') === view) btns[j].setAttribute('aria-current','page');
+    else btns[j].removeAttribute('aria-current');
+  }
+  window.scrollTo(0, 0);
+}
+document.getElementById('nav').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-view]');
+  if (b) show(b.getAttribute('data-view'));
+});
+document.getElementById('sel-to-co').addEventListener('click', function () { show('changes'); });
+
+/* ---- estimate ---- */
+document.getElementById('est-btn').addEventListener('click', function () {
+  var work = document.getElementById('est-working'), out = document.getElementById('est-out');
+  out.hidden = true; work.hidden = false;
+
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+
+    function lines(head, rows) {
+      return '<div class="tablewrap"><table><thead><tr><th>' + head + '</th><th>Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td>' + r[0] + '</td><td class="sm">' + r[1] + '</td><td class="num sm">' + r[2] + '</td><td class="num">' + r[3] + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+
+    var trades = [
+      ['Demolition, haul-off &amp; site protection', '1 ls', '$4,850', '$4,850'],
+      ['Temporary kitchen in the dining room', '1 ls', '$1,150', '$1,150'],
+      ['Framing &amp; header, wall to dining', '1 ls', '$3,900', '$3,900'],
+      ['Plumbing &mdash; rough-in, relocate sink, final set', '1 ls', '$6,800', '$6,800'],
+      ['Electrical &mdash; rough-in, devices, 9 recessed, 3 circuits', '1 ls', '$7,400', '$7,400'],
+      ['HVAC &mdash; relocate two supplies, add return', '1 ls', '$1,900', '$1,900'],
+      ['Drywall, level 5 at ceiling', '320 sf', '$9.50', '$3,040'],
+      ['Interior paint &mdash; walls, ceiling, trim', '1 ls', '$3,200', '$3,200'],
+      ['Hardwood weave-in &amp; full-floor refinish', '620 sf', '$11.25', '$6,975'],
+      ['Cabinet installation labor', '22 ea', '$165.00', '$3,630'],
+      ['Countertop template, fabrication &amp; install', '1 ls', '$1,250', '$1,250'],
+      ['Tile setting labor, backsplash', '62 sf', '$28.00', '$1,736'],
+      ['Finish carpentry &mdash; trim, crown, panel ends', '1 ls', '$4,600', '$4,600'],
+      ['Permits &amp; inspections', '1 ls', '$1,180', '$1,180'],
+      ['Project management &amp; supervision', '1 ls', '$8,900', '$8,900']
+    ];
+
+    var allowA = [
+      ['Cabinetry &mdash; semi-custom painted maple', '22 ea', '$1,150', '$25,300'],
+      ['Countertops &mdash; quartz, 3 cm', '74 sf', '$92.00', '$6,808'],
+      ['Backsplash tile', '62 sf', '$22.00', '$1,364'],
+      ['Plumbing fixtures', '1 ls', '$2,400', '$2,400'],
+      ['Lighting fixtures', '1 ls', '$2,850', '$2,850'],
+      ['Cabinet hardware', '38 ea', '$18.00', '$684'],
+      ['Appliances', '1 ls', '$9,500', '$9,500']
+    ];
+
+    var allowB = [
+      ['Cabinetry &mdash; full-custom inset, white oak', '22 ea', '$1,850', '$40,700'],
+      ['Countertops &mdash; quartzite, mitered edge', '74 sf', '$148.00', '$10,952'],
+      ['Backsplash tile &mdash; handmade, to the ceiling', '94 sf', '$39.00', '$3,666'],
+      ['Plumbing fixtures &mdash; unlacquered brass', '1 ls', '$4,600', '$4,600'],
+      ['Lighting fixtures &mdash; designer pendants', '1 ls', '$5,200', '$5,200'],
+      ['Cabinet hardware &mdash; solid brass', '38 ea', '$34.00', '$1,292'],
+      ['Appliances &mdash; 48&quot; range, panel-ready refrigeration', '1 ls', '$18,500', '$18,500']
+    ];
+
+    out.innerHTML =
+      '<div class="panel" style="margin-bottom:18px">' +
+        '<header><h2>What the job is</h2><span class="r">Weatherstone Court</span></header>' +
+        '<div class="body" style="padding:0">' +
+          '<div class="measgrid">' +
+            '<div class="meas"><div class="l">Kitchen</div><div class="v">320 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">sf</span></div></div>' +
+            '<div class="meas"><div class="l">Cabinet boxes</div><div class="v">22</div></div>' +
+            '<div class="meas"><div class="l">Countertop</div><div class="v">74 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">sf</span></div></div>' +
+            '<div class="meas"><div class="l">Backsplash</div><div class="v">62 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">sf</span></div></div>' +
+            '<div class="meas"><div class="l">Floor to refinish</div><div class="v">620 <span style="font-size:.8rem;font-weight:600;color:var(--ink-3)">sf</span></div></div>' +
+            '<div class="meas"><div class="l">Wall removal</div><div class="v">Yes</div></div>' +
+            '<div class="meas"><div class="l">Plumbing moved</div><div class="v">Yes</div></div>' +
+            '<div class="meas"><div class="l">Build weeks</div><div class="v">9</div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="panel" style="margin-bottom:18px">' +
+        '<header><h2>Labor &amp; trades</h2><span class="r">Same in both versions except where noted</span></header>' +
+        lines('Item', trades) +
+        '<div class="body" style="border-top:1px solid var(--line)"><p class="sm">Subtotal <b>$60,511</b>. The upgraded version adds $2,706 &mdash; inset cabinetry sets slower, the mitered slab is a two-man lift, and the tile runs to the ceiling.</p></div>' +
+      '</div>' +
+
+      '<div class="twoprice">' +
+        '<div class="panel">' +
+          '<div class="pricehead"><h3>As specified</h3><span class="tot">$135,568</span></div>' +
+          lines('Allowance', allowA) +
+          '<div class="body" style="border-top:1px solid var(--line)">' +
+            '<p class="sm">Trades $60,511 &middot; Allowances $48,906 &middot; Contingency 5% $5,471 &middot; Overhead &amp; profit 18% $20,680</p>' +
+            '<p class="sm" style="margin-top:6px">This is the version most clients start from.</p>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="panel">' +
+          '<div class="pricehead"><h3>Upgraded selections</h3><span class="tot">$183,529</span></div>' +
+          lines('Allowance', allowB) +
+          '<div class="body" style="border-top:1px solid var(--line)">' +
+            '<p class="sm">Trades $63,217 &middot; Allowances $84,910 &middot; Contingency 5% $7,406 &middot; Overhead &amp; profit 18% $27,996</p>' +
+            '<p class="sm" style="margin-top:6px">Same kitchen, same crew, same nine weeks. Only the selections changed.</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">' +
+        '<button class="btn btn-p" id="to-prop">Write the proposal from this</button>' +
+        '<button class="btn btn-g">Download both as Excel</button>' +
+        '<button class="btn btn-g">Send the material list to the supplier</button>' +
+      '</div>' +
+
+      '<div class="callout">Both columns came off one entry of the job. The difference between them &mdash; $47,961 &mdash; is almost entirely selections, and being able to show that on one page is how a client talks themselves into the better kitchen instead of talking themselves out of you.</div>';
+
+    var jump = document.getElementById('to-prop');
+    if (jump) jump.addEventListener('click', function () { show('proposal'); });
+  }, 2000);
+});
+
+/* ---- proposal ---- */
+document.getElementById('prop-btn').addEventListener('click', function () {
+  var empty = document.getElementById('prop-empty'), work = document.getElementById('prop-working'),
+      out = document.getElementById('prop-out'), state = document.getElementById('prop-state');
+  empty.hidden = true; out.hidden = true; work.hidden = false; state.textContent = 'Working';
+
+  setTimeout(function () {
+    work.hidden = true; state.textContent = 'Generated &middot; 2.2s'; out.hidden = false;
+    out.innerHTML =
+    '<div class="docout">' +
+      '<div class="head"><span class="c">URBAN KRAFT</span><span class="n">PROPOSAL &middot; SAMPLE</span></div>' +
+      '<p style="font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02rem">Weatherstone Court &mdash; kitchen remodel</p>' +
+      '<p class="sm">320 sq ft &middot; full remodel &middot; prepared for M. &amp; J. R. &middot; target start October 13</p>' +
+
+      '<h4>What you told us</h4>' +
+      '<p>You cook together, the kids end up in the kitchen no matter what, and there is nowhere for anyone to stand. The wall to the dining room is doing nothing but making two small rooms out of one good one. You have been saving for this for four years, and you would like to be cooking in it before the holidays.</p>' +
+
+      '<h4>What we are building</h4>' +
+      '<ul>' +
+        '<li>Remove the wall between the kitchen and dining room, with a new header carrying the load above.</li>' +
+        '<li>A working island with seating for four, and the sink and dishwasher relocated to it.</li>' +
+        '<li>New cabinetry throughout, with a lighting plan drawn for how the room is actually used.</li>' +
+        '<li>Existing red oak floors woven in where the wall came out, then the whole floor refinished so it reads as one room.</li>' +
+      '</ul>' +
+
+      '<h4>Where your money goes</h4>' +
+      '<p>Everything below marked as an allowance is money set aside for something you have not chosen yet. You pick it, and the real price replaces the allowance &mdash; up or down. Nothing is hidden in the margin.</p>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:10px">' +
+        '<tr><th style="text-align:left;padding:7px 0;border-bottom:1px solid var(--line)">&nbsp;</th><th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Amount</th></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Labor, trades, permits and supervision</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$60,511</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Cabinetry allowance</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$25,300</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Countertop allowance</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$6,808</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Tile, fixtures, lighting and hardware allowances</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$7,298</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Appliance allowance</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$9,500</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Contingency for what is behind the plaster</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$5,471</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Overhead and profit</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$20,680</td></tr>' +
+        '<tr><td style="padding:7px 0"><b>Total</b></td><td class="num" style="padding:7px 0"><b>$135,568</b></td></tr>' +
+      '</table>' +
+
+      '<h4>What is not included</h4>' +
+      '<ul>' +
+        '<li>Anything found behind the plaster beyond the contingency above &mdash; knob-and-tube wiring, failed subfloor, undersized framing. If we find it, you see it, and you get a priced change order before we touch it.</li>' +
+        '<li>Window replacement, pantry build-out, or work outside the kitchen and dining opening.</li>' +
+        '<li>Appliance delivery charges beyond the allowance, and any counter or cabinet modification required by an appliance chosen after cabinetry is ordered.</li>' +
+        '<li>Asbestos or lead abatement, if the 1974 materials require it.</li>' +
+      '</ul>' +
+
+      '<h4>How long it takes</h4>' +
+      '<div class="sched">' +
+        '<div class="wk"><span class="w">Week 1</span><span>Protection goes up, temporary kitchen set in the dining room, demolition. This is a loud week.</span></div>' +
+        '<div class="wk"><span class="w">Week 2</span><span>Framing and the new header. Plumbing, electrical and HVAC rough-in. Inspections. The other loud week.</span></div>' +
+        '<div class="wk"><span class="w">Weeks 3&ndash;4</span><span>Drywall, prime and paint. Cabinetry is being built off-site during this time.</span></div>' +
+        '<div class="wk"><span class="w">Weeks 5&ndash;6</span><span>Cabinets set, countertop template and fabrication. Flooring woven in.</span></div>' +
+        '<div class="wk"><span class="w">Weeks 7&ndash;8</span><span>Countertops in, backsplash, plumbing and electrical final, appliances set.</span></div>' +
+        '<div class="wk"><span class="w">Week 9</span><span>Floor refinish, trim, hardware, punch list and walkthrough.</span></div>' +
+      '</div>' +
+      '<p style="margin-top:10px">You will have a working sink, refrigerator and microwave in the dining room from the end of week one. The two weeks you will feel are one and two.</p>' +
+
+      '<h4>How changes are handled</h4>' +
+      '<p>Nothing gets added to this price by surprise. A change order is written, priced and signed before the work happens, and every selection that lands over or under its allowance shows up on your selections sheet the same week it is chosen &mdash; not at the end.</p>' +
+
+      '<h4>Investment</h4>' +
+      '<p style="font-family:var(--display);font-weight:800;font-size:1.3rem;color:var(--ink)">$135,568</p>' +
+      '<p class="sm">Deposit of $13,557 at signing, then four draws at framing, cabinetry delivery, countertop install and substantial completion. Final payment at walkthrough.</p>' +
+
+      '<div class="sigrow">' +
+        '<div><div class="sigline"></div><div class="siglab">Homeowner &middot; date</div></div>' +
+        '<div><div class="sigline"></div><div class="siglab">Urban Kraft &middot; date</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-p">Download Word file</button>' +
+      '<button class="btn btn-g">Send to the client</button>' +
+      '<button class="btn btn-g">Start the selections sheet</button>' +
+    '</div>' +
+    '<div class="callout">Two things in this document are worth more than the rest of it put together: the allowance table, which tells the client the truth early, and the exclusions, which are the same on every job because they are fixed text and not something anyone has to remember at nine at night.</div>';
+  }, 2200);
+});
+
+/* ---- change order ---- */
+document.getElementById('co-btn').addEventListener('click', function () {
+  var work = document.getElementById('co-working'), out = document.getElementById('co-out');
+  out.hidden = true; work.hidden = false;
+
+  setTimeout(function () {
+    work.hidden = true; out.hidden = false;
+    out.innerHTML =
+    '<div class="docout">' +
+      '<div class="head"><span class="c">URBAN KRAFT</span><span class="n">CHANGE ORDER CO-04 &middot; SAMPLE</span></div>' +
+      '<p style="font-family:var(--display);font-weight:700;color:var(--ink);font-size:1.02rem">Weatherstone Court &mdash; allowance reconciliation</p>' +
+      '<p class="sm">Original contract $135,568 &middot; approved changes to date $3,520 &middot; raised in week 3</p>' +
+
+      '<h4>What changed</h4>' +
+      '<p>After the showroom visits, three of your selections came in above the amount set aside for them and two came in below. Rather than let this collect until the end of the job, here is where it stands today.</p>' +
+
+      '<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:10px">' +
+        '<tr><th style="text-align:left;padding:7px 0;border-bottom:1px solid var(--line)">Category</th>' +
+          '<th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Allowed</th>' +
+          '<th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Chosen</th>' +
+          '<th style="text-align:right;padding:7px 0;border-bottom:1px solid var(--line)">Difference</th></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Cabinetry &mdash; glass uppers added</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$25,300</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$27,900</td><td class="num over" style="padding:7px 0;border-bottom:1px solid var(--line-2)">+$2,600</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Countertops &mdash; quartzite, mitered</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$6,808</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$9,140</td><td class="num over" style="padding:7px 0;border-bottom:1px solid var(--line-2)">+$2,332</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Plumbing fixtures &mdash; brass, pot filler</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$2,400</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$3,880</td><td class="num over" style="padding:7px 0;border-bottom:1px solid var(--line-2)">+$1,480</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Backsplash tile</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$1,364</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$1,290</td><td class="num under" style="padding:7px 0;border-bottom:1px solid var(--line-2)">&minus;$74</td></tr>' +
+        '<tr><td style="padding:7px 0;border-bottom:1px solid var(--line-2)">Cabinet hardware</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$684</td><td class="num" style="padding:7px 0;border-bottom:1px solid var(--line-2)">$612</td><td class="num under" style="padding:7px 0;border-bottom:1px solid var(--line-2)">&minus;$72</td></tr>' +
+        '<tr><td style="padding:7px 0"><b>Net change</b></td><td class="num" style="padding:7px 0">&mdash;</td><td class="num" style="padding:7px 0">&mdash;</td><td class="num over" style="padding:7px 0"><b>+$6,266</b></td></tr>' +
+      '</table>' +
+
+      '<h4>Still open</h4>' +
+      '<p>Lighting fixtures remain unselected against a $2,850 allowance and are due by Friday so the electrician can finish trim-out on schedule. That category will be reconciled on its own change order once chosen.</p>' +
+
+      '<h4>What this does to the job</h4>' +
+      '<ul>' +
+        '<li>No effect on the schedule. Everything above was ordered inside the lead times already planned.</li>' +
+        '<li>Revised contract total: <b>$145,354</b>.</li>' +
+        '<li>Added to the draw at countertop install, not billed separately.</li>' +
+      '</ul>' +
+
+      '<div class="sigrow">' +
+        '<div><div class="sigline"></div><div class="siglab">Homeowner &middot; date</div></div>' +
+        '<div><div class="sigline"></div><div class="siglab">Urban Kraft &middot; date</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-p">Download Word file</button>' +
+      '<button class="btn btn-g">Send for signature</button>' +
+    '</div>' +
+    '<div class="callout">Six thousand dollars, written in four minutes, in week three, with the reasons attached. The version of this conversation that happens in week nine costs the money and the review.</div>';
+  }, 1700);
+});
+</script>
+
+<script>
+/* ============================================================
+   VIEW TRACKING
+
+   Paste your endpoint URL between the quotes below and tracking
+   turns on. Leave it empty and nothing is sent at all.
+
+   Optional: add ?p=a-name to the link to label a specific person
+   e.g.  .../demo-urbankraft-r7q2.html?p=owner
+   ============================================================ */
+
+var PF_TRACK_URL = '';
+
+(function () {
+  if (!PF_TRACK_URL) return;
+
+  var KEY = 'pf_visitor', VKEY = 'pf_visits_' + location.pathname;
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  var visitor = read(KEY);
+  if (!visitor) { visitor = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); store(KEY, visitor); }
+  var visitNo = (parseInt(read(VKEY) || '0', 10) || 0) + 1;
+  store(VKEY, String(visitNo));
+
+  var params = new URLSearchParams(location.search);
+  var started = Date.now();
+  var activeMs = 0, lastTick = Date.now();
+  var screens = {}, current = 'dash', currentSince = Date.now();
+
+  function markScreen(name) {
+    if (current) screens[current] = (screens[current] || 0) + Math.round((Date.now() - currentSince) / 1000);
+    current = name; currentSince = Date.now();
+  }
+  window.addEventListener('pf:view', function (e) { markScreen(e.detail); });
+
+  function payload(type) {
+    markScreen(current);
+    return {
+      type: type,
+      page: location.pathname,
+      person: params.get('p') || (location.pathname.split('/').pop() || 'demo').replace(/\.html$/, ''),
+      visitor: visitor,
+      visitNumber: visitNo,
+      secondsOnPage: Math.round((Date.now() - started) / 1000),
+      activeSeconds: Math.round(activeMs / 1000),
+      screenSeconds: screens,
+      referrer: document.referrer || '(direct)',
+      device: (window.innerWidth < 700 ? 'phone/tablet' : 'desktop') + ' ' + window.innerWidth + 'x' + window.innerHeight,
+      timezone: (Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || '',
+      language: navigator.language || '',
+      at: new Date().toISOString()
+    };
+  }
+
+  function send(type, useBeacon) {
+    var body = JSON.stringify(payload(type));
+    try {
+      if (useBeacon && navigator.sendBeacon) { navigator.sendBeacon(PF_TRACK_URL, body); return; }
+      fetch(PF_TRACK_URL, { method: 'POST', mode: 'no-cors', keepalive: true,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: body }).catch(function () {});
+    } catch (e) {}
+  }
+
+  setInterval(function () {
+    var now = Date.now();
+    if (document.visibilityState === 'visible') activeMs += now - lastTick;
+    lastTick = now;
+  }, 1000);
+
+  send('open', false);
+  var hb = setInterval(function () { if (document.visibilityState === 'visible') send('heartbeat', false); }, 30000);
+  window.addEventListener('pagehide', function () { clearInterval(hb); send('close', true); });
+})();
+</script>
+
+</body>
+</html>
