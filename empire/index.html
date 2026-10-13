@@ -344,6 +344,8 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       <li><b>Realist, Pragmatists:</b> foreign land needs only 2 armies to hold instead of 3.</li>
     </ul>
     <p>Perks can be turned off on the New Game screen. Point at an empire's name in the Empires panel to see its perk.</p>
+    <h3>When an empire falls</h3>
+    <p>Its people don't disappear. They turn to the strongest empire that isn't the one that destroyed them, and their land now leans that way. That land can revolt against the conqueror, but a fallen empire never comes back.</p>
     <h3>The leader</h3>
     <p>When one empire holds more than a third of the map and is well ahead of the next, the others stop fighting each other and turn on it. The Empires panel marks it as the target. That includes you. An empire down to its last three territories is still fair game for anyone.</p>
     <h3>Difficulty</h3>
@@ -402,7 +404,7 @@ const PERKS = [
    convertAfter:2, convertChance:0.35},
   {key:'militarist', name:'Drilled Troops',  short:'Wins a tie on its highest die',
    desc:'When you attack, if your highest die ties the defender\'s highest, you win that pair.',
-   attackTies:true},
+   attackTies:true}, // shockCount:N would limit this to the first N attacks each turn
   {key:'socialist',  name:'Collective Farms', short:'More income from loyal land',
    desc:'Every 2 loyal territories add an army to your income, instead of every 3.',
    loyalPer:2},
@@ -792,6 +794,22 @@ const P_=id=>G.players[id];
 function need(t,p){ p=p||P_(t.owner); return t.ideo===p.ideo?HOLD_SAME:(perk(p).holdOther||HOLD_OTHER); }
 function shownArmies(t){ return UI.preview&&UI.preview[t.id]!==undefined?UI.preview[t.id]:t.armies; }
 function revoltChance(t,p){ const short=need(t,p)-shownArmies(t); return short<=0?0:REVOLT_BY_SHORTFALL[Math.min(short,2)]; }
+// When an empire falls, the people who believed in it don't vanish: they turn to the strongest
+// empire that isn't the one that destroyed them ("you beat us, so we join your enemy").
+// Their land now leans that way, so it can revolt against the conqueror, but a dead empire never returns.
+function orphanPeople(deadId,byId){
+  if(!G) return;
+  const dead=P_(deadId), alive=G.players.filter(q=>q.alive&&q.id!==byId);
+  if(!alive.length) return; // the conqueror is the last one standing: the game is over
+  const heir=alive.slice().sort((a,b)=>owned(b.id).length-owned(a.id).length)[0];
+  let n=0;
+  for(const t of G.map.terrs) if(t.ideo===dead.ideo){ t.ideo=heir.ideo; t.heldTurns=0; n++; }
+  if(!n) return;
+  const by=byId!=null?P_(byId):null;
+  log(`The people of the fallen ${dead.name} turn to the ${heir.name}${by?`, against the ${by.name} who destroyed them`:''}. ${n} ${n===1?'territory':'territories'} now lean ${IDEOS[heir.ideo].name}.`,
+    heir.human?'good':(by&&by.human?'bad':'sys'));
+  if(G.players.some(q=>q.human)) for(const t of G.map.terrs) if(t.ideo===heir.ideo&&P_(t.owner).human&&t.owner!==heir.id) addEvent({kind:'swayed',t:t.id,by:heir.id});
+}
 function owned(pid){ return G.map.terrs.filter(t=>t.owner===pid); }
 function income(pid){
   const mine=owned(pid), p=P_(pid);
@@ -822,10 +840,13 @@ function rollBattle(aId,dId){
   const na=Math.min(3,a.armies-1), nd=Math.min(2,d.armies);
   const ra=Array.from({length:na},()=>1+Math.floor(gameRng()*6)).sort((x,y)=>y-x);
   const rd=Array.from({length:nd},()=>1+Math.floor(gameRng()*6)).sort((x,y)=>y-x);
-  const liberators = d.ideo===att.ideo, drilled = !liberators&&!!perk(att).attackTies;
+  // Shock Assault: only the first territory this empire attacks in a turn
+  const pk=perk(att);
+  if(pk.attackTies){ G.shockTargets=G.shockTargets||[]; if(!G.shockTargets.includes(dId)&&G.shockTargets.length<(pk.shockCount||Infinity)) G.shockTargets.push(dId); }
+  const liberators = d.ideo===att.ideo, drilled = !liberators&&!!pk.attackTies&&(G.shockTargets||[]).includes(dId);
   let la=0, ld=0; const pairs=Math.min(na,nd), lostA=[], lostD=[];
   for(let k=0;k<pairs;k++){
-    const win = ra[k]>rd[k] || (ra[k]===rd[k] && (liberators||(drilled&&k===0)));
+    const win = ra[k]>rd[k] || (ra[k]===rd[k] && (liberators||(drilled&&(k===0||pk.allPairs))));
     if(win){ ld++; lostD.push(k); } else { la++; lostA.push(k); }
   }
   a.armies-=la; d.armies-=ld; if(G.stats) G.stats.battles++;
@@ -850,7 +871,7 @@ function takeOver(res){
   if(P_(loser).human){ log(`The ${P_(a.owner).name} takes your ${d.name} (attacking from ${a.name}).`,'bad');
     addEvent({kind:'lost',t:d.id,by:a.owner,from:a.id}); }
   else log(`${P_(a.owner).name} takes ${d.name}.`, P_(a.owner).human?'good':'');
-  if(!owned(loser).length){ P_(loser).alive=false; P_(loser).outRound=G.round; log(`The ${P_(loser).name} has been wiped from the map.`,'sys');
+  if(!owned(loser).length){ P_(loser).alive=false; P_(loser).outRound=G.round; log(`The ${P_(loser).name} has been wiped from the map.`,'sys'); orphanPeople(loser,a.owner);
     if(!P_(loser).human) addEvent({kind:'out',p:loser,by:a.owner}); }
   checkWinner();
 }
@@ -897,7 +918,7 @@ function endTurnRevolts(pid){
     if(p.human) addEvent({kind:'revolt-lost',t:t.id,to:to.id,had,need:needed});
     if(to.human) addEvent({kind:'revolt-gained',t:t.id,from:pid});
     beep(110,180);
-    if(!owned(pid).length){ p.alive=false; p.outRound=G.round; log(`The ${p.name} has collapsed.`,'sys'); }
+    if(!owned(pid).length){ p.alive=false; p.outRound=G.round; log(`The ${p.name} has collapsed.`,'sys'); orphanPeople(pid,to.id); }
   }
   // foreign land held properly for a while may come round to its owner's ideology
   for(const t of owned(pid)){
@@ -916,7 +937,7 @@ function endTurnRevolts(pid){
 function startTurn(){
   const p=P_(G.cur);
   updateLeader();
-  G.phase='reinforce'; G.moved=false; G.undo=[]; G.attacked=false; UI.sel=-1; UI.target=-1;
+  G.phase='reinforce'; G.moved=false; G.undo=[]; G.attacked=false; G.shockTargets=[]; UI.sel=-1; UI.target=-1;
   G.reserve=reinforcements(G.cur); p.opening=false;
   if(p.human){
     G.report={events:G.events||[],before:G.lastHeld,now:owned(G.cur).length}; G.events=[];
@@ -1489,6 +1510,8 @@ function renderSide(){
     else if(UI.target<0) hint=`Attacking from ${T_(UI.sel).name}. Pick a neighbour to attack.`;
     else hint=`${T_(UI.sel).name} (${T_(UI.sel).armies}) against ${T_(UI.target).name} (${T_(UI.target).armies}).`;
     const can=UI.sel>=0&&UI.target>=0&&T_(UI.sel).armies>=2;
+    if(perk(p).attackTies&&perk(p).shockCount){ const st=G.shockTargets||[], n=perk(p).shockCount;
+      hint+=st.includes(UI.target)?' Shock Assault is with this attack.':st.length<n?' Shock Assault is ready.':' Shock Assault is spent for this turn.'; }
     acts=`<button class="btn" data-act="roll" ${can?'':'disabled'}>Roll</button><button class="btn" data-act="blitz" ${can?'':'disabled'}>Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`+
       (canUndo()?`<button class="btn alt" data-act="undo">Undo deploy</button>`:'');
   } else if(G.phase==='fortify'){
@@ -1703,6 +1726,7 @@ function surrender(){
     t.owner=to.id; t.heldTurns=0;
   }
   me.alive=false; me.outRound=G.round; G.surrendered=true; UI.sel=-1; UI.target=-1; G.marks={};
+  orphanPeople(me.id,null);
   log(`The ${me.name} surrenders. Its lands go over to its rivals.`,'bad');
   checkWinner(); render(); finishGame();
 }
@@ -1942,7 +1966,7 @@ window.__FYE={
     const saved=G; const g=newGame({mapType:'random',size:'medium',ideo:0,rivals:3,seed:1,...opts,allAI:true});
     G=g; const P=G.players.length; let turns=0;
     while(!G.over&&G.round<400){
-      const p=P_(G.cur); updateLeader(); if(G.leader>=0) G.leaderTurns=(G.leaderTurns||0)+1;
+      const p=P_(G.cur); G.shockTargets=[]; updateLeader(); if(G.leader>=0) G.leaderTurns=(G.leaderTurns||0)+1;
       G.reserve=reinforcements(G.cur)+(p.opening?OPENING_POOL:0); p.opening=false;
       const gen=aiTurn(); while(!gen.next().done){}
       endTurnRevolts(G.cur); turns++;
