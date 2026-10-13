@@ -285,7 +285,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
     <canvas id="history" width="560" height="240" aria-label="Territories held by each empire, round by round"></canvas>
     <p class="hread" id="history-read"></p>
     <table class="ostats" id="over-stats"></table>
-    <div class="center"><button class="btn" data-act="quit">New game</button></div>
+    <div class="center"><button class="btn alt" data-act="watch" id="btn-watch" hidden>Watch the war go on</button><button class="btn" data-act="quit">New game</button></div>
   </div>
 </div>
 
@@ -318,7 +318,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       <li><b>Undo.</b> Changed your mind about where you put armies? Undo (or U) takes back placements, one at a time, right up until your first battle of the turn. In the opening, you can undo until you click Done.</li>
       <li><b>Deploy.</b> You get one army for every three territories (never fewer than three), one more for every three loyal territories, plus a bonus for each whole continent you hold. Click your territories to place them. Shift-click places five.</li>
       <li><b>Attack.</b> Click one of your territories with two or more armies, then a neighbour. Lines across the water are sea routes and count as neighbours. Roll once, or Blitz to fight it out.</li>
-      <li><b>Redeploy.</b> One move of armies between two of your neighbouring territories. Then your turn ends.</li>
+      <li><b>Redeploy.</b> One move of armies, then your turn ends. You can always move next door. You can also move further, along a chain of your own territories, as long as every territory in between is <b>heartland</b>: yours, with no foreign neighbours at all. Armies can't slip along a border.</li>
     </ul>
     <h3>The leader</h3>
     <p>When one empire holds more than a third of the map and is well ahead of the next, the others stop fighting each other and turn on it. The Empires panel marks it as the target. That includes you. An empire down to its last three territories is still fair game for anyone.</p>
@@ -760,6 +760,17 @@ function income(pid){
 }
 function reinforcements(pid){ return income(pid).total; }
 function enemyNeighbours(t){ return t.adj.filter(n=>T_(n).owner!==t.owner); }
+// Heartland: your territory with no foreign neighbours at all. Armies travel freely through it.
+function isHeartland(t){ return t.adj.every(n=>T_(n).owner===t.owner); }
+// Every territory of yours that armies from `fromId` can reach this redeploy: next door always,
+// and further along any chain whose in-between territories are all heartland.
+function redeployReach(fromId){
+  const from=T_(fromId), seen=new Set([fromId]), q=[fromId], out=new Set();
+  for(let k=0;k<q.length;k++){ const t=T_(q[k]);
+    if(t.id!==fromId&&!isHeartland(t)) continue; // a border territory is a destination, not a road
+    for(const n of t.adj){ if(seen.has(n)||T_(n).owner!==from.owner) continue; seen.add(n); out.add(n); q.push(n); } }
+  return out;
+}
 
 function log(msg,cls){ G.log.push([msg,cls||'']); if(G.log.length>200) G.log.shift(); renderLog(); }
 
@@ -826,7 +837,7 @@ function checkWinner(){
   const all=G.map.terrs.every(t=>t.owner===G.map.terrs[0].owner);
   const me=G.players.find(p=>p.human);
   if(alive.length===1||all){ G.over=true; G.winner=all?G.map.terrs[0].owner:alive[0].id; }
-  else if(me&&!me.alive){ G.over=true; G.winner=alive.slice().sort((a,b)=>owned(b.id).length-owned(a.id).length)[0].id; }
+  else if(me&&!me.alive&&!G.spectate){ G.over=true; G.humanOut=true; G.winner=alive.slice().sort((a,b)=>owned(b.id).length-owned(a.id).length)[0].id; }
   return G.over;
 }
 
@@ -866,7 +877,7 @@ function startTurn(){
   G.reserve=reinforcements(G.cur); p.opening=false;
   if(p.human){
     G.report={events:G.events||[],before:G.lastHeld,now:owned(G.cur).length}; G.events=[];
-    log(`Turn ${G.round}. You have ${G.reserve} armies to deploy.`,'sys'); save(); beepTune([523,659],60); }
+    log(`Turn ${G.round}. You have ${G.reserve} armies to deploy.`,'sys'); if(!G.spectate) save(); beepTune([523,659],60); }
   render();
   if(!p.human) runAI();
 }
@@ -1042,7 +1053,11 @@ function* aiTurn(){
   for(let k=0;k<q.length;k++){ const t=T_(q[k]); for(const n of t.adj){ if(T_(n).owner===pid&&!dist.has(n)){dist.set(n,dist.get(t.id)+1);q.push(n);} } }
   let from=null,fs=0;
   for(const t of mine){ const d=dist.get(t.id); if(!d) continue; const spare=t.armies-need(t); if(spare>fs){fs=spare;from=t;} }
-  if(from){ const to=from.adj.map(T_).filter(n=>n.owner===pid&&dist.get(n.id)<dist.get(from.id)).sort((a,b)=>dist.get(a.id)-dist.get(b.id))[0];
+  if(from){
+    const reach=[...redeployReach(from.id)].map(T_);
+    const threat=t=>enemyNeighbours(t).reduce((s,id)=>s+T_(id).armies,0)-t.armies;
+    const front=reach.filter(t=>enemyNeighbours(t).length).sort((a,b)=>threat(b)-threat(a))[0];
+    const to=front||reach.filter(n=>dist.get(n.id)<dist.get(from.id)).sort((a,b)=>dist.get(a.id)-dist.get(b.id))[0];
     if(to){ moveArmies(from.id,to.id,fs); yield 'fortify'; } }
 }
 let aiTimer=null;
@@ -1379,7 +1394,8 @@ function render(){
   const human=P_(G.cur).human;
   if(UI.sel>=0){ shadeTerr(UI.sel,patSel);
     if(human&&(G.phase==='attack'||G.phase==='fortify')){ const s=T_(UI.sel);
-      for(const n of s.adj){ const e=T_(n); const ok=G.phase==='attack'?e.owner!==s.owner:e.owner===s.owner; if(ok) shadeTerr(n,patTarget); } } }
+      if(G.phase==='attack'){ for(const n of s.adj) if(T_(n).owner!==s.owner) shadeTerr(n,patTarget); }
+      else for(const n of redeployReach(s.id)) shadeTerr(n,patTarget); } }
   if(UI.target>=0) shadeTerr(UI.target,patSel);
   drawLabels();
   if(UI.placed){ cx.font='13px VT323, monospace'; cx.textAlign='center'; cx.textBaseline='middle';
@@ -1403,6 +1419,7 @@ function renderSide(){
   $('phase').textContent=G.over?'GAME OVER':phaseName+(G.phase==='reinforce'?` — ${G.reserve} left`:G.phase==='setup'?` — place ${G.batch}`:'');
   if(G.phase==='setup') $('turn-title').textContent=`[ Opening, round ${G.setupRound} of ${Math.ceil(OPENING_POOL/OPENING_BATCH)} ]`;
   let hint='', acts='';
+  if(G.spectate&&!G.over){ $('risk').innerHTML=''; }
   if(G.phase==='setup'&&!p.human){
     hint=`The ${p.name} is placing its armies. Watch the highlighted territories.`; }
   else if(G.phase==='setup'){
@@ -1413,7 +1430,7 @@ function renderSide(){
     else { hint='Batch placed. Happy with it? Your rivals place next.';
       acts=`<button class="btn" data-act="setupdone">Done</button>`+undo; } }
   else if(!p.human||UI.busy){
-    hint=UI.sel>=0&&UI.target>=0?`${T_(UI.sel).name} attacks ${T_(UI.target).name}${P_(T_(UI.target).owner).human?' — yours!':'.'}`:`${p.name} is on the move…`; }
+    hint=UI.sel>=0&&UI.target>=0?`${T_(UI.sel).name} attacks ${T_(UI.target).name}${P_(T_(UI.target).owner).human?' — yours!':'.'}`:`${p.name} is on the move…${G.spectate?' (You are watching from exile.)':''}`; }
   else if(G.phase==='reinforce'){
     hint='Click your territories to place armies. Shift-click places 5.';
     acts=`<button class="btn" data-act="auto">Auto-place</button>`+(UI.sel>=0&&T_(UI.sel).owner===G.cur?`<button class="btn alt" data-act="all">All on ${esc(T_(UI.sel).name)}</button>`:'')+
@@ -1426,7 +1443,8 @@ function renderSide(){
     acts=`<button class="btn" data-act="roll" ${can?'':'disabled'}>Roll</button><button class="btn" data-act="blitz" ${can?'':'disabled'}>Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`+
       (canUndo()?`<button class="btn alt" data-act="undo">Undo deploy</button>`:'');
   } else if(G.phase==='fortify'){
-    hint=UI.sel<0?'Optional: pick a territory to move armies from.':`Move from ${T_(UI.sel).name} to which neighbour?`;
+    hint=UI.sel<0?'Optional: pick a territory to move armies from. Armies can march through your heartland (land with no foreign neighbours).'
+      :`Move from ${T_(UI.sel).name} to where? Dotted territories can be reached.`;
     acts=`<button class="btn alt" data-act="endturn">End turn</button>`;
   }
   if(mvState){ hint='Split your armies in the box below the map.'; acts=''; }
@@ -1505,6 +1523,7 @@ function tipHTML(t){
   h+=`<div class="tr"><span>Held by</span><span>${sw(t.owner)}${esc(IDEOS[o.ideo].name)}${o.human?' (you)':''}</span></div>`;
   h+=`<div class="tr"><span>Leans</span><span><span class="sw" style="background:${IDEOS[t.ideo].light}"></span><b style="font-weight:normal">${esc(IDEOS[t.ideo].name)}</b>${mineIdeo?' <span class="ok">your people</span>':''}</span></div>`;
   h+=`<div class="tr"><span>Armies</span><span>${t.armies} <span style="color:#555">(holds with ${nd})</span></span></div>`;
+  if(isHeartland(t)) h+=`<div class="tr"><span>Heartland</span><span style="color:#005500">safe, no foreign neighbours</span></div>`;
   if(!holderIdeo&&t.armies>=nd&&o.human) h+=`<div class="tr"><span>Winning hearts</span><span>${Math.min(t.heldTurns||0,CONVERT_AFTER)}/${CONVERT_AFTER} turns</span></div>`;
   if(t.armies<nd) h+=`<div class="warn">Too thin: ${Math.round(revoltChance(t)*100)}% chance it revolts</div>`;
   return h;
@@ -1543,10 +1562,13 @@ cv.addEventListener('click',ev=>{
   }
   if(G.phase==='fortify'){
     if(t.owner!==G.cur){ flash('Pick your own territories.'); return; }
-    if(UI.sel<0||UI.sel===id||!T_(UI.sel).adj.includes(id)){ UI.sel=id; render(); return; }
+    if(UI.sel<0||UI.sel===id||!redeployReach(UI.sel).has(id)){
+      if(UI.sel>=0&&UI.sel!==id&&T_(UI.sel).armies>=2) flash(`${t.name} can't be reached from ${T_(UI.sel).name}: the way runs past a foreign border. Picked ${t.name} instead.`);
+      UI.sel=id; render(); return; }
     const s=T_(UI.sel); if(s.armies<2){ UI.sel=id; render(); return; }
+    const far=!s.adj.includes(id);
     askMove({title:'Redeploy',from:s.id,to:id,min:1,max:s.armies-1,def:clamp(s.armies-need(s),1,s.armies-1),cancellable:true,
-      text:`Shift armies from ${s.name} to ${t.name}. This ends your turn.`,
+      text:`Shift armies from ${s.name} to ${t.name}${far?', marching through your heartland':''}. This ends your turn.`,
       note:`One army always stays behind. ← → or the buttons to adjust, Enter when done.`,
       cb:n=>{ if(n>0){ moveArmies(s.id,id,n); log(`You move ${n} armies to ${t.name}.`); nextPlayer(); } else { UI.target=-1; render(); } }});
   }
@@ -1615,12 +1637,26 @@ $('dlg-move').addEventListener('click',ev=>{ const b=ev.target.closest('[data-mv
 
 function autoPlace(){ for(const [id,k] of aiPlacement(G.cur,G.reserve)){ T_(id).armies+=k; G.undo.push([id,k]); } G.reserve=0; toAttack(); render(); }
 
+// You are out, but the rest of the world keeps fighting; watch it to the end.
+function watchOn(){
+  $('dlg-over').hidden=true;
+  G.spectate=true; G.over=false; G.humanOut=false; G.winner=undefined;
+  log('You watch from exile as the war goes on.','sys');
+  if(checkWinner()){ finishGame(); return; }
+  let n=G.cur; do{ n=(n+1)%G.players.length; if(n===0){ G.round++; recordHistory(); } }while(!P_(n).alive);
+  G.cur=n; startTurn();
+}
 function finishGame(){
   const w=P_(G.winner), me=G.players.find(q=>q.human);
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   if(me&&w.id===me.id&&!G.victoryShown){ G.victoryShown=true; render(); playVictory(()=>finishGame()); return; }
   if(me){ $('over-head').textContent=w.id===me.id?'VICTORY':'DEFEAT';
-    $('over-text').textContent=w.id===me.id?`In ${G.round} turns the ${w.name} has forged an empire. The world answers to one government: yours.`:`The ${w.name} rules the world after ${G.round} turns. Your empire is a footnote.`;
+    const stillGoing=G.humanOut&&!G.spectate&&G.players.filter(p=>p.alive).length>1;
+    $('over-text').textContent=w.id===me.id?`In ${G.round} turns the ${w.name} has forged an empire. The world answers to one government: yours.`
+      :stillGoing?`Your empire fell in round ${me.outRound||G.round}. The war goes on without you; the ${w.name} leads for now.`
+      :G.spectate?`You fell in round ${me.outRound||'?'}. The ${w.name} went on to rule the world after ${G.round} turns.`
+      :`The ${w.name} rules the world after ${G.round} turns. Your empire is a footnote.`;
+    $('btn-watch').hidden=!stillGoing;
     if(w.id!==me.id) beepTune([392,330,262,196],160);
     recordHistory();
     $('over-stats').innerHTML=statsTable();
@@ -1734,6 +1770,7 @@ document.addEventListener('click',ev=>{
   else if(a==='begin'){ beginGame(newGame({...setup}),true); }
   else if(a==='continue'){ const g=loadSave(); if(g) beginGame(g,false); }
   else if(a==='rules'){ $('dlg-rules').hidden=false; }
+  else if(a==='watch'){ watchOn(); }
   else if(a==='close'){ b.closest('.veil').hidden=true; }
   else if(a==='menu'){ $('dlg-menu').hidden=false; }
   else if(a==='quit'){ document.querySelectorAll('.veil').forEach(v=>v.hidden=true); stopGame(); G=null; show('title'); renderSetup(); }
@@ -1782,7 +1819,7 @@ document.addEventListener('keydown',ev=>{
 
 /* test hook: run computer-only games start to finish, no drawing */
 window.__FYE={
-  buildMap, newGameForTest:(o)=>newGame(o), state:()=>G, ui:()=>UI, playScene:(sc)=>playScene(sc,()=>{}), finish:(w)=>{ G.over=true; G.winner=w; finishGame(); },
+  buildMap, reach:(id)=>[...redeployReach(id)], killMe:()=>{ for(const t of G.map.terrs) if(t.owner===0) t.owner=1; G.players[0].alive=false; G.players[0].outRound=G.round; checkWinner(); finishGame(); }, newGameForTest:(o)=>newGame(o), state:()=>G, ui:()=>UI, playScene:(sc)=>playScene(sc,()=>{}), finish:(w)=>{ G.over=true; G.winner=w; finishGame(); },
   simulate(opts){
     const saved=G; const g=newGame({mapType:'random',size:'medium',ideo:0,rivals:3,seed:1,...opts,allAI:true});
     G=g; const P=G.players.length; let turns=0;
