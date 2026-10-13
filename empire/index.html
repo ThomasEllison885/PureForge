@@ -171,7 +171,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
         <h2>[ New Game ]</h2>
         <div class="row"><span class="lbl">Map</span>
           <button class="opt" data-k="mapType" data-v="random">Random lands</button>
-          <button class="opt" data-k="mapType" data-v="world">Earth (roughly)</button>
+          <button class="opt" data-k="mapType" data-v="world">Earth</button>
         </div>
         <div class="row" id="row-size"><span class="lbl">Size</span>
           <button class="opt" data-k="size" data-v="small">Small</button>
@@ -249,7 +249,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       </div>
     </div>
   </div>
-  <div class="statusbar"><span><span class="hk">E</span> End phase</span><span><span class="hk">Esc</span> Cancel</span><span><span class="hk">V</span> View</span><span><span class="hk">Shift</span>+click Place 5</span></div>
+  <div class="statusbar"><span><span class="hk">E</span> End phase</span><span><span class="hk">Esc</span> Cancel</span><span><span class="hk">V</span> View</span><span><span class="hk">Shift</span>+click Place 5</span><span><span class="hk">U</span> Undo</span></div>
 </section>
 
 <!-- ================= DIALOGS ================= -->
@@ -315,6 +315,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
     <p>Before the first turn, every empire places 9 extra armies, 3 at a time, taking turns. Watch where your rivals build up before you commit the rest.</p>
     <h3>Each turn</h3>
     <ul>
+      <li><b>Undo.</b> Changed your mind about where you put armies? Undo (or U) takes back placements, one at a time, right up until your first battle of the turn. In the opening, you can undo until you click Done.</li>
       <li><b>Deploy.</b> You get one army for every three territories (never fewer than three), one more for every three loyal territories, plus a bonus for each whole continent you hold. Click your territories to place them. Shift-click places five.</li>
       <li><b>Attack.</b> Click one of your territories with two or more armies, then a neighbour. Lines across the water are sea routes and count as neighbours. Roll once, or Blitz to fight it out.</li>
       <li><b>Redeploy.</b> One move of armies between two of your neighbouring territories. Then your turn ends.</li>
@@ -445,7 +446,7 @@ function decodeWorld(){
 // Grow territories outward from seeds over land, with a little noise so borders wander like old maps.
 function growTerritories(land, seeds, rng){
   const owner=new Int16Array(N).fill(-1), dist=new Float32Array(N).fill(Infinity), rough=new Float32Array(N);
-  for(let i=0;i<N;i++) rough[i]=0.75+rng()*0.6;
+  for(let i=0;i<N;i++) rough[i]=0.88+rng()*0.24;
   const h=[];
   seeds.forEach((s,k)=>{dist[s]=0;owner[s]=k;heapPush(h,0,s);});
   while(h.length){
@@ -460,7 +461,29 @@ function growTerritories(land, seeds, rng){
     seedXY.forEach(([sx,sy],k)=>{const dd=(sx-x)**2+(sy-y)**2; if(dd<bd){bd=dd;best=k;}});
     owner[i]=best;
   }
+  tidyBorders(land,owner,seeds);
   return owner;
+}
+// A tile surrounded by its neighbour joins that neighbour; a piece of a territory cut off from
+// its home by another territory joins whoever surrounds it. Islands are left alone.
+function tidyBorders(land,owner,seeds){
+  const seedSet=new Set(seeds);
+  for(let pass=0;pass<2;pass++){
+    for(let i=0;i<N;i++){ if(!land[i]||seedSet.has(i)) continue;
+      const cnt=new Map(); for(const [j] of n8(i)) if(land[j]) cnt.set(owner[j],(cnt.get(owner[j])||0)+1);
+      const mine=cnt.get(owner[i])||0; let best=owner[i],bc=0; for(const [k,v] of cnt) if(v>bc){bc=v;best=k;}
+      if(mine<=1&&bc>=4) owner[i]=best; }
+  }
+  const seen=new Uint8Array(N);
+  for(let i=0;i<N;i++){ if(!land[i]||seen[i]) continue;
+    const k=owner[i], part=[i]; seen[i]=1;
+    for(let q=0;q<part.length;q++) for(const [j] of n8(part[q])) if(land[j]&&!seen[j]&&owner[j]===k){ seen[j]=1; part.push(j); }
+    if(part.includes(seeds[k])) continue;
+    const cnt=new Map(); for(const t of part) for(const j of n4(t)) if(land[j]&&owner[j]!==k) cnt.set(owner[j],(cnt.get(owner[j])||0)+1);
+    if(!cnt.size) continue; // a separate island: keep it
+    let best=k,bc=0; for(const [o,v] of cnt) if(v>bc){bc=v;best=o;}
+    for(const t of part) owner[t]=best;
+  }
 }
 
 function nearestLand(land,x,y){
@@ -474,8 +497,20 @@ function nearestLand(land,x,y){
   return -1;
 }
 
+function smoothCoast(land,keep){
+  for(let pass=0;pass<2;pass++){
+    const next=land.slice();
+    for(let i=0;i<N;i++){ if(keep&&keep.has(i)) continue;
+      let n=0; for(const [j] of n8(i)) n+=land[j];
+      if(land[i]&&n<=1) next[i]=0;        // a lone spur sticking out to sea
+      else if(!land[i]&&n>=6) next[i]=1;  // a one-tile bite out of the coast
+    }
+    land.set(next);
+  }
+}
 function buildWorld(rng){
   const land=decodeWorld();
+  smoothCoast(land,HAND_DRAWN);
   const seeds=[], used=new Set();
   for(const [name,lat,lon] of WORLD_SEEDS){
     const x=(lon+180)/2.5-0.5, y=(84-lat)/2.21875-0.5;
@@ -827,7 +862,7 @@ function endTurnRevolts(pid){
 function startTurn(){
   const p=P_(G.cur);
   updateLeader();
-  G.phase='reinforce'; G.moved=false; UI.sel=-1; UI.target=-1;
+  G.phase='reinforce'; G.moved=false; G.undo=[]; G.attacked=false; UI.sel=-1; UI.target=-1;
   G.reserve=reinforcements(G.cur); p.opening=false;
   if(p.human){
     G.report={events:G.events||[],before:G.lastHeld,now:owned(G.cur).length}; G.events=[];
@@ -857,7 +892,7 @@ function startSetup(){
   setupTurn();
 }
 function setupTurn(){
-  const p=P_(G.cur); UI.sel=-1; UI.target=-1;
+  const p=P_(G.cur); UI.sel=-1; UI.target=-1; G.undo=[];
   G.batch=Math.min(OPENING_BATCH,G.setupLeft[G.cur]);
   render();
   if(!p.human){ UI.busy=true; aiTimer=setTimeout(aiSetupBatch,{normal:500,fast:150,instant:0}[UI.speed]); }
@@ -874,9 +909,24 @@ function aiSetupBatch(){
   render(); beep(330,40);
   aiTimer=setTimeout(()=>{ UI.placed=null; UI.busy=false; nextSetup(); },{normal:900,fast:250,instant:0}[UI.speed]);
 }
-function setupPlace(id,k){
-  const t=T_(id); k=Math.min(k,G.batch); t.armies+=k; G.batch-=k; G.setupLeft[G.cur]-=k; UI.sel=id; beep(880,30);
-  if(G.batch===0) nextSetup(); else render();
+function setupPlace(id,k,auto){
+  const t=T_(id); k=Math.min(k,G.batch); if(k<=0) return;
+  t.armies+=k; G.batch-=k; G.setupLeft[G.cur]-=k; UI.sel=id; beep(880,30);
+  if(!auto) (G.undo=G.undo||[]).push([id,k]);
+  if(G.batch===0&&auto) nextSetup(); else render();
+}
+// Take back the last placement. Deploying can be undone until your first battle of the turn;
+// an opening batch until you hand over to your rivals.
+function canUndo(){
+  if(!G||!P_(G.cur).human||UI.busy||!G.undo||!G.undo.length) return false;
+  return G.phase==='setup'||G.phase==='reinforce'||(G.phase==='attack'&&!G.attacked);
+}
+function undoPlace(){
+  if(!canUndo()) return;
+  const [id,k]=G.undo.pop(); T_(id).armies-=k;
+  if(G.phase==='setup'){ G.batch+=k; G.setupLeft[G.cur]+=k; }
+  else { G.reserve+=k; if(G.phase==='attack'){ G.phase='reinforce'; UI.target=-1; } }
+  UI.sel=G.undo.length?G.undo[G.undo.length-1][0]:-1; beep(220,40); render();
 }
 function nextSetup(){
   const P=G.players.length;
@@ -1118,6 +1168,77 @@ function drawScene(ctx,t,sc,att,def){
     ctx.fillStyle='#FFFF55'; ctx.fillRect(Math.round(fx+20-r/2),Math.round(72-r/4),Math.round(r),Math.round(r/2)); }
 }
 
+
+/* ======================================================================
+   VICTORY — fireworks over your capital, and three seconds of fanfare
+   ====================================================================== */
+const VICTORY_MS=3400;
+function victorySong(){
+  // melody and bass, square waves, about three seconds
+  const mel=[[523,130],[659,130],[784,130],[1047,330],[784,130],[1047,500],[0,60],[880,130],[988,130],[1047,130],[1175,130],[1319,700]];
+  const bass=[[131,390],[0,70],[196,390],[0,70],[262,600],[220,260],[247,260],[262,900]];
+  let t=0; for(const [f,d] of mel){ if(f) beep(f,d*0.9,t); t+=d; }
+  t=0; for(const [f,d] of bass){ if(f) beepVol(f,d*0.85,t,0.02); t+=d; }
+}
+function beepVol(f,ms,at,vol){ if(!UI.sound) return; try{
+  actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+  const o=actx.createOscillator(), g=actx.createGain(), t=actx.currentTime+at/1000;
+  o.type='square'; o.frequency.value=f; g.gain.value=vol; o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+ms/1000);
+}catch(e){} }
+function playVictory(done){
+  const me=G.players.find(p=>p.human), col=IDEOS[me.ideo].light;
+  $('scene-title').textContent='[ Victory ]';
+  $('scene-text').textContent=`The ${me.name} rules the world.`;
+  $('dlg-scene').hidden=false;
+  const ctx=$('scene').getContext('2d'), start=performance.now();
+  sceneState={done,stopped:false};
+  victorySong();
+  const frame=now=>{
+    if(!sceneState||sceneState.stopped) return;
+    const t=Math.min(1,(now-start)/VICTORY_MS);
+    drawVictory(ctx,t,col);
+    if(t<1) requestAnimationFrame(frame); else setTimeout(endScene,1400);
+  };
+  requestAnimationFrame(frame);
+}
+function drawVictory(ctx,t,col){
+  // night sky
+  const sky=['#000022','#000044','#000066','#0000AA'];
+  sky.forEach((c,i)=>{ ctx.fillStyle=c; ctx.fillRect(0,i*18,SW,18); });
+  ctx.fillStyle='#0000AA'; ctx.fillRect(0,72,SW,28);
+  for(let k=0;k<40;k++){ if(sRand(k*3+Math.floor(t*12))<0.15) continue; ctx.fillStyle='#FFFFFF'; ctx.fillRect(Math.floor(sRand(k)*SW),Math.floor(sRand(k+50)*60),1,1); }
+  // fireworks: bursts that bloom and fade in the empire colours
+  const cols=[col,'#FFFF55','#FFFFFF','#FF55FF',col,'#55FFFF'];
+  for(let b=0;b<8;b++){
+    const born=b*0.11; if(t<born) continue;
+    const age=(t-born)*2.2; if(age>1) continue;
+    const cx0=30+sRand(b*7)*180, cy0=12+sRand(b*7+1)*34, r=age*22;
+    ctx.fillStyle=cols[b%cols.length];
+    for(let k=0;k<16;k++){ const a=k/16*Math.PI*2, x=cx0+Math.cos(a)*r, y=cy0+Math.sin(a)*r+age*age*6;
+      if(age<0.8||((k+b)%2)) ctx.fillRect(Math.round(x),Math.round(y),age<0.5?2:1,age<0.5?2:1); }
+    if(age<0.15){ ctx.fillStyle='#FFFFFF'; ctx.fillRect(Math.round(cx0-2),Math.round(cy0-2),4,4); }
+  }
+  // the palace
+  const px=96; ctx.fillStyle=sh(col,-0.55); ctx.fillRect(px-26,56,100,26);
+  ctx.fillStyle=sh(col,-0.35); ctx.fillRect(px-6,44,60,38);
+  ctx.fillStyle=sh(col,-0.2);
+  for(let y=0;y<10;y++){ const w=Math.round(Math.sqrt(100-y*y)*2.6); ctx.fillRect(px+24-w/2,44-y,w,1); }     // dome
+  ctx.fillStyle='#FFFF55'; for(let x=px-20;x<px+70;x+=10) ctx.fillRect(x,62,4,6);                            // lit windows
+  for(let x=px;x<px+50;x+=10) ctx.fillRect(x+2,50,3,5);
+  ctx.fillStyle='#222222'; ctx.fillRect(px+20,70,8,12);
+  // flag goes up the pole, then waves
+  ctx.fillStyle='#DDDDDD'; ctx.fillRect(px+24,22,1,14);
+  const up=Math.min(1,t/0.35), fy=Math.round(30-up*8);
+  for(let x=0;x<12;x++){ const wob=Math.round(Math.sin(x/2+t*20)*1); ctx.fillStyle=x%4===3?sh(col,-0.3):col; ctx.fillRect(px+25+x,fy+wob,1,7); }
+  // the crowd
+  for(let k=0;k<34;k++){ const x=4+k*7, bob=Math.round(Math.abs(Math.sin(t*14+k))*2), y=92-bob;
+    ctx.fillStyle='#E8B088'; ctx.fillRect(x,y-6,2,2); ctx.fillStyle=k%3?'#555555':sh(col,-0.2); ctx.fillRect(x-1,y-4,4,5);
+    if(k%4===1){ ctx.fillStyle='#AAAAAA'; ctx.fillRect(x+3,y-12,1,8); ctx.fillStyle=col; ctx.fillRect(x+4,y-12,4,3); } }
+  // the word, once the flag is up
+  if(t>0.3){ ctx.font='bold 20px VT323, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#AA0000'; ctx.fillText('VICTORY',SW/2+2,10+2); ctx.fillStyle='#FFFF55'; ctx.fillText('VICTORY',SW/2,10); }
+}
+
 /* ======================================================================
    RENDERING
    ====================================================================== */
@@ -1166,7 +1287,7 @@ function drawMap(ctx,map,mode){
     ctx.fillStyle=sh(base,-0.35);
     if(dn!==t) ctx.fillRect(px,py+S-2,S,1);
     if(rt!==t) ctx.fillRect(px+S-2,py,1,S);
-    if(up===t&&dn===t&&lf===t&&rt===t){ const h=tileHash(i*7+3)%16; ctx.fillStyle=sh(base,-0.38);
+    if(up===t&&dn===t&&lf===t&&rt===t){ const h=tileHash(i*7+3)%30; ctx.fillStyle=sh(base,-0.38);
       if(h===0){ ctx.fillRect(px+2,py+1,1,1); ctx.fillRect(px+1,py+2,3,1); ctx.fillRect(px,py+3,5,1); }       // hill
       else if(h===1){ ctx.fillRect(px+1,py+1,3,2); ctx.fillRect(px+2,py+3,1,2); }                            // tree
       else if(h===2){ ctx.fillRect(px+1,py+2,2,2); ctx.fillRect(px+3,py+1,2,2); ctx.fillRect(px+3,py+3,1,2); } // woods
@@ -1285,19 +1406,25 @@ function renderSide(){
   if(G.phase==='setup'&&!p.human){
     hint=`The ${p.name} is placing its armies. Watch the highlighted territories.`; }
   else if(G.phase==='setup'){
-    hint=`Place ${G.batch} ${G.batch===1?'army':'armies'}, then your rivals place theirs. You have ${G.setupLeft[G.cur]} left in all. Shift-click places the whole batch.`;
-    acts=`<button class="btn" data-act="autosetup">Auto-place ${G.batch}</button>`; }
+    const undo=`<button class="btn alt" data-act="undo" ${canUndo()?'':'disabled'}>Undo</button>`;
+    if(G.batch>0){
+      hint=`Place ${G.batch} ${G.batch===1?'army':'armies'}, then your rivals place theirs. You have ${G.setupLeft[G.cur]} left in all. Shift-click places the whole batch.`;
+      acts=`<button class="btn" data-act="autosetup">Auto-place ${G.batch}</button>`+undo; }
+    else { hint='Batch placed. Happy with it? Your rivals place next.';
+      acts=`<button class="btn" data-act="setupdone">Done</button>`+undo; } }
   else if(!p.human||UI.busy){
     hint=UI.sel>=0&&UI.target>=0?`${T_(UI.sel).name} attacks ${T_(UI.target).name}${P_(T_(UI.target).owner).human?' — yours!':'.'}`:`${p.name} is on the move…`; }
   else if(G.phase==='reinforce'){
     hint='Click your territories to place armies. Shift-click places 5.';
-    acts=`<button class="btn" data-act="auto">Auto-place</button>`+(UI.sel>=0&&T_(UI.sel).owner===G.cur?`<button class="btn alt" data-act="all">All on ${esc(T_(UI.sel).name)}</button>`:'');
+    acts=`<button class="btn" data-act="auto">Auto-place</button>`+(UI.sel>=0&&T_(UI.sel).owner===G.cur?`<button class="btn alt" data-act="all">All on ${esc(T_(UI.sel).name)}</button>`:'')+
+      `<button class="btn alt" data-act="undo" ${canUndo()?'':'disabled'}>Undo</button>`;
   } else if(G.phase==='attack'){
     if(UI.sel<0) hint='Pick one of your territories to attack from.';
     else if(UI.target<0) hint=`Attacking from ${T_(UI.sel).name}. Pick a neighbour to attack.`;
     else hint=`${T_(UI.sel).name} (${T_(UI.sel).armies}) against ${T_(UI.target).name} (${T_(UI.target).armies}).`;
     const can=UI.sel>=0&&UI.target>=0&&T_(UI.sel).armies>=2;
-    acts=`<button class="btn" data-act="roll" ${can?'':'disabled'}>Roll</button><button class="btn" data-act="blitz" ${can?'':'disabled'}>Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`;
+    acts=`<button class="btn" data-act="roll" ${can?'':'disabled'}>Roll</button><button class="btn" data-act="blitz" ${can?'':'disabled'}>Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`+
+      (canUndo()?`<button class="btn alt" data-act="undo">Undo deploy</button>`:'');
   } else if(G.phase==='fortify'){
     hint=UI.sel<0?'Optional: pick a territory to move armies from.':`Move from ${T_(UI.sel).name} to which neighbour?`;
     acts=`<button class="btn alt" data-act="endturn">End turn</button>`;
@@ -1400,11 +1527,12 @@ cv.addEventListener('click',ev=>{
   const t=T_(id);
   if(G.phase==='setup'){
     if(t.owner!==G.cur){ flash('That is not yours.'); return; }
+    if(G.batch===0){ flash('Batch placed. Click Done to let your rivals place, or Undo.'); return; }
     setupPlace(id,ev.shiftKey?G.batch:1); return;
   }
   if(G.phase==='reinforce'){
     if(t.owner!==G.cur){ flash('That is not yours.'); return; }
-    const k=Math.min(G.reserve,ev.shiftKey?5:1); t.armies+=k; G.reserve-=k; UI.sel=id; beep(880,30);
+    const k=Math.min(G.reserve,ev.shiftKey?5:1); t.armies+=k; G.reserve-=k; UI.sel=id; beep(880,30); G.undo.push([id,k]);
     if(G.reserve===0) toAttack(); render(); return;
   }
   if(G.phase==='attack'){
@@ -1429,6 +1557,7 @@ function toAttack(){ G.phase='attack'; UI.sel=-1; UI.target=-1; log('Deployed. C
 function doRoll(blitz){
   if(UI.sel<0||UI.target<0) return;
   const s=T_(UI.sel), e=T_(UI.target); let res;
+  G.attacked=true; G.undo=[];
   do{ res=rollBattle(s.id,e.id); }while(blitz&&!res.conquered&&s.armies>=2);
   sfxBattle(res);
   if(res.conquered){
@@ -1484,14 +1613,15 @@ function nudgeMove(v){
 }
 $('dlg-move').addEventListener('click',ev=>{ const b=ev.target.closest('[data-mv]'); if(b) nudgeMove(b.dataset.mv); });
 
-function autoPlace(){ for(const [id,k] of aiPlacement(G.cur,G.reserve)) T_(id).armies+=k; G.reserve=0; toAttack(); render(); }
+function autoPlace(){ for(const [id,k] of aiPlacement(G.cur,G.reserve)){ T_(id).armies+=k; G.undo.push([id,k]); } G.reserve=0; toAttack(); render(); }
 
 function finishGame(){
   const w=P_(G.winner), me=G.players.find(q=>q.human);
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  if(me&&w.id===me.id&&!G.victoryShown){ G.victoryShown=true; render(); playVictory(()=>finishGame()); return; }
   if(me){ $('over-head').textContent=w.id===me.id?'VICTORY':'DEFEAT';
     $('over-text').textContent=w.id===me.id?`In ${G.round} turns the ${w.name} has forged an empire. The world answers to one government: yours.`:`The ${w.name} rules the world after ${G.round} turns. Your empire is a footnote.`;
-    beepTune(w.id===me.id?[523,659,784,1047]:[392,330,262,196],160);
+    if(w.id!==me.id) beepTune([392,330,262,196],160);
     recordHistory();
     $('over-stats').innerHTML=statsTable();
     $('history-read').textContent=`${(G.stats&&G.stats.battles)||0} battles fought. Point at the chart to read any round.`;
@@ -1566,7 +1696,7 @@ function renderSetup(){
   const map=buildMap(setup);
   const saved=G; G=null; drawMap(pvx,map,'none'); G=saved;
   $('preview-note').textContent=setup.mapType==='world'
-    ? `${map.terrs.length} territories on ${map.conts.length} continents. Roughly the real world.`
+    ? `${map.terrs.length} territories on ${map.conts.length} continents.`
     : `Map ${setup.seed}: ${map.terrs.length} territories on ${map.conts.length} continents.`;
   $('btn-continue').hidden=!loadSave();
 }
@@ -1612,9 +1742,11 @@ document.addEventListener('click',ev=>{
   else if(a==='scenes'){ UI.scenes=!UI.scenes; savePrefs(); syncMenus(); }
   else if(a==='speed'){ UI.speed={normal:'fast',fast:'instant',instant:'normal'}[UI.speed]; savePrefs(); syncMenus(); }
   else if(!G||UI.busy||!P_(G.cur).human) return;
-  else if(a==='autosetup'&&G.phase==='setup'){ for(const [id,k] of aiPlacement(G.cur,G.batch)) setupPlace(id,k); }
+  else if(a==='autosetup'&&G.phase==='setup'){ for(const [id,k] of aiPlacement(G.cur,G.batch)) setupPlace(id,k,true); }
   else if(a==='auto') autoPlace();
-  else if(a==='all'){ T_(UI.sel).armies+=G.reserve; G.reserve=0; toAttack(); render(); }
+  else if(a==='all'){ G.undo.push([UI.sel,G.reserve]); T_(UI.sel).armies+=G.reserve; G.reserve=0; toAttack(); render(); }
+  else if(a==='undo') undoPlace();
+  else if(a==='setupdone'&&G.phase==='setup'&&G.batch===0) nextSetup();
   else if(a==='roll') doRoll(false);
   else if(a==='blitz') doRoll(true);
   else if(a==='endattack'){ G.phase='fortify'; UI.sel=-1; UI.target=-1; render(); }
@@ -1639,8 +1771,9 @@ document.addEventListener('keydown',ev=>{
   if(k==='c'){ UI.scenes=!UI.scenes; savePrefs(); syncMenus(); }
   if(k==='d'){ UI.speed={normal:'fast',fast:'instant',instant:'normal'}[UI.speed]; savePrefs(); syncMenus(); }
   if(k==='g'){ $('dlg-menu').hidden=false; }
+  if(k==='u'||(k==='z'&&(ev.ctrlKey||ev.metaKey))){ undoPlace(); ev.preventDefault(); }
   if(k==='e'&&!UI.busy&&P_(G.cur).human&&$('dlg-move').hidden){
-    if(G.phase==='setup'){ for(const [id,k] of aiPlacement(G.cur,G.batch)) setupPlace(id,k); }
+    if(G.phase==='setup'){ if(G.batch===0) nextSetup(); else for(const [id,k] of aiPlacement(G.cur,G.batch)) setupPlace(id,k,true); }
     else if(G.phase==='reinforce'){ if(G.reserve>0) autoPlace(); }
     else if(G.phase==='attack'){ G.phase='fortify'; UI.sel=-1; UI.target=-1; render(); }
     else if(G.phase==='fortify') nextPlayer();
