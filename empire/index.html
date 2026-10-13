@@ -249,7 +249,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       </div>
     </div>
   </div>
-  <div class="statusbar"><span><span class="hk">E</span> End phase</span><span><span class="hk">Esc</span> Cancel</span><span><span class="hk">V</span> View</span><span><span class="hk">Shift</span>+click Place 5</span><span><span class="hk">U</span> Undo</span></div>
+  <div class="statusbar"><span><span class="hk">E</span> End phase</span><span><span class="hk">Esc</span> Cancel</span><span><span class="hk">V</span> View</span><span><span class="hk">Shift</span>+click Place 5</span><span><span class="hk">U</span> Undo</span><span><span class="hk">B</span> Blitz their battle</span></div>
 </section>
 
 <!-- ================= DIALOGS ================= -->
@@ -275,6 +275,15 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
     <p>The game saves itself at the start of each of your turns.</p>
     <div><button class="btn" data-act="close">Back to the war</button></div>
     <div><button class="btn alt" data-act="quit">Quit to title</button></div>
+    <div><button class="btn warn" data-act="surrender" id="btn-surrender">Surrender</button></div>
+  </div>
+</div>
+
+<div class="veil" id="dlg-surrender" hidden>
+  <div class="win gray dlg"><h2>[ Surrender ]</h2>
+    <p>Lay down your arms? Your territories go over to your rivals, each to the empire its people believe in, and your empire is gone for good.</p>
+    <p>You can still watch the war play out to the end.</p>
+    <div class="center"><button class="btn warn" data-act="surrender-yes">Surrender</button><button class="btn" data-act="close">Keep fighting</button></div>
   </div>
 </div>
 
@@ -712,7 +721,7 @@ function buildMap(opts){
    GAME STATE + RULES
    ====================================================================== */
 let G=null;           // the game
-const UI={placed:null,sel:-1,target:-1,hover:-1,view:'owner',sound:true,speed:'normal',busy:false,lastBattle:null,scenes:true,sceneQueue:[]};
+const UI={rush:-1,placed:null,sel:-1,target:-1,hover:-1,view:'owner',sound:true,speed:'normal',busy:false,lastBattle:null,scenes:true,sceneQueue:[]};
 
 function newGame(opts){
   const map=buildMap(opts);
@@ -1079,6 +1088,8 @@ function runAI(){
     let d=r.value==='place'?delay()*2:delay();
     const lb=UI.lastBattle, mine=(r.value==='battle'||r.value==='conquer')&&lb&&P_(lb.prevOwner).human;
     if(mine) d*=r.value==='conquer'?6:3; // battles over your land play out slower
+    if(UI.rush>=0&&UI.rush!==UI.target) UI.rush=-1;            // the blitzed fight is over
+    if(UI.rush>=0&&(r.value==='battle'||r.value==='conquer')) d=Math.min(d,15);
     if(UI.speed!=='instant'){ if(r.value==='battle'||r.value==='conquer') sfxBattle(lb); render(); }
     if(UI.sceneQueue.length){ flushScenes(()=>{ aiTimer=setTimeout(step, delay()); }); return; }
     aiTimer=setTimeout(step, d);
@@ -1430,7 +1441,10 @@ function renderSide(){
     else { hint='Batch placed. Happy with it? Your rivals place next.';
       acts=`<button class="btn" data-act="setupdone">Done</button>`+undo; } }
   else if(!p.human||UI.busy){
-    hint=UI.sel>=0&&UI.target>=0?`${T_(UI.sel).name} attacks ${T_(UI.target).name}${P_(T_(UI.target).owner).human?' — yours!':'.'}`:`${p.name} is on the move…${G.spectate?' (You are watching from exile.)':''}`; }
+    if(UI.sel>=0&&UI.target>=0&&!P_(G.cur).human&&UI.speed!=='instant'){
+      const a=T_(UI.sel), e=T_(UI.target);
+      acts=UI.rush===UI.target?'<span class="note">Blitzing…</span>':`<button class="btn" data-act="blitzai" title="Fight this battle out at once (B)">Blitz this battle</button>`; }
+    hint=UI.sel>=0&&UI.target>=0?`${T_(UI.sel).name} (${T_(UI.sel).armies}) attacks ${T_(UI.target).name} (${T_(UI.target).armies})${P_(T_(UI.target).owner).human?' — yours!':'.'}`:`${p.name} is on the move…${G.spectate?' (You are watching from exile.)':''}`; }
   else if(G.phase==='reinforce'){
     hint='Click your territories to place armies. Shift-click places 5.';
     acts=`<button class="btn" data-act="auto">Auto-place</button>`+(UI.sel>=0&&T_(UI.sel).owner===G.cur?`<button class="btn alt" data-act="all">All on ${esc(T_(UI.sel).name)}</button>`:'')+
@@ -1637,6 +1651,26 @@ $('dlg-move').addEventListener('click',ev=>{ const b=ev.target.closest('[data-mv
 
 function autoPlace(){ for(const [id,k] of aiPlacement(G.cur,G.reserve)){ T_(id).armies+=k; G.undo.push([id,k]); } G.reserve=0; toAttack(); render(); }
 
+function openMenu(){
+  const me=G&&G.players.find(p=>p.human);
+  $('btn-surrender').hidden=!(me&&me.alive&&!G.over&&P_(G.cur).human&&!UI.busy&&!mvState);
+  $('dlg-menu').hidden=false;
+}
+// Give up: every territory you hold goes to the rival its people believe in; land that leans
+// your own way goes to whichever rival has the most armies next to it.
+function surrender(){
+  const me=G.players.find(p=>p.human); if(!me||!me.alive) return;
+  const rivals=G.players.filter(p=>p.alive&&p.id!==me.id);
+  for(const t of owned(me.id)){
+    let to=rivals.find(p=>p.ideo===t.ideo);
+    if(!to){ let best=-1; for(const p of rivals){ const n=t.adj.filter(id=>T_(id).owner===p.id).reduce((s,id)=>s+T_(id).armies,0); if(n>best){best=n;to=p;} } }
+    if(!to||(!t.adj.some(id=>T_(id).owner===to.id)&&to.ideo!==t.ideo)) to=rivals.slice().sort((a,b)=>owned(b.id).length-owned(a.id).length)[0];
+    t.owner=to.id; t.heldTurns=0;
+  }
+  me.alive=false; me.outRound=G.round; G.surrendered=true; UI.sel=-1; UI.target=-1; G.marks={};
+  log(`The ${me.name} surrenders. Its lands go over to its rivals.`,'bad');
+  checkWinner(); render(); finishGame();
+}
 // You are out, but the rest of the world keeps fighting; watch it to the end.
 function watchOn(){
   $('dlg-over').hidden=true;
@@ -1653,7 +1687,7 @@ function finishGame(){
   if(me){ $('over-head').textContent=w.id===me.id?'VICTORY':'DEFEAT';
     const stillGoing=G.humanOut&&!G.spectate&&G.players.filter(p=>p.alive).length>1;
     $('over-text').textContent=w.id===me.id?`In ${G.round} turns the ${w.name} has forged an empire. The world answers to one government: yours.`
-      :stillGoing?`Your empire fell in round ${me.outRound||G.round}. The war goes on without you; the ${w.name} leads for now.`
+      :stillGoing?`Your empire ${G.surrendered?'surrendered':'fell'} in round ${me.outRound||G.round}. The war goes on without you; the ${w.name} leads for now.`
       :G.spectate?`You fell in round ${me.outRound||'?'}. The ${w.name} went on to rule the world after ${G.round} turns.`
       :`The ${w.name} rules the world after ${G.round} turns. Your empire is a footnote.`;
     $('btn-watch').hidden=!stillGoing;
@@ -1772,7 +1806,10 @@ document.addEventListener('click',ev=>{
   else if(a==='rules'){ $('dlg-rules').hidden=false; }
   else if(a==='watch'){ watchOn(); }
   else if(a==='close'){ b.closest('.veil').hidden=true; }
-  else if(a==='menu'){ $('dlg-menu').hidden=false; }
+  else if(a==='menu'){ openMenu(); }
+  else if(a==='surrender'){ $('dlg-menu').hidden=true; $('dlg-surrender').hidden=false; }
+  else if(a==='surrender-yes'){ $('dlg-surrender').hidden=true; surrender(); }
+  else if(a==='blitzai'){ UI.rush=UI.target; }
   else if(a==='quit'){ document.querySelectorAll('.veil').forEach(v=>v.hidden=true); stopGame(); G=null; show('title'); renderSetup(); }
   else if(a==='view'){ UI.view=UI.view==='owner'?'ideo':'owner'; savePrefs(); syncMenus(); render(); }
   else if(a==='sound'){ UI.sound=!UI.sound; savePrefs(); syncMenus(); beep(660,60); }
@@ -1807,7 +1844,8 @@ document.addEventListener('keydown',ev=>{
   if(k==='s'){ UI.sound=!UI.sound; savePrefs(); syncMenus(); }
   if(k==='c'){ UI.scenes=!UI.scenes; savePrefs(); syncMenus(); }
   if(k==='d'){ UI.speed={normal:'fast',fast:'instant',instant:'normal'}[UI.speed]; savePrefs(); syncMenus(); }
-  if(k==='g'){ $('dlg-menu').hidden=false; }
+  if(k==='g'){ openMenu(); }
+  if(k==='b'&&G&&!P_(G.cur).human&&UI.target>=0){ UI.rush=UI.target; }
   if(k==='u'||(k==='z'&&(ev.ctrlKey||ev.metaKey))){ undoPlace(); ev.preventDefault(); }
   if(k==='e'&&!UI.busy&&P_(G.cur).human&&$('dlg-move').hidden){
     if(G.phase==='setup'){ if(G.batch===0) nextSetup(); else for(const [id,k] of aiPlacement(G.cur,G.batch)) setupPlace(id,k,true); }
