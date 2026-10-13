@@ -90,6 +90,8 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
 .log .good{color:var(--lgreen)}
 .legend{font-size:18px;color:var(--gray)}
 .risk{color:var(--lred);font-size:18px}
+.perkline{font-size:18px;color:var(--lcyan);margin-top:4px;min-height:2.3em}
+.perkline b{font-weight:normal;color:var(--yellow)}
 .mapbox{position:relative}
 .tip{position:absolute;z-index:3;pointer-events:none;background:var(--gray);color:var(--black);border:2px solid var(--black);
   box-shadow:5px 5px 0 rgba(0,0,0,.75);font-size:18px;line-height:1.1;min-width:190px;white-space:nowrap}
@@ -149,7 +151,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
 
 <!-- ================= TITLE / SETUP ================= -->
 <section id="scr-title">
-  <div class="menubar"><span class="title">PURE FORGE: FORGE YOUR EMPIRE</span><span class="grow"></span><button data-act="rules"><span class="hk">R</span>ules</button></div>
+  <div class="menubar"><span class="title">PURE FORGE: FORGE YOUR EMPIRE</span><span class="grow"></span><button data-act="music" id="btn-music"><span class="hk">M</span>usic</button><button data-act="rules"><span class="hk">R</span>ules</button></div>
   <div class="desk">
     <div class="logo">
       <svg viewBox="0 0 12 10" aria-hidden="true" shape-rendering="crispEdges">
@@ -186,6 +188,11 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
           <button class="opt" data-k="ideo" data-v="1">Militarist</button><br>
           <button class="opt" data-k="ideo" data-v="2">Socialist</button>
           <button class="opt" data-k="ideo" data-v="3">Realist</button>
+          <div class="perkline" id="perk-line"></div>
+        </div>
+        <div class="row"><span class="lbl">Ideology perks</span>
+          <button class="opt" data-k="perks" data-v="true">On</button>
+          <button class="opt" data-k="perks" data-v="false">Off</button>
         </div>
         <div class="row"><span class="lbl">Difficulty</span>
           <button class="opt" data-k="diff" data-v="easy">Easy</button>
@@ -329,6 +336,14 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       <li><b>Attack.</b> Click one of your territories with two or more armies, then a neighbour. Lines across the water are sea routes and count as neighbours. Roll once, or Blitz to fight it out.</li>
       <li><b>Redeploy.</b> One move of armies, then your turn ends. You can always move next door. You can also move further, along a chain of your own territories, as long as every territory in between is <b>heartland</b>: yours, with no foreign neighbours at all. Armies can't slip along a border.</li>
     </ul>
+    <h3>Ideology perks</h3>
+    <ul>
+      <li><b>Populist, Hearts and Minds:</b> wins foreign land over after 2 turns instead of 3, at 35% a turn instead of 20%.</li>
+      <li><b>Militarist, Drilled Troops:</b> when attacking, a tie between the two highest dice goes to you.</li>
+      <li><b>Socialist, Collective Farms:</b> +1 army for every 2 loyal territories instead of every 3.</li>
+      <li><b>Realist, Pragmatists:</b> foreign land needs only 2 armies to hold instead of 3.</li>
+    </ul>
+    <p>Perks can be turned off on the New Game screen. Point at an empire's name in the Empires panel to see its perk.</p>
     <h3>The leader</h3>
     <p>When one empire holds more than a third of the map and is well ahead of the next, the others stop fighting each other and turn on it. The Empires panel marks it as the target. That includes you. An empire down to its last three territories is still fair game for anyone.</p>
     <h3>Difficulty</h3>
@@ -379,6 +394,24 @@ function lvl(pid){ if(G.players[pid]&&G.players[pid].human) return LEVELS.normal
 function gameLevel(){ return LEVELS[G.opts.diff||'normal']||LEVELS.normal; } // an empire down to this many territories gets finished off, coalition or not            // +1 army for every 3 loyal territories
 // winning hearts: foreign land held at full garrison slowly comes round to its owner
 const CONVERT_AFTER = 3, CONVERT_CHANCE = 0.20;
+// Ideology perks: one trait each, each bending a different rule of the game.
+// Tuned by playing hundreds of computer-only games until every ideology wins about as often.
+const PERKS = [
+  {key:'populist',   name:'Hearts and Minds', short:'Wins foreign land over faster',
+   desc:'Foreign land you hold at full garrison comes round to you after 2 turns instead of 3, with a 35% chance a turn instead of 20%.',
+   convertAfter:2, convertChance:0.35},
+  {key:'militarist', name:'Drilled Troops',  short:'Wins a tie on its highest die',
+   desc:'When you attack, if your highest die ties the defender\'s highest, you win that pair.',
+   attackTies:true},
+  {key:'socialist',  name:'Collective Farms', short:'More income from loyal land',
+   desc:'Every 2 loyal territories add an army to your income, instead of every 3.',
+   loyalPer:2},
+  {key:'realist',    name:'Pragmatists',      short:'Holds foreign land with fewer armies',
+   desc:'Foreign land needs only 2 armies to hold, instead of 3.',
+   holdOther:2},
+];
+const NO_PERK = {};
+function perk(p){ return p&&p.hasPerk?PERKS[p.ideo]:NO_PERK; }
 const LEGEND_H = 18; // legend strip under the map, in canvas pixels
 const SAVE_KEY = 'fye-save-v1', PREF_KEY = 'fye-prefs-v1';
 
@@ -726,8 +759,9 @@ const UI={rush:-1,placed:null,sel:-1,target:-1,hover:-1,view:'owner',sound:true,
 function newGame(opts){
   const map=buildMap(opts);
   const rng=mulberry32((opts.seed*31+Date.now())>>>0);
-  const ideos=[opts.ideo]; for(const k of shuffle([0,1,2,3].filter(i=>i!==opts.ideo),rng)) if(ideos.length<=opts.rivals) ideos.push(k);
-  const players=ideos.map((ideo,k)=>({id:k,ideo,human:k===0&&!opts.allAI,name:IDEOS[ideo].bloc,alive:true,opening:true}));
+  const ideos=opts.forceIdeos?opts.forceIdeos.slice():[opts.ideo]; // forceIdeos: test harness only
+  if(!opts.forceIdeos) for(const k of shuffle([0,1,2,3].filter(i=>i!==opts.ideo),rng)) if(ideos.length<=opts.rivals) ideos.push(k);
+  const players=ideos.map((ideo,k)=>({id:k,ideo,human:k===0&&!opts.allAI,name:IDEOS[ideo].bloc,alive:true,opening:true,hasPerk:opts.perks!==false}));
   // every territory leans to one of the ideologies in play; neighbours tend to agree
   const P=players.length, terrs=map.terrs;
   // Equal shares: every ideology gets the same number of territories (give or take one).
@@ -755,14 +789,14 @@ function gameRng(){ const r=mulberry32(G.rngState); G.rngState=(r()*4294967296)>
 
 const T_=id=>G.map.terrs[id];
 const P_=id=>G.players[id];
-function need(t,p){ p=p||P_(t.owner); return t.ideo===p.ideo?HOLD_SAME:HOLD_OTHER; }
+function need(t,p){ p=p||P_(t.owner); return t.ideo===p.ideo?HOLD_SAME:(perk(p).holdOther||HOLD_OTHER); }
 function shownArmies(t){ return UI.preview&&UI.preview[t.id]!==undefined?UI.preview[t.id]:t.armies; }
-function revoltChance(t,p){ const short=need(t,p)-shownArmies(t); return short<=0?0:(REVOLT_BY_SHORTFALL[Math.min(short,2)]); }
+function revoltChance(t,p){ const short=need(t,p)-shownArmies(t); return short<=0?0:REVOLT_BY_SHORTFALL[Math.min(short,2)]; }
 function owned(pid){ return G.map.terrs.filter(t=>t.owner===pid); }
 function income(pid){
   const mine=owned(pid), p=P_(pid);
   const land=Math.max(3,Math.floor(mine.length/3));
-  const loyalCount=mine.filter(t=>t.ideo===p.ideo).length, loyal=Math.floor(loyalCount/LOYAL_PER_ARMY);
+  const loyalCount=mine.filter(t=>t.ideo===p.ideo).length, loyal=Math.floor(loyalCount/(perk(p).loyalPer||LOYAL_PER_ARMY));
   let conts=0; for(const c of G.map.conts) if(c.terrs.every(id=>T_(id).owner===pid)) conts+=c.bonus;
   const bonus=p.human?0:lvl(pid).bonus;
   return {land,loyal,loyalCount,conts,bonus,total:land+loyal+conts+bonus};
@@ -788,14 +822,14 @@ function rollBattle(aId,dId){
   const na=Math.min(3,a.armies-1), nd=Math.min(2,d.armies);
   const ra=Array.from({length:na},()=>1+Math.floor(gameRng()*6)).sort((x,y)=>y-x);
   const rd=Array.from({length:nd},()=>1+Math.floor(gameRng()*6)).sort((x,y)=>y-x);
-  const liberators = d.ideo===att.ideo;
+  const liberators = d.ideo===att.ideo, drilled = !liberators&&!!perk(att).attackTies;
   let la=0, ld=0; const pairs=Math.min(na,nd), lostA=[], lostD=[];
   for(let k=0;k<pairs;k++){
-    const win = ra[k]>rd[k] || (ra[k]===rd[k] && liberators);
+    const win = ra[k]>rd[k] || (ra[k]===rd[k] && (liberators||(drilled&&k===0)));
     if(win){ ld++; lostD.push(k); } else { la++; lostA.push(k); }
   }
   a.armies-=la; d.armies-=ld; if(G.stats) G.stats.battles++;
-  const res={aId,dId,ra,rd,la,ld,lostA,lostD,dice:na,liberators,conquered:false,prevOwner:d.owner};
+  const res={aId,dId,ra,rd,la,ld,lostA,lostD,dice:na,liberators,drilled,conquered:false,prevOwner:d.owner};
   if(d.armies<=0){ res.conquered=true; }
   UI.lastBattle=res;
   return res;
@@ -870,7 +904,7 @@ function endTurnRevolts(pid){
     if(t.ideo===p.ideo) continue;
     if(t.armies<need(t,p)){ t.heldTurns=0; continue; }
     t.heldTurns=(t.heldTurns||0)+1;
-    if(t.heldTurns<CONVERT_AFTER||gameRng()>=CONVERT_CHANCE) continue;
+    if(t.heldTurns<(perk(p).convertAfter||CONVERT_AFTER)||gameRng()>=(perk(p).convertChance||CONVERT_CHANCE)) continue;
     const was=t.ideo; t.ideo=p.ideo; t.heldTurns=0;
     log(`${t.name} has come round. Its people now lean ${IDEOS[p.ideo].name}.`, p.human?'good':(G.players.some(q=>q.human&&q.ideo===was)?'bad':''));
     if(p.human) addEvent({kind:'converted',t:t.id,was});
@@ -914,6 +948,7 @@ function startSetup(){
 function setupTurn(){
   const p=P_(G.cur); UI.sel=-1; UI.target=-1; G.undo=[];
   G.batch=Math.min(OPENING_BATCH,G.setupLeft[G.cur]);
+  if(p.human&&!G.spectate) save();
   render();
   if(!p.human){ UI.busy=true; aiTimer=setTimeout(aiSetupBatch,{normal:500,fast:150,instant:0}[UI.speed]); }
 }
@@ -1473,12 +1508,12 @@ function renderSide(){
     $('battle-head').innerHTML=`${esc(T_(b.aId).name)} <span class="note">vs</span> ${esc(T_(b.dId).name)}`;
     $('dice').innerHTML=b.ra.map((v,k)=>`<span class="die ${b.lostA.includes(k)?'lost':''}">${v}</span>`).join('')+
       '<span class="note">&nbsp;vs&nbsp;</span>'+b.rd.map((v,k)=>`<span class="die d ${b.lostD.includes(k)?'lost':''}">${v}</span>`).join('');
-    $('battle-res').textContent=(b.conquered?'Conquered! ':`Attacker lost ${b.la}, defender lost ${b.ld}. `)+(b.liberators?'The locals share the attacker\'s ideology, so ties went his way.':'');
+    $('battle-res').textContent=(b.conquered?'Conquered! ':`Attacker lost ${b.la}, defender lost ${b.ld}. `)+(b.liberators?'The locals share the attacker\'s ideology, so ties went his way.':b.drilled&&b.ra.some((v,k)=>k<b.rd.length&&v===b.rd[k])?(b.ra[0]===b.rd[0]?'Drilled Troops: the tie on the highest dice went to the attacker.':''):'');
   } else $('battle-win').hidden=true;
   renderInfo();
   // empires
   $('empires').innerHTML='<tr><td class="note">* = you</td><td class="n note">Land</td><td class="n note">Army</td><td class="n note">+Turn</td></tr>'+
-    G.players.map(q=>{ const m=owned(q.id); return `<tr class="${q.alive?'':'dead'} ${q.human?'me':''}"><td>${sw(q.id)}${esc(IDEOS[q.ideo].name)}${G.leader===q.id&&q.alive?' <span style="color:#FF5555">◄ target</span>':''}</td><td class="n">${m.length}</td><td class="n">${m.reduce((s,t)=>s+t.armies,0)}</td><td class="n">${q.alive?reinforcements(q.id):'-'}</td></tr>`; }).join('');
+    G.players.map(q=>{ const m=owned(q.id); return `<tr class="${q.alive?'':'dead'} ${q.human?'me':''}"><td title="${q.hasPerk?esc(PERKS[q.ideo].name+': '+PERKS[q.ideo].desc):'No perk'}">${sw(q.id)}${esc(IDEOS[q.ideo].name)}${G.leader===q.id&&q.alive?' <span style="color:#FF5555">◄ target</span>':''}</td><td class="n">${m.length}</td><td class="n">${m.reduce((s,t)=>s+t.armies,0)}</td><td class="n">${q.alive?reinforcements(q.id):'-'}</td></tr>`; }).join('');
   if(me&&me.alive){ const inc=income(me.id);
     $('empires').innerHTML+=`<tr><td colspan="4" class="note inc">Your income: ${inc.land} land + ${inc.loyal} loyal (${inc.loyalCount} lands) + ${inc.conts} continents</td></tr>`; }
   // continents
@@ -1494,7 +1529,7 @@ function renderInfo(){
     <div class="kv"><span>Armies</span><b>${shownArmies(t)}</b></div>
     <div class="kv"><span>Leans</span><span><span class="sw" style="background:${IDEOS[t.ideo].light}"></span>${esc(IDEOS[t.ideo].name)}</span></div>
     <div class="kv"><span>Needs to hold</span><b>${nd}</b></div>
-    ${t.ideo!==o.ideo&&t.armies>=nd&&o.human?`<div class="kv"><span>Winning hearts</span><b>${Math.min(t.heldTurns||0,CONVERT_AFTER)}/${CONVERT_AFTER} turns${(t.heldTurns||0)>=CONVERT_AFTER?`, ${Math.round(CONVERT_CHANCE*100)}%/turn`:''}</b></div>`:''}
+    ${t.ideo!==o.ideo&&t.armies>=nd&&o.human?`<div class="kv"><span>Winning hearts</span><b>${Math.min(t.heldTurns||0,perk(o).convertAfter||CONVERT_AFTER)}/${perk(o).convertAfter||CONVERT_AFTER} turns${(t.heldTurns||0)>=(perk(o).convertAfter||CONVERT_AFTER)?`, ${Math.round((perk(o).convertChance||CONVERT_CHANCE)*100)}%/turn`:''}</b></div>`:''}
     ${t.armies<nd?`<div style="color:#FF5555">Too thin: ${Math.round(revoltChance(t)*100)}% chance it revolts.</div>`:''}`;
 }
 function renderLog(){
@@ -1538,7 +1573,7 @@ function tipHTML(t){
   h+=`<div class="tr"><span>Leans</span><span><span class="sw" style="background:${IDEOS[t.ideo].light}"></span><b style="font-weight:normal">${esc(IDEOS[t.ideo].name)}</b>${mineIdeo?' <span class="ok">your people</span>':''}</span></div>`;
   h+=`<div class="tr"><span>Armies</span><span>${t.armies} <span style="color:#555">(holds with ${nd})</span></span></div>`;
   if(isHeartland(t)) h+=`<div class="tr"><span>Heartland</span><span style="color:#005500">safe, no foreign neighbours</span></div>`;
-  if(!holderIdeo&&t.armies>=nd&&o.human) h+=`<div class="tr"><span>Winning hearts</span><span>${Math.min(t.heldTurns||0,CONVERT_AFTER)}/${CONVERT_AFTER} turns</span></div>`;
+  if(!holderIdeo&&t.armies>=nd&&o.human) h+=`<div class="tr"><span>Winning hearts</span><span>${Math.min(t.heldTurns||0,perk(o).convertAfter||CONVERT_AFTER)}/${perk(o).convertAfter||CONVERT_AFTER} turns</span></div>`;
   if(t.armies<nd) h+=`<div class="warn">Too thin: ${Math.round(revoltChance(t)*100)}% chance it revolts</div>`;
   return h;
 }
@@ -1753,16 +1788,59 @@ function loadSave(){ try{ const s=localStorage.getItem(SAVE_KEY); if(!s) return 
 function savePrefs(){ try{ localStorage.setItem(PREF_KEY,JSON.stringify({sound:UI.sound,speed:UI.speed,view:UI.view,scenes:UI.scenes})); }catch(e){} }
 function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); if(typeof p.sound==='boolean') UI.sound=p.sound; if(p.speed) UI.speed=p.speed; if(p.view) UI.view=p.view; if(typeof p.scenes==='boolean') UI.scenes=p.scenes; }catch(e){} }
 
+
+/* ======================================================================
+   TITLE MUSIC — an original march for the PC speaker, about 11 seconds
+   ====================================================================== */
+const NOTE_IDX={C:0,'C#':1,D:2,'D#':3,E:4,F:5,'F#':6,G:7,'G#':8,A:9,'A#':10,B:11};
+function nf(n){ const m=/^([A-G]#?)(\d)$/.exec(n); return 440*Math.pow(2,(NOTE_IDX[m[1]]+12*(+m[2]+1)-69)/12); }
+const MARCH_STEP=170; // ms per step; 4 steps to a bar
+const MARCH_MELODY=[ // [note, steps]
+  ['G4',1],['C5',1],['C5',1],['E5',1], ['G5',2],['E5',1],['C5',1], ['D5',1],['E5',1],['F5',1],['D5',1], ['E5',2],['C5',2],
+  ['G4',1],['C5',1],['C5',1],['E5',1], ['G5',2],['A5',1],['G5',1], ['F5',1],['E5',1],['D5',1],['B4',1], ['C5',4],
+  ['E5',1],['E5',1],['F5',1],['G5',1], ['A5',2],['G5',1],['F5',1], ['E5',1],['F5',1],['G5',1],['E5',1], ['D5',2],['G4',2],
+  ['C5',1],['E5',1],['G5',1],['C6',1], ['B5',2],['A5',1],['G5',1], ['F5',1],['D5',1],['B4',1],['D5',1], ['C5',3],['C6',1]];
+const MARCH_CHORDS=['C','C','G','C', 'C','C','G','C', 'C','F','C','G', 'C','G','G','C']; // one per bar
+const CHORD_BASS={C:['C3','G2'],G:['G2','D3'],F:['F2','C3']};
+let musicNodes=[], musicTimer=null, musicPlayed=false;
+function musicNote(f,ms,at,vol,type){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(), g=actx.createGain(), t=actx.currentTime+at/1000;
+    o.type=type||'square'; o.frequency.value=f; g.gain.setValueAtTime(vol,t); g.gain.setValueAtTime(vol,t+ms/1000*0.85); g.gain.linearRampToValueAtTime(0,t+ms/1000);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+ms/1000+0.02); musicNodes.push(o);
+  }catch(e){}
+}
+function playMarch(){
+  if(!UI.sound) return;
+  stopMusic(); musicPlayed=true;
+  let t=0;
+  for(const [n,len] of MARCH_MELODY){ musicNote(nf(n),len*MARCH_STEP*0.92,t,0.032); t+=len*MARCH_STEP; }
+  MARCH_CHORDS.forEach((c,bar)=>{ const [root,fifth]=CHORD_BASS[c], b0=bar*4*MARCH_STEP;
+    musicNote(nf(root),MARCH_STEP*1.6,b0,0.022); musicNote(nf(fifth),MARCH_STEP*1.6,b0+2*MARCH_STEP,0.022);
+    musicNote(70,25,b0+MARCH_STEP,0.03,'triangle'); musicNote(70,25,b0+3*MARCH_STEP,0.03,'triangle'); }); // drum taps
+  syncMusicBtn();
+  musicTimer=setTimeout(()=>{ musicNodes=[]; syncMusicBtn(); },t+200);
+}
+function stopMusic(){ for(const o of musicNodes){ try{ o.stop(); }catch(e){} } musicNodes=[]; clearTimeout(musicTimer); syncMusicBtn(); }
+function syncMusicBtn(){ const b=$('btn-music'); if(b) b.innerHTML=`<span class="hk">M</span>usic${musicNodes.length?': stop':''}`; }
+// browsers only allow sound after a click or key press, so the march starts on the first one
+function titleMusicOnce(){ if(!musicPlayed&&!$('scr-title').hidden) playMarch(); }
+document.addEventListener('pointerdown',ev=>{ if(!ev.target.closest('[data-act="music"]')) titleMusicOnce(); },{capture:true});
+document.addEventListener('keydown',()=>titleMusicOnce(),{capture:true});
+
 /* ======================================================================
    SCREENS + MENUS
    ====================================================================== */
-const setup={mapType:'random',size:'medium',diff:'normal',ideo:0,rivals:2,seed:Math.floor(Math.random()*90000)+10000};
+const setup={mapType:'random',size:'medium',diff:'normal',perks:true,ideo:0,rivals:2,seed:Math.floor(Math.random()*90000)+10000};
 const pv=$('preview'), pvx=pv.getContext('2d');
 function renderSetup(){
   document.querySelectorAll('.opt').forEach(b=>{ const on=String(setup[b.dataset.k])===b.dataset.v;
     b.setAttribute('aria-pressed',on); b.textContent=(on?'(•) ':'( ) ')+b.textContent.replace(/^\(.\) /,''); });
   $('row-size').hidden=setup.mapType==='world'; $('row-seed').hidden=setup.mapType==='world';
   $('seed').value=setup.seed;
+  const pk=PERKS[setup.ideo];
+  $('perk-line').innerHTML=setup.perks?`<b>${esc(pk.name)}:</b> ${esc(pk.desc)}`:'<span class="note">Perks off: every ideology plays by the same rules.</span>';
   const map=buildMap(setup);
   const saved=G; G=null; drawMap(pvx,map,'none'); G=saved;
   $('preview-note').textContent=setup.mapType==='world'
@@ -1797,12 +1875,13 @@ $('history').addEventListener('mousemove',historyHover);
 document.addEventListener('click',ev=>{
   if(ev.target.closest('[data-act="scene-skip"]')){ endScene(); return; }
   const o=ev.target.closest('.opt');
-  if(o){ const k=o.dataset.k; setup[k]=k==='mapType'||k==='size'||k==='diff'?o.dataset.v:+o.dataset.v; renderSetup(); return; }
+  if(o){ const k=o.dataset.k; setup[k]=k==='perks'?o.dataset.v==='true':k==='mapType'||k==='size'||k==='diff'?o.dataset.v:+o.dataset.v; renderSetup(); return; }
   const b=ev.target.closest('[data-act]'); if(!b) return;
   const a=b.dataset.act;
   if(a==='reroll'){ setup.seed=Math.floor(Math.random()*90000)+10000; renderSetup(); }
-  else if(a==='begin'){ beginGame(newGame({...setup}),true); }
-  else if(a==='continue'){ const g=loadSave(); if(g) beginGame(g,false); }
+  else if(a==='begin'){ stopMusic(); beginGame(newGame({...setup}),true); }
+  else if(a==='continue'){ const g=loadSave(); if(g){ stopMusic(); beginGame(g,false); } }
+  else if(a==='music'){ if(musicNodes.length) stopMusic(); else { const was=UI.sound; UI.sound=true; playMarch(); UI.sound=was; } }
   else if(a==='rules'){ $('dlg-rules').hidden=false; }
   else if(a==='watch'){ watchOn(); }
   else if(a==='close'){ b.closest('.veil').hidden=true; }
@@ -1839,6 +1918,7 @@ document.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
   if(k==='escape'){ document.querySelectorAll('.veil').forEach(v=>{ if(v.id!=='dlg-move'&&v.id!=='dlg-over') v.hidden=true; }); if(G){ UI.sel=-1; UI.target=-1; render(); } return; }
   if(k==='r'&&!ev.metaKey&&!ev.ctrlKey){ $('dlg-rules').hidden=false; return; }
+  if(k==='m'&&!$('scr-title').hidden){ if(musicNodes.length) stopMusic(); else { const was=UI.sound; UI.sound=true; playMarch(); UI.sound=was; } return; }
   if(!G||$('scr-game').hidden) return;
   if(k==='v'){ UI.view=UI.view==='owner'?'ideo':'owner'; savePrefs(); syncMenus(); render(); }
   if(k==='s'){ UI.sound=!UI.sound; savePrefs(); syncMenus(); }
@@ -1857,7 +1937,7 @@ document.addEventListener('keydown',ev=>{
 
 /* test hook: run computer-only games start to finish, no drawing */
 window.__FYE={
-  buildMap, reach:(id)=>[...redeployReach(id)], killMe:()=>{ for(const t of G.map.terrs) if(t.owner===0) t.owner=1; G.players[0].alive=false; G.players[0].outRound=G.round; checkWinner(); finishGame(); }, newGameForTest:(o)=>newGame(o), state:()=>G, ui:()=>UI, playScene:(sc)=>playScene(sc,()=>{}), finish:(w)=>{ G.over=true; G.winner=w; finishGame(); },
+  buildMap, perks:PERKS, reach:(id)=>[...redeployReach(id)], killMe:()=>{ for(const t of G.map.terrs) if(t.owner===0) t.owner=1; G.players[0].alive=false; G.players[0].outRound=G.round; checkWinner(); finishGame(); }, newGameForTest:(o)=>newGame(o), state:()=>G, ui:()=>UI, playScene:(sc)=>playScene(sc,()=>{}), finish:(w)=>{ G.over=true; G.winner=w; finishGame(); },
   simulate(opts){
     const saved=G; const g=newGame({mapType:'random',size:'medium',ideo:0,rivals:3,seed:1,...opts,allAI:true});
     G=g; const P=G.players.length; let turns=0;
@@ -1869,7 +1949,7 @@ window.__FYE={
       if(G.over) break;
       let n=G.cur; do{ n=(n+1)%P; if(n===0){ G.round++; recordHistory(); } }while(!P_(n).alive); G.cur=n;
     }
-    const out={over:G.over,round:G.round,winner:G.over?G.winner:-1,terrs:G.map.terrs.length,links:G.map.links.length,leaderTurns:G.leaderTurns||0};
+    const out={ideos:G.players.map(p=>p.ideo),winIdeo:G.over?G.players[G.winner].ideo:-1,over:G.over,round:G.round,winner:G.over?G.winner:-1,terrs:G.map.terrs.length,links:G.map.links.length,leaderTurns:G.leaderTurns||0};
     G=saved; return out;
   }
 };
