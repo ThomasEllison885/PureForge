@@ -38,7 +38,10 @@ button{font:inherit;cursor:pointer}
 .btn{background:var(--green);color:var(--black);border:0;padding:2px 12px;box-shadow:5px 4px 0 var(--black);margin:4px 8px 8px 0}
 .btn:hover,.btn:focus-visible{color:var(--white);outline:none}
 .btn:active{transform:translate(5px,4px);box-shadow:none}
-.btn:disabled{background:var(--dgray);color:var(--gray);box-shadow:none;cursor:default;transform:none}
+/* when pressed the button shifts down-right; this invisible margin keeps it under the pointer so the click still lands */
+.btn{position:relative}
+.btn::before{content:'';position:absolute;top:-5px;left:-6px;right:0;bottom:0}
+.btn:disabled,.btn.off{background:var(--dgray);color:var(--gray);box-shadow:none;cursor:default;transform:none}
 .btn.alt{background:var(--cyan)}
 .btn.warn{background:var(--red);color:var(--white)}
 
@@ -271,7 +274,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
       </div>
       <div class="half"><div class="lbl">Ends up in</div><div class="nm" id="mv-to-name"></div><div class="big" id="mv-go"></div><div class="need" id="mv-go-need"></div></div>
     </div>
-    <div class="center"><button class="btn alt" data-mv="min">Fewest</button><button class="btn alt" data-mv="even">Even</button><button class="btn alt" data-mv="max">Most</button></div>
+    <div class="center"><button class="btn alt" data-mv="min" title="Fewest that still holds the territory you're moving into">Fewest safe</button><button class="btn alt" data-mv="even">Even</button><button class="btn alt" data-mv="max" title="Most you can move while the territory you're leaving still holds">Most safe</button></div>
     <p class="mvnote" id="move-note"></p>
     <div class="center"><button class="btn" data-mv="ok">Done</button><button class="btn warn" data-mv="cancel" id="move-cancel">Cancel</button></div>
   </div>
@@ -1490,7 +1493,7 @@ function renderSide(){
   if(G.phase==='setup'&&!p.human){
     hint=`The ${p.name} is placing its armies. Watch the highlighted territories.`; }
   else if(G.phase==='setup'){
-    const undo=`<button class="btn alt" data-act="undo" ${canUndo()?'':'disabled'}>Undo</button>`;
+    const undo=`<button class="btn alt ${canUndo()?'':'off'}" data-act="undo" data-why="Nothing to undo yet.">Undo</button>`;
     if(G.batch>0){
       hint=`Place ${G.batch} ${G.batch===1?'army':'armies'}, then your rivals place theirs. You have ${G.setupLeft[G.cur]} left in all. Shift-click places the whole batch.`;
       acts=`<button class="btn" data-act="autosetup">Auto-place ${G.batch}</button>`+undo; }
@@ -1504,7 +1507,7 @@ function renderSide(){
   else if(G.phase==='reinforce'){
     hint='Click your territories to place armies. Shift-click places 5.';
     acts=`<button class="btn" data-act="auto">Auto-place</button>`+(UI.sel>=0&&T_(UI.sel).owner===G.cur?`<button class="btn alt" data-act="all">All on ${esc(T_(UI.sel).name)}</button>`:'')+
-      `<button class="btn alt" data-act="undo" ${canUndo()?'':'disabled'}>Undo</button>`;
+      `<button class="btn alt ${canUndo()?'':'off'}" data-act="undo" data-why="Nothing to undo: you haven't placed any armies yet this turn.">Undo</button>`;
   } else if(G.phase==='attack'){
     if(UI.sel<0) hint='Pick one of your territories to attack from.';
     else if(UI.target<0) hint=`Attacking from ${T_(UI.sel).name}. Pick a neighbour to attack.`;
@@ -1512,7 +1515,8 @@ function renderSide(){
     const can=UI.sel>=0&&UI.target>=0&&T_(UI.sel).armies>=2;
     if(perk(p).attackTies&&perk(p).shockCount){ const st=G.shockTargets||[], n=perk(p).shockCount;
       hint+=st.includes(UI.target)?' Shock Assault is with this attack.':st.length<n?' Shock Assault is ready.':' Shock Assault is spent for this turn.'; }
-    acts=`<button class="btn" data-act="roll" ${can?'':'disabled'}>Roll</button><button class="btn" data-act="blitz" ${can?'':'disabled'}>Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`+
+    const why=UI.sel<0?'First click one of your territories to attack from.':UI.target<0?'Now click a neighbouring enemy territory to attack.':`${T_(UI.sel).name} needs at least 2 armies to attack.`;
+    acts=`<button class="btn ${can?'':'off'}" data-act="roll" data-why="${esc(why)}">Roll</button><button class="btn ${can?'':'off'}" data-act="blitz" data-why="${esc(why)}">Blitz</button><br><button class="btn alt" data-act="endattack">Done attacking</button>`+
       (canUndo()?`<button class="btn alt" data-act="undo">Undo deploy</button>`:'');
   } else if(G.phase==='fortify'){
     hint=UI.sel<0?'Optional: pick a territory to move armies from. Armies can march through your heartland (land with no foreign neighbours).'
@@ -1520,7 +1524,8 @@ function renderSide(){
     acts=`<button class="btn alt" data-act="endturn">End turn</button>`;
   }
   if(mvState){ hint='Split your armies in the box below the map.'; acts=''; }
-  $('hint').textContent=hint; $('actions').innerHTML=acts;
+  $('hint').textContent=hint;
+  const ae=$('actions'); if(ae._html!==acts){ ae.innerHTML=acts; ae._html=acts; } // rebuilding mid-click loses the click
   // revolt warning, always visible on your turn
   const risk=p.human&&!G.over?owned(G.cur).filter(t=>shownArmies(t)<need(t)):[];
   $('risk').innerHTML=risk.length?`<b>Revolt risk</b> when this turn ends: `+
@@ -1641,10 +1646,11 @@ cv.addEventListener('click',ev=>{
     const far=!s.adj.includes(id);
     askMove({title:'Redeploy',from:s.id,to:id,min:1,max:s.armies-1,def:clamp(s.armies-need(s),1,s.armies-1),cancellable:true,
       text:`Shift armies from ${s.name} to ${t.name}${far?', marching through your heartland':''}. This ends your turn.`,
-      note:`One army always stays behind. ← → or the buttons to adjust, Enter when done.`,
+      note:`Fewest safe and Most safe leave both territories with no revolt risk. ← → fine-tunes from there; one army always stays behind. Enter when done.`,
       cb:n=>{ if(n>0){ moveArmies(s.id,id,n); log(`You move ${n} armies to ${t.name}.`); nextPlayer(); } else { UI.target=-1; render(); } }});
   }
 });
+document.addEventListener('pointerdown',ev=>{ const b=ev.target.closest('.btn,.opt,.menubar button'); if(b&&!b.disabled&&!b.classList.contains('off')) beep(1400,10); },{capture:true});
 function flash(msg){ $('hint').textContent=msg; beep(150,90); }
 function toAttack(){ G.phase='attack'; UI.sel=-1; UI.target=-1; log('Deployed. Choose your attacks.'); }
 
@@ -1663,7 +1669,7 @@ function doRoll(blitz){
       if(min===max){ finish(min); }
       else askMove({title:`${e.name} Taken`,from:sid,to:eid,min,max,def:sug,cancellable:false,
         text:`You have ${T_(sid).armies} armies to split between ${T_(sid).name} and ${e.name}.`,
-        note:`At least ${min} must move in (one per die you rolled), and one stays behind. ← → to adjust, Enter when done.`,
+        note:`Fewest safe and Most safe leave both territories with no revolt risk. ← → fine-tunes from there: at least ${min} must move in (one per die you rolled), and one stays behind. Enter when done.`,
         cb:finish});
     });
   } else {
@@ -1702,7 +1708,12 @@ function nudgeMove(v){
   if(v==='cancel'){ if(m.cancellable) closeMove(0); return; }
   const total=T_(m.from).armies+T_(m.to).armies;
   const even=Math.round(total/2)-T_(m.to).armies;
-  m.n=clamp(v==='min'?m.min:v==='max'?m.max:v==='even'?even:m.n+(+v),m.min,m.max);
+  // Fewest: the fewest that leave the territory you're moving into with no revolt risk.
+  // Most: the most you can move while the territory you're leaving keeps no revolt risk.
+  // The arrows still go all the way to the true minimum and maximum.
+  const to=T_(m.to), from=T_(m.from);
+  const safeMin=clamp(need(to)-to.armies,m.min,m.max), safeMax=clamp(from.armies-need(from),m.min,m.max);
+  m.n=clamp(v==='min'?safeMin:v==='max'?safeMax:v==='even'?even:m.n+(+v),m.min,m.max);
   updateMove();
 }
 $('dlg-move').addEventListener('click',ev=>{ const b=ev.target.closest('[data-mv]'); if(b) nudgeMove(b.dataset.mv); });
@@ -1897,6 +1908,7 @@ function beginGame(g,fresh){
 
 $('history').addEventListener('mousemove',historyHover);
 document.addEventListener('click',ev=>{
+  const off=ev.target.closest('.btn.off'); if(off){ if(off.dataset.why) flash(off.dataset.why); else beep(150,90); return; }
   if(ev.target.closest('[data-act="scene-skip"]')){ endScene(); return; }
   const o=ev.target.closest('.opt');
   if(o){ const k=o.dataset.k; setup[k]=k==='perks'?o.dataset.v==='true':k==='mapType'||k==='size'||k==='diff'?o.dataset.v:+o.dataset.v; renderSetup(); return; }
