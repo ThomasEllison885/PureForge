@@ -138,6 +138,10 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
 .split .arrow{display:flex;flex-direction:column;align-items:center}
 .split .arrow .btn{margin:4px 6px 8px 0;min-width:44px}
 .mvnote{font-size:18px;color:var(--dgray);text-align:center}
+.intro{max-width:980px}
+#intro{width:100%;display:block;image-rendering:pixelated;border:2px solid var(--black);background:#000}
+.intro-text{font-size:26px;color:var(--white);text-align:center;min-height:1.3em;margin:10px 0 2px}
+.intro-sub{font-size:20px;color:var(--lcyan);text-align:center;min-height:2.4em;margin:0 0 6px}
 .count{font-size:40px;color:var(--black);text-align:center;margin:6px 0}
 .rules h3{color:var(--yellow);font-weight:normal;margin:10px 0 2px;font-size:22px}
 .rules p,.rules li{margin:2px 0}
@@ -154,7 +158,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
 
 <!-- ================= TITLE / SETUP ================= -->
 <section id="scr-title">
-  <div class="menubar"><span class="title">PURE FORGE: FORGE YOUR EMPIRE</span><span class="grow"></span><button data-act="music" id="btn-music"><span class="hk">M</span>usic</button><button data-act="rules"><span class="hk">R</span>ules</button></div>
+  <div class="menubar"><span class="title">PURE FORGE: FORGE YOUR EMPIRE</span><span class="grow"></span><button data-act="rules"><span class="hk">R</span>ules</button></div>
   <div class="desk">
     <div class="logo">
       <svg viewBox="0 0 12 10" aria-hidden="true" shape-rendering="crispEdges">
@@ -308,6 +312,17 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
   </div>
 </div>
 
+<section id="scr-intro" hidden>
+  <div class="desk intro">
+    <div class="win"><h2 id="intro-title">[ The World Divides ]</h2>
+      <canvas id="intro" width="320" height="180"></canvas>
+      <p class="intro-text" id="intro-line"></p>
+      <p class="intro-sub" id="intro-sub"></p>
+      <div class="center"><button class="btn" data-act="intro-go" id="intro-go">To war</button> <span class="note">any key skips</span></div>
+    </div>
+  </div>
+</section>
+
 <div class="veil" id="dlg-scene" hidden>
   <div class="win gray dlg scene"><h2 id="scene-title">[ Battle ]</h2>
     <canvas id="scene" width="240" height="100"></canvas>
@@ -334,7 +349,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
     <p>Before the first turn, every empire places 9 extra armies, 3 at a time, taking turns. Watch where your rivals build up before you commit the rest.</p>
     <h3>Each turn</h3>
     <ul>
-      <li><b>Undo.</b> Changed your mind about where you put armies? Undo (or U) takes back placements, one at a time, right up until your first battle of the turn. In the opening, you can undo until you click Done.</li>
+      <li><b>Undo.</b> Changed your mind about where you put armies? Undo (or U) takes back placements, one at a time, right up until your first battle of the turn. In the opening, you can undo until the last army of each batch is placed.</li>
       <li><b>Deploy.</b> You get one army for every three territories (never fewer than three), one more for every three loyal territories, plus a bonus for each whole continent you hold. Click your territories to place them. Shift-click places five.</li>
       <li><b>Attack.</b> Click one of your territories with two or more armies, then a neighbour. Lines across the water are sea routes and count as neighbours. Roll once, or Blitz to fight it out.</li>
       <li><b>Redeploy.</b> One move of armies, then your turn ends. You can always move next door. You can also move further, along a chain of your own territories, as long as every territory in between is <b>heartland</b>: yours, with no foreign neighbours at all. Armies can't slip along a border.</li>
@@ -992,7 +1007,7 @@ function setupPlace(id,k,auto){
   const t=T_(id); k=Math.min(k,G.batch); if(k<=0) return;
   t.armies+=k; G.batch-=k; G.setupLeft[G.cur]-=k; UI.sel=id; beep(880,30);
   if(!auto) (G.undo=G.undo||[]).push([id,k]);
-  if(G.batch===0&&auto) nextSetup(); else render();
+  if(G.batch===0) nextSetup(); else render(); // last army of the batch placed: rivals go next
 }
 // Take back the last placement. Deploying can be undone until your first battle of the turn;
 // an opening batch until you hand over to your rivals.
@@ -1495,7 +1510,7 @@ function renderSide(){
   else if(G.phase==='setup'){
     const undo=`<button class="btn alt ${canUndo()?'':'off'}" data-act="undo" data-why="Nothing to undo yet.">Undo</button>`;
     if(G.batch>0){
-      hint=`Place ${G.batch} ${G.batch===1?'army':'armies'}, then your rivals place theirs. You have ${G.setupLeft[G.cur]} left in all. Shift-click places the whole batch.`;
+      hint=`Place ${G.batch} ${G.batch===1?'army':'armies'}. Your rivals place theirs as soon as you've placed the last one. You have ${G.setupLeft[G.cur]} left in all. Shift-click places the whole batch.`;
       acts=`<button class="btn" data-act="autosetup">Auto-place ${G.batch}</button>`+undo; }
     else { hint='Batch placed. Happy with it? Your rivals place next.';
       acts=`<button class="btn" data-act="setupdone">Done</button>`+undo; } }
@@ -1859,10 +1874,128 @@ function playMarch(){
 }
 function stopMusic(){ for(const o of musicNodes){ try{ o.stop(); }catch(e){} } musicNodes=[]; clearTimeout(musicTimer); syncMusicBtn(); }
 function syncMusicBtn(){ const b=$('btn-music'); if(b) b.innerHTML=`<span class="hk">M</span>usic${musicNodes.length?': stop':''}`; }
-// browsers only allow sound after a click or key press, so the march starts on the first one
-function titleMusicOnce(){ if(!musicPlayed&&!$('scr-title').hidden) playMarch(); }
-document.addEventListener('pointerdown',ev=>{ if(!ev.target.closest('[data-act="music"]')) titleMusicOnce(); },{capture:true});
-document.addEventListener('keydown',()=>titleMusicOnce(),{capture:true});
+
+
+/* ======================================================================
+   INTRO — after Begin: the rivals raise their banners, then you raise yours.
+   The picture and the music follow your ideology and how many rivals you face.
+   ====================================================================== */
+const EMBLEMS = [ // 7x7, one per ideology
+  ['...#...','..##...','..###..','.#####.','..###..','...#...','...#...'], // Populist: torch
+  ['...#...','...#...','#######','.#####.','..###..','.##.##.','##...##'], // Militarist: star
+  ['.#.#.#.','#######','.##.##.','###.###','.##.##.','#######','.#.#.#.'], // Socialist: gear
+  ['...#...','#######','#..#..#','#..#..#','##.#.##','...#...','.#####.'], // Realist: scales
+];
+// each ideology's anthem: key, scale, tempo and drum weight
+const ANTHEMS = [
+  {tonic:60, scale:[0,2,4,5,7,9,11], step:150, drum:0.025, motto:'A voice for every people.'},     // Populist: bright C major
+  {tonic:57, scale:[0,2,3,5,7,8,11], step:165, drum:0.05,  motto:'Order through strength.'},       // Militarist: A minor, heavy drums
+  {tonic:65, scale:[0,2,4,5,7,9,11], step:205, drum:0.03,  motto:'The many, together.'},           // Socialist: F major, slow anthem
+  {tonic:62, scale:[0,2,3,5,7,9,10], step:180, drum:0.03,  motto:'What works, works.'},            // Realist: D dorian, stately
+];
+const ANTHEM_TUNE=[ // [scale degree 1-8, octave, steps] — 8 bars of 4 steps
+  [5,-1,1],[1,0,1],[1,0,1],[3,0,1], [5,0,2],[3,0,1],[1,0,1], [2,0,1],[3,0,1],[4,0,1],[2,0,1], [3,0,2],[1,0,2],
+  [5,-1,1],[1,0,1],[3,0,1],[5,0,1], [1,1,2],[7,0,1],[5,0,1], [4,0,1],[2,0,1],[7,-1,1],[2,0,1], [1,0,4]];
+const ANTHEM_BASS=[1,1,5,1,1,4,5,1];
+function degFreq(a,deg,oct){ const sem=a.scale[(deg-1)%7]+12*(oct+Math.floor((deg-1)/7)); return 440*Math.pow(2,(a.tonic+sem-69)/12); }
+function playAnthem(ideo,at){
+  const a=ANTHEMS[ideo]; let t=at;
+  for(const [d,o,len] of ANTHEM_TUNE){ musicNote(degFreq(a,d,o),len*a.step*0.92,t,0.032); t+=len*a.step; }
+  ANTHEM_BASS.forEach((d,bar)=>{ const b0=at+bar*4*a.step;
+    musicNote(degFreq(a,d,-2),a.step*1.6,b0,0.022); musicNote(degFreq(a,d+4,-2),a.step*1.6,b0+2*a.step,0.022);
+    for(let k=0;k<4;k++) if(a.drum>0.04||k%2===1) musicNote(70,25,b0+k*a.step,a.drum,'triangle'); });
+  return t-at;
+}
+function playStinger(ideo,at){ // a rival announces itself: drum and two notes in its key
+  const a=ANTHEMS[ideo];
+  musicNote(70,40,at,0.05,'triangle'); musicNote(70,40,at+90,0.05,'triangle');
+  musicNote(degFreq(a,1,-1),220,at+180,0.03); musicNote(degFreq(a,5,-1),360,at+400,0.03);
+}
+let introState=null;
+function playIntro(g,done){
+  const me=g.players[0], rivals=g.players.slice(1);
+  const RIVAL_GAP=900, START=700, tPlayer=START+rivals.length*RIVAL_GAP+300;
+  stopMusic();
+  const was=UI.sound;
+  rivals.forEach((r,i)=>{ if(was) playStinger(r.ideo,START+i*RIVAL_GAP); });
+  const themeLen=was?playAnthem(me.ideo,tPlayer):ANTHEM_TUNE.reduce((s,n)=>s+n[2],0)*ANTHEMS[me.ideo].step;
+  const total=tPlayer+themeLen+900;
+  $('scr-title').hidden=true; $('scr-intro').hidden=false; $('scr-game').hidden=true;
+  $('intro-title').textContent=`[ The World Divides: ${rivals.length+1} Empires ]`;
+  const ctx=$('intro').getContext('2d'), bg=introBackdrop(g), start=performance.now();
+  introState={done,stopped:false};
+  const frame=now=>{
+    if(!introState||introState.stopped) return;
+    const t=now-start; drawIntro(ctx,bg,g,t,START,RIVAL_GAP,tPlayer);
+    // captions follow the banners
+    let line='The old order has fallen. New powers rise.', sub='';
+    const shown=Math.min(rivals.length,Math.floor((t-START)/RIVAL_GAP)+1);
+    if(t>=START&&t<tPlayer){ const r=rivals[Math.max(0,shown-1)]; line=`The ${r.name} rises.`; sub=`"${ANTHEMS[r.ideo].motto}"`+(r.hasPerk?`  ${PERKS[r.ideo].name}: ${PERKS[r.ideo].short.toLowerCase()}.`:''); }
+    if(t>=tPlayer){ line=`You lead the ${me.name}.`;
+      sub=`"${ANTHEMS[me.ideo].motto}"`+(me.hasPerk?`  ${PERKS[me.ideo].name}: ${PERKS[me.ideo].short.toLowerCase()}.`:'')+(t>tPlayer+themeLen*0.5?'  Forge your empire.':''); }
+    if($('intro-line').textContent!==line) $('intro-line').textContent=line;
+    if($('intro-sub').textContent!==sub) $('intro-sub').textContent=sub;
+    if(t<total) requestAnimationFrame(frame); else endIntro();
+  };
+  requestAnimationFrame(frame);
+}
+function endIntro(){
+  if(!introState||introState.stopped) return;
+  const d=introState.done; introState.stopped=true; introState=null; stopMusic();
+  $('scr-intro').hidden=true; d();
+}
+// the planet, split among the empires in play, drawn once
+function introBackdrop(g){
+  const c=document.createElement('canvas'); c.width=320; c.height=180; const x=c.getContext('2d');
+  const bands=['#000011','#000022','#000033','#000044','#000055','#000066'];
+  bands.forEach((col,i)=>{ x.fillStyle=col; x.fillRect(0,i*20,320,20); });
+  for(let k=0;k<90;k++){ x.fillStyle=k%7?'#AAAAAA':'#FFFFFF'; x.fillRect(Math.floor(sRand(k*5)*320),Math.floor(sRand(k*5+1)*120),1,1); }
+  const P=g.players.length, cx=160, cy=420, R=300;
+  for(let y=110;y<180;y++) for(let px=0;px<320;px++){
+    const dx=px-cx, dy=y-cy, d=Math.hypot(dx,dy); if(d>R) continue;
+    const ang=Math.atan2(dy,dx)+Math.PI/2, sector=clamp(Math.floor((ang+0.75)/1.5*P),0,P-1);
+    const n=sRand(Math.floor(px/6)*131+Math.floor(y/5)*17)+sRand(Math.floor(px/14)*7+Math.floor(y/9)*3);
+    let col='#0000AA';
+    if(n>0.95) col=IDEOS[g.players[sector].ideo].dark;
+    if(d>R-2) col='#5555FF';
+    else if(col==='#0000AA'&&((px+y)%2===0)&&n>0.85) col='#2424C8';
+    x.fillStyle=col; x.fillRect(px,y,1,1);
+  }
+  return c;
+}
+function drawEmblem(ctx,ideo,x,y,scale,col){
+  ctx.fillStyle=col; EMBLEMS[ideo].forEach((row,r)=>{ for(let k=0;k<7;k++) if(row[k]==='#') ctx.fillRect(x+k*scale,y+r*scale,scale,scale); });
+}
+function drawBanner(ctx,p,x,base,rise,scale,t,big){
+  // rise: 0 hidden below the planet .. 1 fully up
+  const poleH=(big?58:44), fw=(big?44:24), fh=(big?28:16), top=Math.round(base-poleH*rise);
+  ctx.fillStyle='#777777'; ctx.fillRect(x,top,big?2:1,Math.round(poleH*rise)+4);
+  ctx.fillStyle='#FFFF55'; ctx.fillRect(x-1,top-2,big?4:3,2);
+  if(rise<0.15) return;
+  const col=IDEOS[p.ideo].light, dark=IDEOS[p.ideo].dark;
+  for(let k=0;k<fw;k++){ const wob=Math.round(Math.sin(k/4-t/180)*(k/fw)*2);
+    ctx.fillStyle=k%6===5?sh(col,-0.15):col; ctx.fillRect(x+(big?2:1)+k,top+2+wob,1,fh); }
+  drawEmblem(ctx,p.ideo,x+(big?2:1)+Math.round(fw/2-3.5*scale),top+2+Math.round(fh/2-3.5*scale),scale,dark);
+  ctx.font=(big?'16px':'12px')+' VT323, monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+  const label=big?IDEOS[p.ideo].bloc.toUpperCase():IDEOS[p.ideo].name.toUpperCase();
+  ctx.fillStyle='#000000'; ctx.fillText(label,x+fw/2+1,base+6); ctx.fillStyle=col; ctx.fillText(label,x+fw/2,base+5);
+}
+function drawIntro(ctx,bg,g,t,START,GAP,tPlayer){
+  ctx.drawImage(bg,0,0);
+  const me=g.players[0], rivals=g.players.slice(1), n=rivals.length;
+  // rivals in the back row, spread across the horizon
+  rivals.forEach((r,i)=>{ const x=Math.round(40+(i+0.5)*(240/n))-12, rise=clamp((t-START-i*GAP)/500,0,1);
+    drawBanner(ctx,r,x,82,1-Math.pow(1-rise,3),1,t,false); });
+  // yours, front and centre
+  const rise=clamp((t-tPlayer)/700,0,1);
+  drawBanner(ctx,me,138,158,1-Math.pow(1-rise,3),2,t,true);
+  if(rise>=1){ const k=Math.floor((t-tPlayer)/160)%2; ctx.fillStyle=k?'#FFFF55':'#FFFFFF'; // a few sparks round your flag
+    for(let s=0;s<10;s++){ const a=s/10*Math.PI*2+t/600, r=40+Math.sin(t/300+s)*4; ctx.fillRect(Math.round(162+Math.cos(a)*r),Math.round(116+Math.sin(a)*r*0.5),1,1); } }
+  // title types itself out
+  const title='THE WORLD DIVIDES', shown=title.slice(0,Math.floor(t/45));
+  ctx.font='20px VT323, monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillStyle='#AA0000'; ctx.fillText(shown,161,7); ctx.fillStyle='#FFFF55'; ctx.fillText(shown,160,6);
+}
 
 /* ======================================================================
    SCREENS + MENUS
@@ -1883,7 +2016,7 @@ function renderSetup(){
     : `Map ${setup.seed}: ${map.terrs.length} territories on ${map.conts.length} continents.`;
   $('btn-continue').hidden=!loadSave();
 }
-function show(screen){ $('scr-title').hidden=screen!=='title'; $('scr-game').hidden=screen!=='game'; }
+function show(screen){ $('scr-title').hidden=screen!=='title'; $('scr-game').hidden=screen!=='game'; $('scr-intro').hidden=true; }
 function syncMenus(){
   $('btn-view').innerHTML=`<span class="hk">V</span>iew: ${UI.view==='owner'?'Owners':'Ideology'}`;
   $('btn-sound').innerHTML=`<span class="hk">S</span>ound: ${UI.sound?'On':'Off'}`;
@@ -1915,7 +2048,8 @@ document.addEventListener('click',ev=>{
   const b=ev.target.closest('[data-act]'); if(!b) return;
   const a=b.dataset.act;
   if(a==='reroll'){ setup.seed=Math.floor(Math.random()*90000)+10000; renderSetup(); }
-  else if(a==='begin'){ stopMusic(); beginGame(newGame({...setup}),true); }
+  else if(a==='begin'){ const g=newGame({...setup}); playIntro(g,()=>beginGame(g,true)); }
+  else if(a==='intro-go'){ endIntro(); }
   else if(a==='continue'){ const g=loadSave(); if(g){ stopMusic(); beginGame(g,false); } }
   else if(a==='music'){ if(musicNodes.length) stopMusic(); else { const was=UI.sound; UI.sound=true; playMarch(); UI.sound=was; } }
   else if(a==='rules'){ $('dlg-rules').hidden=false; }
@@ -1944,6 +2078,7 @@ document.addEventListener('click',ev=>{
 $('seed').addEventListener('change',()=>{ const v=parseInt($('seed').value,10); if(v>0){ setup.seed=v%1000000; renderSetup(); } });
 document.addEventListener('keydown',ev=>{
   if(ev.target.tagName==='INPUT') return;
+  if(introState){ endIntro(); ev.preventDefault(); return; }
   if(!$('dlg-scene').hidden){ endScene(); return; }
   if(mvState){ const k=ev.key;
     if(k==='ArrowRight'||k==='ArrowUp'||k==='+'){ nudgeMove('+1'); ev.preventDefault(); }
@@ -1954,7 +2089,6 @@ document.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
   if(k==='escape'){ document.querySelectorAll('.veil').forEach(v=>{ if(v.id!=='dlg-move'&&v.id!=='dlg-over') v.hidden=true; }); if(G){ UI.sel=-1; UI.target=-1; render(); } return; }
   if(k==='r'&&!ev.metaKey&&!ev.ctrlKey){ $('dlg-rules').hidden=false; return; }
-  if(k==='m'&&!$('scr-title').hidden){ if(musicNodes.length) stopMusic(); else { const was=UI.sound; UI.sound=true; playMarch(); UI.sound=was; } return; }
   if(!G||$('scr-game').hidden) return;
   if(k==='v'){ UI.view=UI.view==='owner'?'ideo':'owner'; savePrefs(); syncMenus(); render(); }
   if(k==='s'){ UI.sound=!UI.sound; savePrefs(); syncMenus(); }
