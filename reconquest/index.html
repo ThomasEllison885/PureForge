@@ -7069,6 +7069,270 @@ ul.colony-list small { color: #5c5144; }
         }
     }
   }
+  // ---- Building sites --------------------------------------------------------
+  // What each kind of building looks like the turn it is being built, and the
+  // scaffolding around one being raised a level.
+  function siteGround(g, x, y, a, b) {
+    let P = (u, v) => isoP(x, y, u, v, 0);
+    bpoly(g, [P(-a, -b), P(a, -b), P(a, b), P(-a, b)], "rgba(122,92,58,0.55)");
+    (g.strokeStyle = "rgba(240,226,190,0.7)"), (g.lineWidth = 0.6), g.setLineDash([2, 2]);
+    bpoly(g, [P(-a, -b), P(a, -b), P(a, b), P(-a, b)], null, "rgba(240,226,190,0.7)", 0.6);
+    g.setLineDash([]);
+  }
+  // Bare timber frame of a gabled building; `walls` boards the lower part of
+  // the lit side.
+  function frameHouse(g, x, y, w, d, h, walls, detail) {
+    let P = (a, b, zz) => isoP(x, y, a, b, zz),
+      hw = w / 2,
+      hd = d / 2,
+      rh = Math.min(w, d) * 0.55,
+      wood = "#b08a5a",
+      dark = "#7a5a34";
+    bshadow(g, x, y, (w + d) * 0.5, (w + d) * 0.22);
+    if (walls) {
+      bpoly(g, [P(-hw, hd, 0), P(hw, hd, 0), P(hw, hd, h * walls), P(-hw, hd, h * walls)], "#c8a878", "rgba(40,28,16,0.5)", 0.5);
+      bpoly(g, [P(hw, hd, 0), P(hw, -hd, 0), P(hw, -hd, h * walls), P(hw, hd, h * walls)], "#9a7a50", "rgba(40,28,16,0.5)", 0.5);
+    }
+    let line = (p, q, c, lw) => {
+      (g.strokeStyle = c), (g.lineWidth = lw), g.beginPath(), g.moveTo(p[0], p[1]), g.lineTo(q[0], q[1]), g.stroke();
+    };
+    // back posts first, then front
+    for (let [a, b] of [[-hw, -hd], [hw, -hd], [-hw, hd]]) line(P(a, b, 0), P(a, b, h), a < 0 && b < 0 ? dark : wood, 1.3);
+    line(P(-hw, -hd, h), P(hw, -hd, h), dark, 1);
+    line(P(-hw, -hd, h), P(-hw, hd, h), dark, 1);
+    // rafters along the ridge
+    let n = Math.max(2, Math.round(w / 4));
+    for (let k = 0; k <= n; k++) {
+      let a = -hw + (w * k) / n;
+      line(P(a, -hd, h), P(a, 0, h + rh), dark, 0.8), line(P(a, hd, h), P(a, 0, h + rh), wood, 0.9);
+    }
+    line(P(-hw, 0, h + rh), P(hw, 0, h + rh), wood, 1.1);
+    line(P(hw, hd, 0), P(hw, hd, h), wood, 1.4);
+    line(P(hw, -hd, 0), P(hw, -hd, h), wood, 1.3);
+    line(P(-hw, hd, h), P(hw, hd, h), wood, 1.1);
+    line(P(hw, -hd, h), P(hw, hd, h), wood, 1.1);
+    if (detail) {
+      // braces
+      line(P(-hw, hd, h * 0.15), P(-hw + w * 0.25, hd, h), dark, 0.6);
+      line(P(hw, hd, h * 0.15), P(hw - w * 0.25, hd, h), dark, 0.6);
+    }
+  }
+  function scaffold(g, x, y, w, d, h, detail) {
+    let P = (a, b, zz) => isoP(x, y, a, b, zz),
+      hw = w / 2 + 2,
+      hd = d / 2 + 2,
+      pole = "#8a6a40",
+      line = (p, q, lw) => {
+        (g.strokeStyle = pole), (g.lineWidth = lw), g.beginPath(), g.moveTo(p[0], p[1]), g.lineTo(q[0], q[1]), g.stroke();
+      };
+    for (let [a, b] of [[-hw, hd], [0, hd], [hw, hd], [hw, 0], [hw, -hd]]) line(P(a, b, 0), P(a, b, h), 0.9);
+    for (let zz of detail ? [h * 0.35, h * 0.7, h] : [h * 0.5, h]) {
+      line(P(-hw, hd, zz), P(hw, hd, zz), 0.8);
+      line(P(hw, hd, zz), P(hw, -hd, zz), 0.8);
+      detail && bpoly(g, [P(-hw, hd + 1.2, zz), P(hw, hd + 1.2, zz), P(hw, hd, zz + 0.6), P(-hw, hd, zz + 0.6)], "#c8a060");
+    }
+    if (detail) {
+      line(P(-hw, hd, 0), P(0, hd, h * 0.7), 0.5), line(P(hw, hd, 0), P(hw, 0, h * 0.7), 0.5);
+    }
+  }
+  function stoneBlocks(g, x, y, n) {
+    for (let k = 0; k < n; k++) {
+      let r = k % 3,
+        c = Math.floor(k / 3);
+      crate(g, x + r * 3.4 - c * 1.7, y - c * 2.4 + r * 0.6, 1.5);
+    }
+  }
+  function lumber(g, x, y, n) {
+    for (let k = 0; k < n; k++) {
+      let P = (a, b, zz) => isoP(x, y, a, b, zz),
+        zz = k * 0.9;
+      bpoly(g, [P(-7, 1, zz), P(7, 1, zz), P(7, -1, zz + 0.7), P(-7, -1, zz + 0.7)], k % 2 ? "#c8a06a" : "#b08a5a", "rgba(60,40,20,0.5)", 0.4);
+    }
+  }
+  function sawhorse(g, x, y) {
+    (g.strokeStyle = "#6a4a26"), (g.lineWidth = 0.9), g.beginPath(), g.moveTo(x - 4, y), g.lineTo(x - 2, y - 4), g.lineTo(x, y), g.moveTo(x + 1, y + 1), g.lineTo(x + 3, y - 3), g.lineTo(x + 5, y + 1), g.moveTo(x - 2, y - 4), g.lineTo(x + 3, y - 3), g.stroke();
+  }
+  function buildSite(g, id, flag, detail, seed) {
+    let worker = (x, y) => detail && bperson(g, x, y, "#7a5a3a");
+    switch (id) {
+      case "center": {
+        // Clearing the ground: half the stockade up, the hall in timber.
+        siteGround(g, 0, 0, 15, 15);
+        let pal = palisade(g, 0, 0, 30, 30, 5, !1, detail);
+        pal.back();
+        frameHouse(g, 0, 0, 12, 9, 8, 0.35, detail);
+        logPile(g, 8, 10, 3);
+        worker(-6, 10), worker(4, 13);
+        bflag(g, -10, -4, flag, 14);
+        return;
+      }
+      case "house":
+        siteGround(g, 0, 2, 14, 10);
+        frameHouse(g, -7, -2, 11, 8, 7, 0.5, detail);
+        frameHouse(g, 9, 5, 9, 8, 6, 0, detail);
+        lumber(g, -6, 12, 4), sawhorse(g, 6, 14), worker(0, 12);
+        return;
+      case "farm": {
+        // Fields staked out, half of them turned; barn going up in timber.
+        let P = (a, b) => isoP(0, 0, a, b, 0);
+        bpoly(g, [P(-30, -30), P(30, -30), P(30, 30), P(-30, 30)], "rgba(150,120,70,0.35)", "rgba(240,226,190,0.6)", 0.6);
+        bpoly(g, [P(-30, 0), P(0, 0), P(0, 30), P(-30, 30)], "#8a6a44");
+        (g.strokeStyle = "rgba(60,40,20,0.55)"), (g.lineWidth = 0.6), g.beginPath();
+        for (let k = -28; k <= 0; k += 3) {
+          let p0 = P(k, 0),
+            p1 = P(k, 30);
+          g.moveTo(p0[0], p0[1]), g.lineTo(p1[0], p1[1]);
+        }
+        g.stroke();
+        frameHouse(g, 14, -6, 20, 13, 11, 0.25, detail);
+        // plough and ox at the end of the last furrow
+        let o0 = P(2, 24);
+        detail && ((g.fillStyle = "#5a4030"), g.beginPath(), g.ellipse(o0[0] + 6, o0[1] - 3, 4, 2.4, 0, 0, Math.PI * 2), g.fill(), g.fillRect(o0[0] + 3, o0[1] - 2, 1, 3), g.fillRect(o0[0] + 8, o0[1] - 2, 1, 3));
+        (g.strokeStyle = "#4a3018"), (g.lineWidth = 1), g.beginPath(), g.moveTo(o0[0] - 4, o0[1] - 4), g.lineTo(o0[0] + 2, o0[1] - 2), g.stroke();
+        worker(o0[0] - 5, o0[1] - 1);
+        lumber(g, -6, -14, 3);
+        return;
+      }
+      case "mill": {
+        siteGround(g, -2, 2, 14, 10);
+        frameHouse(g, -4, 0, 16, 11, 9, 0.4, detail);
+        // the water wheel waits on the ground
+        (g.strokeStyle = "#4a2e18"), (g.lineWidth = 1.3), g.beginPath(), g.ellipse(14, 10, 7, 3.2, 0, 0, Math.PI * 2), g.stroke();
+        if (detail) {
+          g.lineWidth = 0.6;
+          for (let k = 0; k < 6; k++) {
+            let an = (k * Math.PI) / 3;
+            g.beginPath(), g.moveTo(14, 10), g.lineTo(14 + Math.cos(an) * 7, 10 + Math.sin(an) * 3.2), g.stroke();
+          }
+        }
+        logPile(g, -16, 12, 4), sawhorse(g, 4, 15), worker(-2, 14);
+        return;
+      }
+      case "mine":
+      case "gold_mine": {
+        // Digging in: a raw cut in the hillside, the headframe half raised.
+        bshadow(g, 0, 2, 20, 8);
+        (g.fillStyle = "#8a7258"), g.beginPath(), g.moveTo(-20, 6), g.quadraticCurveTo(-12, -10, 2, -9), g.quadraticCurveTo(16, -8, 20, 6), g.closePath(), g.fill();
+        (g.fillStyle = "#5a4430"), g.beginPath(), g.ellipse(-1, 3, 6, 4, 0, Math.PI, 0), g.fill();
+        (g.fillStyle = "#1c140c"), g.beginPath(), g.ellipse(-1, 4, 3, 3, 0, Math.PI, 0), g.fill();
+        (g.strokeStyle = "#5a3e22"), (g.lineWidth = 1.3), g.beginPath(), g.moveTo(10, 4), g.lineTo(11.5, -10), g.moveTo(16, 4), g.lineTo(14.5, -10), g.moveTo(10.6, -3), g.lineTo(15.4, -3), g.stroke();
+        (g.fillStyle = "#9a8a70"), g.beginPath(), g.moveTo(-26, 12), g.quadraticCurveTo(-21, 4, -14, 12), g.closePath(), g.fill();
+        if (detail) {
+          // pick and shovel leaning on the spoil
+          (g.strokeStyle = "#6a4a26"), (g.lineWidth = 0.8), g.beginPath(), g.moveTo(-18, 11), g.lineTo(-14, 3), g.moveTo(-16, 11), g.lineTo(-13, 4), g.stroke();
+          (g.strokeStyle = "#555"), (g.lineWidth = 1), g.beginPath(), g.moveTo(-16, 2.5), g.lineTo(-12, 3.5), g.stroke();
+        }
+        lumber(g, 4, 13, 3), worker(-6, 9), worker(3, 9);
+        id === "gold_mine" && detail && ((g.fillStyle = "#e8c24a"), g.beginPath(), g.arc(-19, 10, 1.2, 0, Math.PI * 2), g.fill());
+        return;
+      }
+      case "church": {
+        // Stone footings and a tower in scaffolding.
+        siteGround(g, 0, 2, 14, 9);
+        let P = (a, b, zz) => isoP(2, 2, a, b, zz);
+        bpoly(g, [P(-10, 5.5, 0), P(10, 5.5, 0), P(10, 5.5, 3.5), P(-10, 5.5, 3.5)], "#d8d0c0", "rgba(40,30,20,0.4)", 0.5);
+        bpoly(g, [P(10, 5.5, 0), P(10, -5.5, 0), P(10, -5.5, 3.5), P(10, 5.5, 3.5)], "#aaa292", "rgba(40,30,20,0.4)", 0.5);
+        let T = (a, b2, zz) => isoP(-10, -4, a, b2, zz);
+        bpoly(g, [T(-3.4, 3.4, 0), T(3.4, 3.4, 0), T(3.4, 3.4, 8), T(-3.4, 3.4, 6)], "#efe9dc", "rgba(40,30,20,0.4)", 0.5);
+        bpoly(g, [T(3.4, 3.4, 0), T(3.4, -3.4, 0), T(3.4, -3.4, 7), T(3.4, 3.4, 8)], "#b8b0a0", "rgba(40,30,20,0.4)", 0.5);
+        scaffold(g, -10, -4, 7, 7, 18, detail);
+        stoneBlocks(g, 10, 12, 6), worker(-2, 12), worker(14, 6);
+        return;
+      }
+      case "commerce": {
+        siteGround(g, 2, 2, 16, 12);
+        frameHouse(g, -8, -4, 16, 11, 10, 0.3, detail);
+        // stall posts with no awnings yet
+        for (let [sx, sy] of [[10, 2], [2, 12]]) {
+          let P = (a, b, zz) => isoP(sx, sy, a, b, zz);
+          (g.strokeStyle = "#5a3e22"), (g.lineWidth = 0.9), g.beginPath();
+          for (let [a, b] of [[-4, 3], [4, 3], [4, -3], [-4, -3]]) {
+            let p0 = P(a, b, 0),
+              p1 = P(a, b, 6);
+            g.moveTo(p0[0], p0[1]), g.lineTo(p1[0], p1[1]);
+          }
+          g.stroke();
+        }
+        detail && (crate(g, 14, 12, 1.6), crate(g, 17, 10, 1.6)), worker(6, 8);
+        return;
+      }
+      case "tavern":
+        // Ground floor walled in, the upper storey still in timber.
+        siteGround(g, 0, 0, 11, 9);
+        frameHouse(g, 0, 0, 16, 12, 14, 0.5, detail);
+        scaffold(g, 0, 0, 16, 12, 10, detail);
+        detail && (barrel(g, 12, 10)), lumber(g, -12, 10, 3), worker(-4, 12);
+        return;
+      case "dock": {
+        // Pilings driven, half the deck laid.
+        let P = (a, b, zz) => isoP(0, 0, a, b, zz);
+        bpoly(g, [P(-10, -3, 1.5), P(6, -3, 1.5), P(6, 3, 1.5), P(-10, 3, 1.5)], "#9a7448", "rgba(40,28,16,0.6)", 0.5);
+        (g.strokeStyle = "#5a3e22"), (g.lineWidth = 1.3), g.beginPath();
+        for (let a = -26; a <= -12; a += 4)
+          for (let b of [-3, 3]) {
+            let p0 = P(a, b, -1),
+              p1 = P(a, b, 3);
+            g.moveTo(p0[0], p0[1]), g.lineTo(p1[0], p1[1]);
+          }
+        g.stroke();
+        let c0 = P(-6, -2, 1.5);
+        (g.strokeStyle = "#4a3018"), (g.lineWidth = 1.1), g.beginPath(), g.moveTo(c0[0], c0[1]), g.lineTo(c0[0], c0[1] - 14), g.lineTo(c0[0] - 10, c0[1] - 10), g.stroke();
+        frameHouse(g, 12, 2, 11, 9, 8, 0.2, detail);
+        lumber(g, 2, 8, 3), worker(-4, 4);
+        return;
+      }
+      case "fort": {
+        // A ditch dug and one wall of stakes up; logs everywhere.
+        let P = (a, b) => isoP(0, 0, a, b, 0);
+        bpoly(g, [P(-30, -30), P(30, -30), P(30, 30), P(-30, 30)], null, "rgba(90,66,40,0.8)", 2.4);
+        let pal = palisade(g, 0, 0, 56, 56, 9, !1, detail);
+        pal.back();
+        frameHouse(g, 0, -4, 18, 16, 12, 0.3, detail);
+        logPile(g, 10, 16, 4), logPile(g, -22, 12, 3), lumber(g, 16, 2, 3);
+        worker(-6, 16), worker(2, 20), worker(18, 10);
+        bflag(g, -26, 0, flag, 16);
+        return;
+      }
+      case "war_college": {
+        // Footings for both wings and a tower in scaffolding.
+        siteGround(g, 0, 0, 28, 26);
+        let foot = (x, y, w, d) => {
+          let P = (a, b, zz) => isoP(x, y, a, b, zz);
+          bpoly(g, [P(-w / 2, d / 2, 0), P(w / 2, d / 2, 0), P(w / 2, d / 2, 3), P(-w / 2, d / 2, 3)], "#d8cfc0", "rgba(40,30,20,0.4)", 0.5);
+          bpoly(g, [P(w / 2, d / 2, 0), P(w / 2, -d / 2, 0), P(w / 2, -d / 2, 3), P(w / 2, d / 2, 3)], "#aaa292", "rgba(40,30,20,0.4)", 0.5);
+        };
+        foot(-12, -14, 34, 14), foot(18, 0, 14, 30);
+        scaffold(g, -26, -20, 7, 7, 22, detail);
+        stoneBlocks(g, -6, 12, 9), worker(0, 8), worker(8, 14), worker(-14, 4);
+        return;
+      }
+      default:
+        siteGround(g, 0, 0, 10, 8);
+        frameHouse(g, 0, 0, 14, 11, 9, 0.3, detail);
+        lumber(g, 10, 10, 3), worker(-6, 10);
+    }
+  }
+
+  // Scaffolding wrapped round the main body of a building being raised a level.
+  var UPFRAME = {
+    center: [0, 0, 14, 11, 12],
+    house: [-8, -3, 12, 9, 10],
+    farm: [14, -6, 20, 13, 13],
+    mill: [-4, 0, 16, 11, 11],
+    mine: [13, -4, 6, 6, 22],
+    gold_mine: [13, -4, 6, 6, 22],
+    church: [-10, -4, 7, 7, 24],
+    commerce: [-8, -4, 16, 11, 12],
+    tavern: [0, 0, 16, 12, 16],
+    dock: [12, 2, 11, 9, 10],
+    fort: [0, -4, 18, 16, 14],
+    war_college: [-12, -14, 34, 14, 16],
+  };
+  function upgradeScaffold(g, id, detail) {
+    let f = UPFRAME[id] || [0, 0, 14, 11, 11];
+    scaffold(g, f[0], f[1], f[2], f[3], f[4], detail);
+    detail && (lumber(g, f[0] - f[2] / 2 - 6, f[1] + f[3] / 2 + 6, 2), bperson(g, f[0] + f[2] / 2 + 4, f[1] + f[3] / 2 + 5, "#7a5a3a"));
+  }
   function ft(e, n, o, r) {
     let { building: i, colony: s } = r,
       a = i.w || 1,
@@ -7084,7 +7348,7 @@ ul.colony-list small { color: #5c5144; }
       c = ye(i.id);
     Ye(e, l.x, l.y, o.zoom, (h) => {
       if (i.building === "new") {
-        ht(h, (i.w || 1) > 1 ? 1.8 : 1);
+        buildSite(h, i.id, u, o.zoom >= 0.75, i.x * 31 + i.y);
         return;
       }
       bldgSprite(
@@ -7097,7 +7361,7 @@ ul.colony-list small { color: #5c5144; }
         o.zoom >= 0.75,
         i.x * 31 + i.y,
       ),
-        i.building === "upgrade" && pt(h);
+        i.building === "upgrade" && upgradeScaffold(h, i.id, o.zoom >= 0.75);
     });
   }
   function ht(e, n) {
@@ -7544,7 +7808,7 @@ ul.colony-list small { color: #5c5144; }
           p = YL(u.x, u.y, o, terracePx(n.map, u.x, u.y, o.zoom));
         Nn(p, r, 200) &&
           Ye(e, p.x, p.y, a, (m) =>
-            _r(m, c, ee[h.nationId].color, u.count, u.active),
+            _r(m, c, ee[h.nationId].color, u.count, u.active || (s.selected != null && (u.ids || [u.id]).includes(s.selected))),
           );
       }
   }
@@ -8115,13 +8379,16 @@ ul.colony-list small { color: #5c5144; }
       let sc = Math.max(d.zoom * 1.25, 0.55),
         best = null,
         bd = 1e9;
+      // While moves play, units are hit where they are drawn, mid-walk.
+      let live = O && O.frame ? O.frame.positions : null;
       for (let u of t.units) {
         if (u.aboard || u.owner !== o.id) continue;
-        let p = Y(u.x, u.y, {
+        let at = (live && live.get(u.id)) || u,
+          p = Y(at.x, at.y, {
             ox: d.ox,
             oy: d.oy,
             zoom: d.zoom,
-            lift: terracePx(t.map, u.x, u.y, d.zoom),
+            lift: terracePx(t.map, at.x, at.y, d.zoom),
           }),
           hw = (u.kind === "ship" ? 30 : 16) * sc,
           up = (u.kind === "ship" ? 30 : 18) * sc,
@@ -8572,6 +8839,7 @@ ul.colony-list small { color: #5c5144; }
             x: U.x,
             y: U.y,
             count: (L.ids || []).length || 1,
+            ids: L.ids || [L.unitId],
             active: !1,
           }),
           b.push([Math.round(U.x), Math.round(U.y), K.kind]));
@@ -8638,7 +8906,7 @@ ul.colony-list small { color: #5c5144; }
       if (!t || o.hidden) return;
       let f = J();
       if (O) {
-        So(f.ctx, f, t, d, { anim: O.frame || un() });
+        So(f.ctx, f, t, d, { anim: O.frame || un(), selected: l });
         return;
       }
       let g = l ? j(t, l) : null,
@@ -9110,7 +9378,14 @@ ul.colony-list small { color: #5c5144; }
         }
         if (!g) {
           let sel = l ? j(t, l) : null;
-          if (sel && sel.kind === "ship") {
+          if (O) {
+            let hu = unitAt(v.x, v.y);
+            if (hu) {
+              y && ((y = null), (T = null), (S = null)), (l = hu.id), (h = ""), R();
+              return;
+            }
+          }
+          if (!O && sel && sel.kind === "ship") {
             let spot = Xe(t, sel.id).find(
               ([sx, sy]) => sx === b.x && sy === b.y,
             );
