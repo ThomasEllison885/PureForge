@@ -212,6 +212,7 @@ button.recruit small { display: block; font-weight: 400; }
 ul.colony-list { padding-left: 0; list-style: none; }
 ul.colony-list li { margin: 6px 0; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 ul.colony-list small { color: #5c5144; }
+button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 #status { min-height: 1.2em; color: #7a2e24; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 .minimap-wrap { margin-top: 8px; }
 #minimap { width: 100%; height: auto; aspect-ratio: 4 / 3; cursor: pointer; background: #07141d; border-radius: 4px; }
@@ -1070,7 +1071,7 @@ ul.colony-list small { color: #5c5144; }
     },
     we = {
       startPopulation: 60,
-      startStock: { food: 30, wood: 25, metal: 10, goods: 4, gold: 0 },
+      startStock: { food: 30, wood: 25, metal: 10, goods: 4, gold: 10 },
       housing: { center: 60, house: 40, farm: 40 },
       produce: {
         farm: { food: 10 },
@@ -1760,12 +1761,64 @@ ul.colony-list small { color: #5c5144; }
       }
     );
   }
+  // ---- Selling in Europe (a first, simple form of the stage 5 trade) ----
+  // Fixed prices in gold per unit. A coastal colony's cargo sails out and the
+  // gold comes back in two turns; an inland colony hauls to the coast first.
+  // Deliberately a poor deal: Europe pays little for colonial raw goods. A
+  // proper trade system with better and worse offers comes later.
+  var EUROPE_PRICE = { goods: 1 / 2, metal: 1 / 6, wood: 1 / 12, food: 1 / 20 };
+  function coastalColony(e, c) {
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        let q = se(e, c.x + dx, c.y + dy);
+        if (q && (q.terrain === "coast" || q.terrain === "ocean")) return !0;
+      }
+    return !1;
+  }
+  function europeTurns(e, c) {
+    return coastalColony(e, c) ? 2 : 3;
+  }
+  function europeValue(r, t) {
+    return Math.floor(t * (EUROPE_PRICE[r] || 0));
+  }
+  function sellEurope(e, n, r, i) {
+    return be(e, () => {
+      let s = e.colonies.find((d) => d.id === n);
+      if (!s) return { ok: !1, error: "No such colony." };
+      if (!EUROPE_PRICE[r]) return { ok: !1, error: "Europe does not buy that." };
+      let t = Math.floor(Number(i));
+      if (!(t > 0)) return { ok: !1, error: "Send at least 1." };
+      if (s.stock[r] < t)
+        return { ok: !1, error: `${s.name} has only ${s.stock[r]} ${Ne[r].toLowerCase()}.` };
+      let g = europeValue(r, t);
+      if (g < 1)
+        return { ok: !1, error: `That much ${Ne[r].toLowerCase()} is not worth a gold piece. Send at least ${Math.ceil(1 / EUROPE_PRICE[r])}.` };
+      s.stock[r] -= t;
+      let l = europeTurns(e, s);
+      return (
+        e.shipments || (e.shipments = []),
+        e.shipments.push({ from: s.id, to: "europe", resource: r, amount: t, gold: g, arrives: e.year + l }),
+        {
+          ok: !0,
+          discoveries: [],
+          note: `${t} ${Ne[r].toLowerCase()} shipped to Europe. ${g} gold comes back to ${s.name} in ${l} turns.`,
+        }
+      );
+    });
+  }
   function Do(e) {
     let n = [],
       o = [];
     for (let r of e.shipments || []) {
       if (r.arrives > e.year) {
         o.push(r);
+        continue;
+      }
+      if (r.to === "europe") {
+        let c = e.colonies.find((s) => s.id === r.from);
+        c &&
+          ((c.stock.gold += r.gold),
+          n.push(`Europe paid ${r.gold} gold for ${r.amount} ${Ne[r.resource].toLowerCase()} from ${c.name}.`));
         continue;
       }
       let i = e.colonies.find((s) => s.id === r.to);
@@ -2048,6 +2101,10 @@ ul.colony-list small { color: #5c5144; }
       c = Math.max(6, Math.round(s.length / $.specialLandPerFind));
     for (let h = 0; h < c; h++) d(u[Math.floor(i() * u.length)]);
     for (let h of An.filter((p) => p.rare)) i() < $.rareChance && d(h);
+    // Ancient ruins turn up across the land, about one per 2,800 squares.
+    let ruins = An.find((h) => h.id === "ancient_ruins"),
+      nr2 = Math.max(2, Math.round(s.length / 2800));
+    for (let h = 0; h < nr2; h++) d(ruins);
     return a;
   }
   function Jr(e, n, o) {
@@ -2186,7 +2243,8 @@ ul.colony-list small { color: #5c5144; }
           (o += $.cartographerBonus),
         e.kind === "ship" &&
           n.skills.includes("navigator") &&
-          (o += $.navigatorBonus)),
+          (o += $.navigatorBonus),
+        e.kind === "explorer" && n.perks && n.perks.trail && (o += 1)),
       o
     );
   }
@@ -2436,6 +2494,7 @@ ul.colony-list small { color: #5c5144; }
       ),
       buildings: [{ id: "center", level: 1, x: o.x, y: o.y, w: 1, h: 1 }],
     };
+    s.treasury && ((l.stock.gold += s.treasury), (s.treasury = 0));
     e.colonies.push(l), (e.units = e.units.filter((c) => c.id !== o.id));
     let d = si(l);
     Ko(e, s.id, d);
@@ -2523,7 +2582,9 @@ ul.colony-list small { color: #5c5144; }
   function an(e, n, o, r, i) {
     let s = Gn(e, n);
     if (!s) return B("No such colony.");
-    if (s.owner !== V(e).id) return B("That is not your colony.");
+    // Rival governors build in their own colonies; you can only build in yours.
+    let own = ce(e, s.owner);
+    if (s.owner !== V(e).id && (!own || own.isHuman)) return B("That is not your colony.");
     if (o === "center") return B("The city is already standing.");
     let a = ye(o);
     if (!a) return B("Unknown building.");
@@ -2767,6 +2828,7 @@ ul.colony-list small { color: #5c5144; }
       )
         continue;
       (s.foundBy = n), (s.foundYear = e.year), r.push(s);
+      s.kind === "ancient_ruins" && ruinsPrize(e, n, s);
       let t = ce(e, n);
       t &&
         t.isHuman &&
@@ -2838,6 +2900,7 @@ ul.colony-list small { color: #5c5144; }
         if (s.foundBy != null) continue;
         if (Math.max(Math.abs(x - s.x), Math.abs(y - s.y)) > range) continue;
         (s.foundBy = n), (s.foundYear = e.year);
+        s.kind === "ancient_ruins" && ruinsPrize(e, n, s);
         p &&
           p.isHuman &&
           (e.pendingSpecials.push({ id: s.id, ownerId: n, at: [x, y], by: ids && ids[0], year: e.year }),
@@ -2845,6 +2908,146 @@ ul.colony-list small { color: #5c5144; }
             `You found ${/^[AEIOU]/.test(ke[s.kind].name) ? "an" : "a"} ${ke[s.kind].name}.`,
           ));
       }
+  }
+  // ---- Rival nations -------------------------------------------------------
+  // Computer nations explore with their ship and explorers, name what they
+  // reach first, bring their storeship to a good stretch of coast, found
+  // colonies there and further inland, and run them with the colony governor.
+  function rivalSiteOk(e, s) {
+    if (!s) return !1;
+    let t = se(e, s.x, s.y);
+    return (
+      !!t &&
+      Ho(t.terrain) &&
+      !ln(e, s.x, s.y) &&
+      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < $.colonySpacing)
+    );
+  }
+  function rivalSite(e, n, cx, cy, coastal, avoid) {
+    let p = ce(e, n),
+      { width: w, height: h, tiles } = e.map,
+      best = null,
+      bs = -1 / 0,
+      R = 40;
+    for (let y = Math.max(1, cy - R); y <= Math.min(h - 2, cy + R); y++)
+      for (let x = Math.max(1, cx - R); x <= Math.min(w - 2, cx + R); x++) {
+        if (p.explored[y * w + x] !== "1") continue;
+        let t = tiles[y * w + x];
+        if (!Ho(t.terrain) || !rivalSiteOk(e, { x, y })) continue;
+        if (avoid && avoid.some((a) => a && Math.max(Math.abs(a.x - x), Math.abs(a.y - y)) < $.colonySpacing)) continue;
+        let shore = Z(x, y, w, h).some(([a, b]) => {
+          let q = tiles[b * w + a].terrain;
+          return q === "coast" || q === "ocean";
+        });
+        if (coastal && !shore) continue;
+        let sc =
+          (Ve(e, "farm", x, y) || 0) +
+          (t.riverId ? 10 : 0) +
+          (shore ? 6 : 0) -
+          Math.hypot(x - cx, y - cy) * 0.6;
+        sc > bs && ((bs = sc), (best = { x, y }));
+      }
+    return best;
+  }
+  function rivalFound(e, u) {
+    let before = e.log.length,
+      f = Wo(e, u.id);
+    // The founding notice is for the founder, not for you.
+    e.log.length = before;
+    f.ok && f.colony && (f.colony.governor = "balanced");
+    return f.ok;
+  }
+  function rivalMoves(e, n) {
+    let p = ce(e, n);
+    if (!p || p.isHuman) return;
+    let { width: w, height: h } = e.map;
+    for (let u of e.units)
+      u.owner === n &&
+        !u.rivalInit &&
+        (u.kind === "explorer" || (u.kind === "ship" && u.name !== "Storeship")) &&
+        ((u.autoExplore = !0), (u.rivalInit = 1));
+    // The storeship carries the settlers to a good stretch of coast.
+    let store = e.units.find(
+      (u) => u.owner === n && u.kind === "ship" && e.units.some((s) => s.aboard === u.id && s.kind === "settler"),
+    );
+    if (store) {
+      rivalSiteOk(e, p.siteA) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
+      let s = p.siteA;
+      if (s && Xe(e, store.id).some(([a, b]) => a === s.x && b === s.y)) {
+        let aboard = e.units.filter((q) => q.aboard === store.id && q.kind !== "leader"),
+          settlers = aboard.filter((q) => q.kind === "settler");
+        for (let q of aboard) xo(e, q.id, s.x, s.y);
+        settlers[0] && !settlers[0].aboard && rivalFound(e, settlers[0]);
+        p.siteA = null;
+      } else if (s) {
+        let water = Z(s.x, s.y, w, h)
+          .filter(([a, b]) => {
+            let q = e.map.tiles[b * w + a].terrain;
+            return q === "coast" || q === "ocean";
+          })
+          .sort((A, B) => Math.hypot(A[0] - store.x, A[1] - store.y) - Math.hypot(B[0] - store.x, B[1] - store.y))[0];
+        water && (store.dest = { x: water[0], y: water[1] });
+      }
+    }
+    // Settlers on land walk to a spot of their own and found there.
+    let walkers = e.units.filter((u) => u.owner === n && u.kind === "settler" && !u.aboard);
+    for (let q of walkers) {
+      if (!rivalSiteOk(e, q.site)) {
+        let others = walkers.filter((o) => o !== q).map((o) => o.site);
+        q.site = rivalSite(e, n, q.x, q.y, !1, others);
+      }
+      if (!q.site) continue;
+      q.x === q.site.x && q.y === q.site.y ? rivalFound(e, q) : (q.dest = { x: q.site.x, y: q.site.y });
+    }
+    mr(e, n), cr(e, n);
+    for (let q of e.units.filter((u) => u.owner === n && u.kind === "settler" && !u.aboard && u.site))
+      q.x === q.site.x && q.y === q.site.y && rivalFound(e, q);
+    // Rivals name what they reach first straight away.
+    for (let it of e.pendingNames.filter((q) => q.ownerId === n)) Jo(e, it.kind, it.id, Vo(e, it.kind, n), n);
+  }
+  // ---- Ancient Ruins (stage 2) --------------------------------------------
+  // Small finds, never a windfall: a few coins, old maps, a survivor, or one
+  // of two lasting curiosities.
+  function ruinsPrize(e, n, s) {
+    if (s.prize) return;
+    let p = ce(e, n),
+      seed = e.seed >>> 0,
+      r = z(s.x, s.y, seed + 917),
+      msg = "";
+    p.perks || (p.perks = {});
+    let cache = () => {
+      let g = 4 + Math.floor(z(s.y, s.x, seed + 919) * 7),
+        mine = e.colonies.filter((c) => c.owner === n),
+        col = mine.sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y))[0];
+      col ? (col.stock.gold += g) : (p.treasury = (p.treasury || 0) + g);
+      return `A small cache of old coins: ${g} gold${col ? `, carried to ${col.name}` : ", kept until your first colony is founded"}.`;
+    };
+    if (r < 0.32) msg = cache();
+    else if (r < 0.58) {
+      let ex = p.explored.split(""),
+        w = e.map.width;
+      paintSight(e.map, s.x, s.y, 10, (x, y) => {
+        ex[C(x, y, w)] = "1";
+      });
+      p.explored = ex.join("");
+      msg = "Weathered maps of the country round about. The land for some miles around the ruins is now on your charts.";
+    } else if (r < 0.82) {
+      let settlers = z(s.x + 7, s.y, seed + 921) < 0.2,
+        u = Le(e, p, settlers ? "settler" : "explorer", s.x, s.y, settlers ? "Settlers" : "Survivor");
+      u.mp = 0;
+      msg = settlers
+        ? "A few castaways living in the ruins ask to join you. They come as settlers."
+        : "A lone survivor of an earlier voyage joins you as an explorer.";
+    } else if (!p.perks.trail) {
+      p.perks.trail = 1;
+      msg = "Carved trail markers show the old paths. From now on your explorers move one square farther each turn.";
+    } else if (!p.perks.calendar) {
+      p.perks.calendar = 1;
+      p.score = (p.score || 0) + 60;
+      msg = "A carved stone calendar. Word of it raises your standing at home by 60.";
+    } else msg = cache();
+    s.prize = msg;
+    p.isHuman && e.log.push(`Ancient Ruins: ${msg}`);
   }
   function Tn(e, n, o, by) {
     let r = [],
@@ -4129,7 +4332,7 @@ ul.colony-list small { color: #5c5144; }
       a = Le(e, n, "leader", o[0], o[1], i.leaders[0]);
     a.aboard = s.id;
     let t = Le(e, n, "explorer", o[0], o[1], "Explorer");
-    t.aboard = s.id;
+    (t.aboard = s.id), e.arrivals.push({ owner: n.id, year: vr(), spot: [...o] });
   }
   function Le(e, n, o, r, i, s) {
     let a = {
@@ -4429,6 +4632,22 @@ ul.colony-list small { color: #5c5144; }
       let i = Oo(e, r.id),
         s = er(e, r.id);
       e.governorNews.push(...i, ...s);
+    }
+    for (let r of e.players) {
+      if (r.isHuman) continue;
+      // Games started before rivals moved never got them a storeship.
+      r.storeshipChecked ||
+        ((r.storeshipChecked = 1),
+        !e.arrivals.some((a) => a.owner === r.id) &&
+          !e.units.some((u) => u.owner === r.id && u.kind === "settler") &&
+          !e.colonies.some((c) => c.owner === r.id) &&
+          (() => {
+            let sh = e.units.find((u) => u.owner === r.id && u.kind === "ship");
+            sh && e.arrivals.push({ owner: r.id, year: Math.max(e.year + 1, vr()), spot: [sh.x, sh.y] });
+          })());
+      // What rivals do at home is not news to you; the dispatch covers them.
+      let quiet = e.log.length;
+      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), (e.log.length = quiet);
     }
     e.log.push(...e.governorNews), (e.lastTraces = []);
     for (let r of e.players)
@@ -8713,7 +8932,8 @@ ul.colony-list small { color: #5c5144; }
         }));
     }
     let Ln = 170,
-      O = null;
+      O = null,
+      tearArm = null;
     // Repaint when a detailed piece of ground finishes painting.
     onTerrainReady = () => {
       (Q = null), pe();
@@ -9235,9 +9455,10 @@ ul.colony-list small { color: #5c5144; }
       <div class="card find">
         <p class="find-kicker">Special discovery</p>
         <h2>${G(k.name)}</h2>
-        <p>${G(qn(k))}${k.rare ? "" : ". Build there to take advantage of it"}.</p>
+        <p>${G(qn(k))}${k.rare ? "" : ". Build there to take advantage of it"}${k.rare && /[.!]$/.test(qn(k)) ? "" : "."}</p>
+        ${g.prize ? `<p class="find-stat">${G(g.prize)}</p>` : ""}
         ${finderLine(f) ? `<p class="find-stat">${G(finderLine(f))}</p>` : ""}
-        <p class="muted">${k.rare ? `Its effect starts once stage ${k.stage} of the game is built.` : "You found it, so it counts for you. Point at it on the map to see how far it reaches."}</p>
+        <p class="muted">${k.rare ? (k.stage > 2 ? `Its effect starts once stage ${k.stage} of the game is built.` : g.prize ? "Yours to keep." : "Its effect is already yours.") : "You found it, so it counts for you. Point at it on the map to see how far it reaches."}</p>
         <div class="row">
           <button type="button" id="goto-find" class="primary">Go to it</button>
           <button type="button" id="close-find">Carry on</button>
@@ -9657,6 +9878,7 @@ ul.colony-list small { color: #5c5144; }
           ${Ht(t, f, U)}
           ${qa(t, f, U)}
           ${U.building ? "<p>Under construction. Ready next turn.</p>" : (U.level || 1) >= 4 ? '<p class="muted">At the top level.</p>' : `<button type="button" id="up-building" ${Me(f.stock, nn) ? "" : "disabled"}>Raise to level ${$e}<small>${qe(nn)}</small></button>`}
+          <button type="button" id="tear-down" class="${tearArm === `${U.x},${U.y}` ? "danger" : ""}">${tearArm === `${U.x},${U.y}` ? "Click again to tear it down. Nothing is refunded." : U.building ? "Abandon construction" : "Tear down"}</button>
         </div>`;
       }
       let I = t.colonies.filter((E) => E.owner === k.id && E.id !== f.id),
@@ -9671,7 +9893,20 @@ ul.colony-list small { color: #5c5144; }
       </div>
       <p class="muted">Supplies take a turn or more to arrive, depending on distance.</p>`
           : "",
-        Ae = f.governor;
+        Ae = f.governor,
+        eu = europeTurns(t, f),
+        onWay = (t.shipments || []).filter((E) => E.to === "europe" && E.from === f.id),
+        sell = `
+      <h3 class="side-sub">Sell in Europe</h3>
+      <div class="transfer">
+        <select id="sell-what">${Object.keys(EUROPE_PRICE)
+          .map((E) => `<option value="${E}">${Ne[E]}</option>`)
+          .join("")}</select>
+        <input id="sell-amount" type="number" min="1" value="10">
+        <button type="button" id="sell-send">Ship</button>
+      </div>
+      <p class="muted">Europe drives a hard bargain: 1 gold per 2 goods, 6 metal, 12 wood, or 20 crops. The gold comes back in ${eu} turns${eu > 2 ? ", since it is hauled to the coast first" : ""}.</p>
+      ${onWay.length ? `<ul class="underway">${onWay.map((E) => `<li>${E.amount} ${Ne[E.resource].toLowerCase()} at sea: ${E.gold} gold due in ${E.arrives - t.year} turn${E.arrives - t.year === 1 ? "" : "s"}</li>`).join("")}</ul>` : ""}`;
       (s.innerHTML = `
       <p id="status">${h}</p>
       <p id="hover">${T ? "Move over the pale squares." : "Click a building to see it, or pick something to build."}</p>
@@ -9694,6 +9929,7 @@ ul.colony-list small { color: #5c5144; }
       <div class="build-list">${v}</div>
       <div class="row">${f.level >= 4 ? '<span class="muted">The colony is at the top level.</span>' : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land one square all round.</small></button>`}</div>
       ${X}
+      ${sell}
       <p class="muted">Click anywhere outside the colony to go back to the map.</p>
       <div class="minimap-wrap"><canvas id="minimap" width="288" height="216"></canvas></div>`),
         (s.querySelector("#auto-toggle").onclick = () => {
@@ -9708,6 +9944,27 @@ ul.colony-list small { color: #5c5144; }
       Po &&
         (Po.onclick = () => {
           x(Ir(t, f.id)), R();
+        });
+      let td = s.querySelector("#tear-down");
+      td &&
+        U &&
+        (td.onclick = () => {
+          let key = `${U.x},${U.y}`;
+          if (tearArm !== key) {
+            (tearArm = key), R();
+            return;
+          }
+          tearArm = null;
+          let nm = ae[U.id].name.toLowerCase();
+          x(
+            be(t, () => {
+              f.buildings = f.buildings.filter((q) => q !== U);
+              return { ok: !0, discoveries: [], note: `${f.name}'s ${nm} was torn down.` };
+            }),
+          ),
+            (h = `${f.name}'s ${nm} was torn down.`),
+            (S = null),
+            R();
         });
       let Io = s.querySelector("#up-building");
       Io &&
@@ -9745,6 +10002,12 @@ ul.colony-list small { color: #5c5144; }
             }
             R();
           };
+        });
+      let sl = s.querySelector("#sell-send");
+      sl &&
+        (sl.onclick = () => {
+          let E = sellEurope(t, f.id, s.querySelector("#sell-what").value, s.querySelector("#sell-amount").value);
+          x(E), E.ok && E.note && (h = E.note), R();
         });
       let cp = s.querySelector("#cancel-place");
       cp &&
@@ -9822,7 +10085,7 @@ ul.colony-list small { color: #5c5144; }
       }),
       (e.querySelector("#help").onclick = () => ue()),
       window.addEventListener("keydown", (f) => {
-        if (!t || o.hidden || f.target.matches("input, textarea")) return;
+        if (!t || o.hidden || (f.target.matches && f.target.matches("input, textarea"))) return;
         if (O && O.hold) return;
         if ((f.key === "n" || f.key === "N") && !m) {
           f.preventDefault(), nextUnit();
