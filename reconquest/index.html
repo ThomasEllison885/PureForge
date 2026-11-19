@@ -4687,9 +4687,72 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let n = e.undo.pop();
     return n ? (Wi(e, n), !0) : !1;
   }
+  // Saves in this browser. Returns the save text, or throws if the browser
+  // has no room for it.
   function Lr(e) {
     let n = bo(e);
     return localStorage.setItem(br, n), n;
+  }
+  // The map's squares are packed column by column so a save of the full map
+  // is about a megabyte instead of six, small enough for browser storage.
+  function b64(bytes) {
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 32768)
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+    return btoa(s);
+  }
+  function unb64(str) {
+    let s = atob(str),
+      b = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    return b;
+  }
+  function packTiles(tiles) {
+    let keys = new Set();
+    for (let tl of tiles) for (let k in tl) keys.add(k);
+    let cols = {};
+    for (let k of keys) {
+      let vals = tiles.map((tl) => tl[k]);
+      if (vals.every((v) => typeof v === "string")) {
+        let dict = [...new Set(vals)],
+          ix = new Map(dict.map((v, i) => [v, i]));
+        cols[k] = { t: "s", dict, data: b64(Uint8Array.from(vals, (v) => ix.get(v))) };
+      } else if (vals.every((v) => typeof v === "boolean"))
+        cols[k] = { t: "b", data: vals.map((v) => (v ? "1" : "0")).join("") };
+      else if (vals.every((v) => Number.isInteger(v) && v >= 0 && v < 65536))
+        cols[k] = { t: "u16", data: b64(new Uint8Array(Uint16Array.from(vals).buffer)) };
+      else if (vals.every((v) => typeof v === "number"))
+        cols[k] = { t: "f64", data: b64(new Uint8Array(Float64Array.from(vals).buffer)) };
+      else cols[k] = { t: "j", data: vals };
+    }
+    return { n: tiles.length, cols };
+  }
+  function unpackTiles(pk) {
+    let tiles = Array.from({ length: pk.n }, () => ({}));
+    for (let [k, c] of Object.entries(pk.cols)) {
+      let vals =
+        c.t === "s"
+          ? Array.from(unb64(c.data), (i) => c.dict[i])
+          : c.t === "b"
+            ? Array.from(c.data, (ch) => ch === "1")
+            : c.t === "u16"
+              ? Array.from(new Uint16Array(unb64(c.data).buffer))
+              : c.t === "f64"
+                ? Array.from(new Float64Array(unb64(c.data).buffer))
+                : c.data;
+      for (let i = 0; i < pk.n; i++) tiles[i][k] = vals[i];
+    }
+    return tiles;
+  }
+  // The year of the game saved in this browser, if there is one.
+  function savedYear() {
+    try {
+      let s = localStorage.getItem(br),
+        m = s && s.match(/"year":(\d+)/);
+      return m ? Number(m[1]) : null;
+    } catch (err) {
+      return null;
+    }
   }
   function Br() {
     let e = localStorage.getItem(br);
@@ -4706,14 +4769,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         year: e.year,
         season: e.season,
         nextId: e.nextId,
-        map: e.map,
+        map: { ...e.map, tiles: void 0, packedTiles: packTiles(e.map.tiles) },
         players: e.players,
         units: e.units,
         colonies: e.colonies,
         pendingNames: e.pendingNames,
         pendingSpecials: e.pendingSpecials || [],
         shipments: e.shipments || [],
-        log: e.log,
+        log: e.log.slice(-300),
         glimpsed: e.glimpsed || [],
         arrivals: e.arrivals || [],
         arrivedThisTurn: e.arrivedThisTurn || [],
@@ -4727,6 +4790,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!n || n.version !== 1)
       throw new Error("That save is from another version.");
     let o = n.game;
+    o.map.packedTiles && ((o.map.tiles = unpackTiles(o.map.packedTiles)), delete o.map.packedTiles);
     (o.undo = []),
       (o.log = o.log || []),
       (o.glimpsed = o.glimpsed || []),
@@ -8877,9 +8941,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <div class="row"><input id="seed" type="number" value="${f.seed}"><button type="button" id="reseed" class="ghost">Another map</button></div>
         <div class="row">
           <button type="button" id="start" class="primary">Set sail</button>
-          <button type="button" id="continue" class="ghost">Continue saved game</button>
+          <button type="button" id="continue" class="ghost" ${savedYear() ? "" : "disabled"}>${savedYear() ? `Continue saved game · ${savedYear()}` : "No saved game yet"}</button>
           <button type="button" id="practice" class="ghost">Dice preview</button>
-          <label class="ghost" style="padding:6px 10px">Load file<input id="file" type="file" accept="application/json" hidden></label>
         </div>`),
             n.querySelectorAll("[data-nation]").forEach((b) => {
               b.onclick = () => {
@@ -8908,17 +8971,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             }),
             (n.querySelector("#start").onclick = () => N(ho(f))),
             (n.querySelector("#continue").onclick = () => {
-              let b = Br();
+              let b = null;
+              try {
+                b = Br();
+              } catch (err) {
+                (h = `That save could not be read: ${err.message}`), g();
+                return;
+              }
               if (!b) {
                 (h = "No save in this browser."), g();
                 return;
               }
               N(b);
             }),
-            (n.querySelector("#file").onchange = async (b) => {
-              let w = b.target.files[0];
-              w && N(vo(await w.text()));
-            }),
+
             (n.querySelector("#practice").onclick = () => ve());
           titleCoast();
         };
@@ -10056,6 +10122,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       O && le();
       let f = V(t).explored;
       Er(t), (l = null), (y = null), (T = null);
+      try {
+        localStorage.setItem(br, bo(t));
+      } catch (err) {}
       let g = V(t),
         v = (t.arrivedThisTurn || []).includes(g.id)
           ? [...t.units]
@@ -10108,14 +10177,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         yo(t) && ((h = ""), R());
       }),
       (e.querySelector("#save").onclick = () => {
-        Lr(t);
-        let f = new Blob([bo(t)], { type: "application/json" }),
-          g = document.createElement("a");
-        (g.href = URL.createObjectURL(f)),
-          (g.download = `newer-world-${t.seed}.json`),
-          g.click(),
-          (h = "Saved in this browser, and a file downloaded."),
-          R();
+        // The game keeps its own save; nothing to download or look after.
+        try {
+          localStorage.setItem(br, bo(t)),
+            (h = `Game saved (${t.year}). Continue saved game on the title screen picks it up. It also saves itself at the end of every turn.`);
+        } catch (err) {
+          h = "The game could not be saved: this browser is out of room for it or blocks site storage.";
+        }
+        R();
       }),
       (e.querySelector("#help").onclick = () => ue()),
       window.addEventListener("keydown", (f) => {
