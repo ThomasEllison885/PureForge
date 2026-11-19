@@ -2793,7 +2793,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         paintSight(e.map, c.x, c.y, townSight(c.level), (x, y) => {
           r[C(x, y, i)] = "1";
         });
-    (o.explored = r.join("")), Hs(e);
+    (o.explored = r.join("")), Hs(e), chartRivers(e, n, o.explored, null, null, null);
     let Ni = e.map.firstClaim,
       gained = 0,
       chars = null;
@@ -2877,11 +2877,41 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let u = j(e, id);
       u && (v = Math.max(v, $.vision[u.kind] || 1));
     }
-    for (let [x, y] of path)
+    for (let [x, y] of path) {
+      let touched = new Set();
       paintSight(e.map, x, y, v, (xx, yy) => {
-        r[C(xx, yy, w)] = "1";
+        let k = C(xx, yy, w);
+        r[k] = "1";
+        let rid = e.map.tiles[k].riverId;
+        rid && touched.add(rid);
       });
+      touched.size && chartRivers(e, n, r, [x, y], ids && ids[0], touched);
+    }
     o.explored = r.join("");
+  }
+  // A river counts as discovered only once every square of it is on a
+  // nation's charts. The first nation to chart the whole of it names it.
+  var riverTileCache = new WeakMap();
+  function riverTiles(map) {
+    let m = riverTileCache.get(map);
+    if (m) return m;
+    m = new Map();
+    for (let k = 0; k < map.tiles.length; k++) {
+      let rid = map.tiles[k].riverId;
+      rid && (m.has(rid) || m.set(rid, []), m.get(rid).push(k));
+    }
+    return riverTileCache.set(map, m), m;
+  }
+  function chartRivers(e, n, explored, at, by, only) {
+    let tiles = riverTiles(e.map);
+    for (let rv of e.map.rivers) {
+      if (rv.namedBy != null || rv.pending) continue;
+      if (only && !only.has(rv.id)) continue;
+      let tl = tiles.get(rv.id);
+      if (!tl || !tl.every((k) => explored[k] === "1")) continue;
+      rv.pending = !0;
+      e.pendingNames.push({ kind: "river", id: rv.id, ownerId: n, at: at || null, by: by || null, year: e.year });
+    }
   }
   // Resources spotted from any square along the route, each remembering the
   // square it was spotted from so the find can be announced at that moment.
@@ -3073,13 +3103,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s.at = [a.x, a.y];
       if (
         t &&
-        (s("peak", t.peakId),
-        s("region", t.regionId),
-        s("river", t.riverId),
-        t.terrain === "coast")
-      )
-        for (let [l, d] of Z(a.x, a.y, e.map.width, e.map.height))
-          s("river", se(e, l, d).riverId);
+        (s("peak", t.peakId), s("region", t.regionId))
+      );
     }
     return r;
   }
@@ -8645,6 +8670,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (r) => !r.aboard && r.owner === o.id && r.x === e && r.y === n,
       );
     }
+    // Is this unit still partway along a move being shown?
+    function isWalking(id) {
+      if (!O) return !1;
+      let el = animClock(performance.now());
+      return O.list.some(
+        (q) =>
+          (q.ids || [q.unitId]).includes(id) &&
+          (O.paused || (el - q.delay) / q.pace < q.path.length - 1),
+      );
+    }
     function unitAt(sx, sy) {
       let o = V(t);
       if (!o) return null;
@@ -8938,20 +8973,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     onTerrainReady = () => {
       (Q = null), pe();
     };
-    // How long one square of a move takes on screen. Explorers walk, so a
-    // full exploring run takes about twelve seconds.
-    function paceFor(b, slow) {
-      return b.some((w) => {
-        let u = j(t, w.unitId);
-        return u && u.kind === "explorer";
-      })
-        ? Math.max(
-            450,
-            Math.min(1500, Math.round(12e3 / Math.max(...b.map((w) => w.path.length - 1)))),
-          )
-        : slow
-          ? 220
-          : Math.max(28, Math.min(140, Math.round(90 * (d.zoom || 0.2))));
+    // How long one square of a move takes on screen. Everyone walks or sails
+    // at a pace you can follow: an explorer's full run takes about twelve
+    // seconds, any other move about ten, never faster than 450 ms a square.
+    function paceOne(w) {
+      let u = j(t, w.unitId),
+        steps = Math.max(1, w.path.length - 1);
+      return u && u.kind === "explorer"
+        ? Math.max(450, Math.min(1500, Math.round(12e3 / steps)))
+        : Math.max(450, Math.min(1300, Math.round(10e3 / steps)));
     }
     // Milliseconds of animation played so far, not counting time spent paused
     // on a discovery.
@@ -8967,7 +8997,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         k && k();
         return;
       }
-      let pace = paceFor(b, slow);
       if (O) {
         // A new move made while others are still playing joins them. Nothing
         // already walking jumps ahead, and a unit already on the move starts
@@ -8978,7 +9007,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           for (let q of O.list)
             q.unitId === w.unitId &&
               (delay = Math.max(delay, q.delay + (q.path.length - 1) * q.pace));
-          (w.delay = delay), (w.pace = pace), O.list.push(w), O.shown.push(-1);
+          (w.delay = delay), (w.pace = paceOne(w)), O.list.push(w), O.shown.push(-1);
         }
         let d0 = O.done;
         O.done = () => {
@@ -8986,7 +9015,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         };
         return;
       }
-      for (let w of b) (w.delay = 0), (w.pace = pace);
+      for (let w of b) (w.delay = 0), (w.pace = paceOne(w));
       (O = {
         list: b,
         start: performance.now(),
@@ -9179,7 +9208,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!t || o.hidden) return;
       let f = J();
       if (O) {
-        So(f.ctx, f, t, d, { anim: O.frame || un(), selected: l });
+        let gr0 = l ? j(t, l) : null,
+          route0 = c && c.moved && P && gr0 && gr0.id === P && u ? Se(gr0, u.x, u.y) : null;
+        So(f.ctx, f, t, d, { anim: O.frame || un(), selected: l, route: route0 });
         return;
       }
       let g = l ? j(t, l) : null,
@@ -9511,7 +9542,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (a.hidden = !1),
         (a.innerHTML = `
       <form class="card">
-        <h2>You reached this ${g} first</h2>
+        <h2>${g === "river" ? "You charted this whole river first" : `You reached this ${g} first`}</h2>
         ${featStats(f) ? `<p class="find-stat">${G(featStats(f))}</p>` : ""}
         ${finderLine(f) ? `<p class="muted">${G(finderLine(f))}</p>` : ""}
         <p>The name is yours. Everyone's map will use it. Keep the suggestion or type your own.</p>
@@ -9611,15 +9642,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     i.addEventListener("mousedown", (f) => {
       (c = { x: f.clientX, y: f.clientY, ox: d.ox, oy: d.oy, moved: !1 }),
         (P = null);
-      if (t && !O && !y) {
+      // Units can be picked up while other moves play; only one still on
+      // its way somewhere has to finish walking first.
+      if (t && !y) {
         let g = Fe(f),
           hit = unitAt(g.x, g.y),
           k = hit || tileAt(t.map, g.x, g.y, d),
-          v = stackAt(k.x, k.y);
+          v = (hit && O ? [hit] : stackAt(k.x, k.y)).filter((w) => !isWalking(w.id));
         if (v.length) {
           let b = l ? j(t, l) : null,
             pick = b && v.some((w) => w.id === b.id) ? b : topOf(v);
           P = withLeader(pick);
+          P != null && isWalking(P) && (P = null);
         }
       }
       P == null && i.classList.add("drag");
