@@ -4903,53 +4903,92 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         .join(",");
     return `${n.explored}#${r}#${i}`;
   }
+  // The map is cached as a grid of 256-pixel tiles fixed to the map, so
+  // panning only ever draws the few tiles coming into view, a few
+  // milliseconds' worth a frame. A tile that is out of date keeps showing
+  // until its replacement is drawn; brand-new ground shows the overview.
+  var TILE = 256,
+    TILE_MAX = 320,
+    tileEpoch = 0,
+    mapRepaint = null,
+    mapTiles = new Map(),
+    tileTick = 0;
+  function drawTile(o, r, i, s, colonyTiles, tile, ti, tj, a, key) {
+    let TS = TILE / a,
+      g = tile.canvas.getContext("2d"),
+      cam = { ox: -ti * TS, oy: -tj * TS, zoom: r.zoom, lift: 0 },
+      frame = { w: TS, h: TS, x0: 0, y0: 0 },
+      S = o.map;
+    g.setTransform(1, 0, 0, 1, 0, 0),
+      (g.fillStyle = "#000000"),
+      g.fillRect(0, 0, TILE, TILE),
+      g.setTransform(a, 0, 0, a, 0, 0),
+      blitTerrace(g, S, cam, frame),
+      rt(g, o, cam, frame, i),
+      it(g, o, cam, frame, i, colonyTiles),
+      blitFog(g, S, cam, i.explored, s),
+      Qe(g, cam, 0, 0, S.width, S.height, 0),
+      (g.strokeStyle = "#000000"),
+      (g.lineWidth = 3),
+      g.stroke(),
+      (tile.key = key),
+      (tile.zoom = r.zoom),
+      (tile.dpr = a);
+  }
   function Zi(e, n, o, r, i, s) {
     let a = e.getTransform().a || 1,
-      t = Math.round(n.w * 0.5),
-      l = Math.round(n.h * 0.5),
-      d = `${o.map.seed}|${n.w}x${n.h}|${a}|${r.zoom}|${Xi(o, i, s)}`,
-      u = Q && (Math.abs(r.ox - Q.ox) > Q.mx || Math.abs(r.oy - Q.oy) > Q.my);
-    if (!Q || Q.key !== d || u) {
-      let rise = Math.ceil(6 * Tk * r.zoom + 16),
-        c = Math.ceil((n.w + t * 2) * a),
-        h = Math.ceil((n.h + l * 2 + rise) * a),
-        p =
-          Q && Q.canvas.width === c && Q.canvas.height === h
-            ? Q.canvas
-            : $o(c, h),
-        m = p.getContext("2d");
-      m.setTransform(1, 0, 0, 1, 0, 0),
-        (m.fillStyle = "#000000"),
-        m.fillRect(0, 0, c, h),
-        m.setTransform(a, 0, 0, a, t * a, (l + rise) * a);
-      let y = { w: n.w, h: n.h, x0: -t, y0: -l - rise },
-        S = o.map;
-      blitTerrace(m, S, r, y),
-        rt(m, o, r, y, i),
-        it(m, o, r, y, i, Ct(o)),
-        blitFog(m, S, r, i.explored, s),
-        Qe(m, r, 0, 0, S.width, S.height, 0),
-        (m.strokeStyle = "#000000"),
-        (m.lineWidth = 3),
-        m.stroke(),
-        (Q = {
-          key: d,
-          canvas: p,
-          ox: r.ox,
-          oy: r.oy,
-          mx: t,
-          my: l,
-          rise,
-          dpr: a,
-        });
+      TS = TILE / a,
+      key = `${o.map.seed}|${a}|${r.zoom}|${tileEpoch}|${Xi(o, i, s)}`,
+      i0 = Math.floor(-r.ox / TS),
+      j0 = Math.floor(-r.oy / TS),
+      i1 = Math.floor((n.w - r.ox) / TS),
+      j1 = Math.floor((n.h - r.oy) / TS),
+      ci = (i0 + i1) / 2,
+      cj = (j0 + j1) / 2,
+      show = [],
+      todo = [],
+      missing = !1;
+    for (let tj = j0; tj <= j1; tj++)
+      for (let ti = i0; ti <= i1; ti++) {
+        let k = `${ti},${tj}`,
+          tile = mapTiles.get(k),
+          usable = tile && tile.zoom === r.zoom && tile.dpr === a;
+        usable ? show.push([ti, tj, tile]) : (missing = !0);
+        (!usable || tile.key !== key) && todo.push([ti, tj, Math.hypot(ti - ci, tj - cj)]);
+      }
+    // Draw what is due, nearest the middle first, within a small budget.
+    if (todo.length) {
+      todo.sort((p, q) => p[2] - q[2]);
+      let t0 = performance.now(),
+        colonyTiles = null;
+      for (let [ti, tj] of todo) {
+        if (performance.now() - t0 > 5 && show.length) break;
+        colonyTiles || (colonyTiles = Ct(o));
+        let k = `${ti},${tj}`,
+          tile = mapTiles.get(k);
+        tile || ((tile = { canvas: $o(TILE, TILE) }), mapTiles.set(k, tile));
+        drawTile(o, r, i, s, colonyTiles, tile, ti, tj, a, key);
+      }
+      todo.some(([ti, tj]) => (mapTiles.get(`${ti},${tj}`) || {}).key !== key) && mapRepaint && mapRepaint();
+      (show = []), (missing = !1);
+      for (let tj = j0; tj <= j1; tj++)
+        for (let ti = i0; ti <= i1; ti++) {
+          let tile = mapTiles.get(`${ti},${tj}`);
+          tile && tile.zoom === r.zoom && tile.dpr === a ? show.push([ti, tj, tile]) : (missing = !0);
+        }
     }
-    e.drawImage(
-      Q.canvas,
-      r.ox - Q.ox - Q.mx,
-      r.oy - Q.oy - Q.my - (Q.rise || 0),
-      Q.canvas.width / a,
-      Q.canvas.height / a,
-    );
+    missing && blitTerrace(e, o.map, r, null);
+    for (let [ti, tj, tile] of show) {
+      tile.used = ++tileTick;
+      let x = Math.round((ti * TS + r.ox) * a) / a,
+        y = Math.round((tj * TS + r.oy) * a) / a;
+      e.drawImage(tile.canvas, x, y, TS, TS);
+    }
+    // Keep memory in check: forget the tiles least recently on screen.
+    if (mapTiles.size > TILE_MAX) {
+      let old = [...mapTiles.entries()].sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
+      for (let k = 0; k < mapTiles.size - TILE_MAX; k++) mapTiles.delete(old[k][0]);
+    }
   }
   function backTrees(g, x, y, seed, n) {
     let r = (k) => z(x * 23 + k, y * 11 - k, seed + 851),
@@ -9315,10 +9354,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function N(f) {
       (t = f), (h = ""), (n.hidden = !0), (r.hidden = !0), (o.hidden = !1);
-      let g = t.units.find((k) => k.kind === "ship" && k.owner === V(t).id);
-      (l = g ? g.id : null),
+      let me_ = V(t).id,
+        g = t.units.find((k) => k.kind === "ship" && k.owner === me_),
+        // A game with colonies opens on the largest of them; a new one on
+        // the lead ship.
+        home = t.colonies
+          .filter((k) => k.owner === me_)
+          .sort((a, b) => b.level - a.level || b.population - a.population)[0];
+      (l = home ? null : g ? g.id : null),
         requestAnimationFrame(() => {
-          q(g), R();
+          q(home ? { x: home.x, y: home.y } : g), R();
         });
     }
     function _(f, g) {
@@ -9397,9 +9442,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     onTerrainReady = () => {
       readyTimer ||
         (readyTimer = setTimeout(() => {
-          (readyTimer = 0), (Q = null), pe();
+          (readyTimer = 0), tileEpoch++, pe();
         }, 200));
     };
+    mapRepaint = () => pe();
     // How long one square of a move takes on screen. Everyone walks or sails
     // at a pace you can follow: an explorer's full run takes about twelve
     // seconds, any other move about ten, never faster than 450 ms a square.
