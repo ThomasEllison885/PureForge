@@ -212,6 +212,10 @@ button.recruit small { display: block; font-weight: 400; }
 ul.colony-list { padding-left: 0; list-style: none; }
 ul.colony-list li { margin: 6px 0; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 ul.colony-list small { color: #5c5144; }
+.place-tip { position: fixed; z-index: 50; pointer-events: none; background: rgba(24, 18, 12, 0.92); color: #f4ead2; border: 1px solid #c8a656; border-radius: 4px; padding: 4px 8px; font: 13px "Segoe UI", sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+.place-tip .ok { color: #cfe8a8; }
+.place-tip .no { color: #f0a898; }
+.place-tip[hidden] { display: none; }
 button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 #status { min-height: 1.2em; color: #7a2e24; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 .minimap-wrap { margin-top: 8px; }
@@ -598,6 +602,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#8e99a4",
         colorDim: "#555e66",
       },
+      woods: {
+        id: "woods",
+        name: "Light forest",
+        pass: "land",
+        color: "#5d7d3c",
+        colorDim: "#3a4e26",
+      },
+      swamp: {
+        id: "swamp",
+        name: "Swamp",
+        pass: "land",
+        color: "#4e5c3a",
+        colorDim: "#303824",
+      },
+      desert: {
+        id: "desert",
+        name: "Desert",
+        pass: "land",
+        color: "#d2b878",
+        colorDim: "#82724a",
+      },
     },
     Qn = [
       {
@@ -890,7 +915,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Oak Forest",
         group: "wood",
         color: "#8a6a3a",
-        terrain: ["forest"],
+        terrain: ["forest", "woods"],
         building: "mill",
         bonus: 50,
         radius: 5,
@@ -900,7 +925,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Cherry Forest",
         group: "wood",
         color: "#b3443f",
-        terrain: ["forest"],
+        terrain: ["forest", "woods"],
         building: "mill",
         bonus: 40,
         radius: 5,
@@ -910,7 +935,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Redwood Forest",
         group: "wood",
         color: "#9c3d22",
-        terrain: ["forest"],
+        terrain: ["forest", "woods"],
         building: "mill",
         bonus: 70,
         radius: 5,
@@ -920,7 +945,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Teak Forest",
         group: "wood",
         color: "#a8773c",
-        terrain: ["forest"],
+        terrain: ["forest", "woods"],
         building: "mill",
         bonus: 60,
         radius: 5,
@@ -930,7 +955,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Maple Forest",
         group: "wood",
         color: "#d8742c",
-        terrain: ["forest"],
+        terrain: ["forest", "woods"],
         building: "mill",
         bonus: 40,
         radius: 5,
@@ -940,7 +965,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Medicinal Herbs",
         group: "herb",
         color: "#7bc96f",
-        terrain: ["forest", "plains"],
+        terrain: ["forest", "plains", "swamp", "woods"],
         building: "church",
         bonus: 50,
         radius: 5,
@@ -950,7 +975,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name: "Rice Lands",
         group: "farm",
         color: "#e6e1b8",
-        terrain: ["plains"],
+        terrain: ["plains", "swamp"],
         river: !0,
         building: "farm",
         bonus: 70,
@@ -1339,6 +1364,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         forest: 2,
         hills: 2,
         mountains: 3,
+        woods: 1.5,
+        swamp: 3,
+        desert: 1,
       },
       riverCost: 0.5,
       riverPull: 14,
@@ -1351,14 +1379,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         farm: {
           pad: 1,
           base: 0,
-          tile: { plains: 4, forest: -1, hills: -2, river: 8 },
+          tile: { plains: 4, forest: -1, hills: -2, river: 8, woods: 1, swamp: -3, desert: -4 },
         },
-        mill: { pad: 2, base: 0, tile: { forest: 4, plains: 1, river: 8 } },
-        mine: { pad: 3, base: 0, tile: { hills: 3, mountains: 4, river: 6 } },
+        mill: { pad: 2, base: 0, tile: { forest: 4, plains: 1, river: 8, woods: 2, swamp: 1 } },
+        mine: { pad: 3, base: 0, tile: { hills: 3, mountains: 4, river: 6, desert: 1 } },
         gold_mine: {
           pad: 3,
           base: -100,
-          tile: { hills: 2, mountains: 4, river: 8, gold: 60 },
+          tile: { hills: 2, mountains: 4, river: 8, gold: 60, desert: 1 },
         },
       },
       landCost: 2,
@@ -1977,8 +2005,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             ? (u.terrain = "hills")
             : u.moisture > 0.52
               ? (u.terrain = "forest")
-              : (u.terrain = "plains")),
-        (u.gold =
+              : (u.terrain = "plains"));
+      // A little more country for flavour: open woods on the edges of the
+      // forests, dry belts of desert in a few parts of the map, and small
+      // swamps in low, wet ground.
+      if (u.terrain === "plains" || u.terrain === "forest") {
+        let x = d % n,
+          y = Math.floor(d / n),
+          dry = tn(x * 0.022 + 3.1, y * 0.022 - 7.7, e + 701),
+          wet = tn(x * 0.09, y * 0.09, e + 709),
+          low = u.elev - $.seaLevel;
+        u.terrain === "plains" && u.moisture > 0.485
+          ? (u.terrain = "woods")
+          : u.terrain === "forest" && u.moisture < 0.54 && wet < 0.4 && (u.terrain = "woods");
+        u.terrain !== "forest" && dry > 0.725 && u.moisture < 0.47 && (u.terrain = "desert");
+        low < 0.05 && wet > 0.615 && u.moisture > 0.42 && dry < 0.6 && (u.terrain = "swamp");
+      }
+      (u.gold =
           u.terrain === "hills" && Jr(d % n, Math.floor(d / n), e) < 0.05),
         delete u.moisture;
     }
@@ -2467,7 +2510,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!o || o.kind !== "settler" || o.aboard)
       return B("Select a settler on land.");
     let r = se(e, o.x, o.y);
-    if (!r || !Ho(r.terrain)) return B("Found on plains, forest, or hills.");
+    if (!r || !Ho(r.terrain)) return B("Found on plains, forest, light forest, hills, or desert.");
     if (ln(e, o.x, o.y)) return B("That square is already built on.");
     if (
       e.colonies.some(
@@ -2674,7 +2717,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return o;
   }
   function Ho(e) {
-    return e === "plains" || e === "forest" || e === "hills";
+    return e === "plains" || e === "forest" || e === "hills" || e === "woods" || e === "desert";
   }
   function ai(e, n, o, r) {
     let i = [];
@@ -3379,6 +3422,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let u of [
       "Plains",
       "Forest",
+      "Light forest",
+      "Swamp",
+      "Desert",
       "Hills",
       "Mountains",
       "Coast",
@@ -3717,7 +3763,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         : "offshore";
   }
   function Pi(e) {
-    return e === "forest"
+    return e === "woods"
+      ? "in the open woods"
+      : e === "swamp"
+        ? "in the swamp"
+        : e === "desert"
+          ? "in the desert"
+          : e === "forest"
       ? "in the forest"
       : e === "plains"
         ? "on the plains"
@@ -4816,6 +4868,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       forest: [52, 82, 42],
       hills: [120, 116, 66],
       mountains: [122, 116, 106],
+      woods: [96, 118, 58],
+      swamp: [72, 84, 54],
+      desert: [204, 180, 120],
       snow: [208, 212, 218],
       rock: [128, 118, 102],
       riverBank: [52, 88, 86],
@@ -4895,6 +4950,73 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       Q.canvas.width / a,
       Q.canvas.height / a,
     );
+  }
+  // Open woods: a few broadleaf trees and the odd pine, with room between.
+  function woodsTile(g, x, y, seed) {
+    let r = (k) => z(x * 13 + k, y * 7 - k, seed + 811),
+      n = r(1) < 0.25 ? 1 : r(2) < 0.6 ? 2 : 3,
+      trees = [];
+    for (let k = 0; k < n; k++) {
+      let a = (r(10 + k) - 0.5) * 0.8,
+        b = (r(20 + k) - 0.5) * 0.8;
+      trees.push({ sx: (a - b) * 32, sy: (a + b) * 16, pine: r(30 + k) < 0.25, size: 0.75 + r(40 + k) * 0.4 });
+    }
+    trees.sort((p, q) => p.sy - q.sy);
+    for (let t of trees) {
+      g.save(), g.translate(t.sx, t.sy), g.scale(t.size, t.size);
+      (g.fillStyle = "rgba(0,0,0,0.2)"), g.beginPath(), g.ellipse(2, 1, 6, 2.2, 0, 0, Math.PI * 2), g.fill();
+      if (t.pine)
+        (g.fillStyle = "#2e4a24"), g.beginPath(), g.moveTo(0, -16), g.lineTo(-5.5, 0), g.lineTo(5.5, 0), g.closePath(), g.fill(),
+          (g.fillStyle = "#406a30"), g.beginPath(), g.moveTo(0, -16), g.lineTo(5.5, 0), g.lineTo(1, 0), g.closePath(), g.fill();
+      else
+        (g.strokeStyle = "#4a3420"), (g.lineWidth = 1.4), g.beginPath(), g.moveTo(0, 0), g.lineTo(0, -6), g.stroke(),
+          (g.fillStyle = "#4a6e2e"), g.beginPath(), g.arc(0, -10, 6.2, 0, Math.PI * 2), g.fill(),
+          (g.fillStyle = "#6a9040"), g.beginPath(), g.arc(1.8, -11.6, 3.6, 0, Math.PI * 2), g.fill();
+      g.restore();
+    }
+  }
+  // Swamp: tufts of reeds and now and then a dead, bare tree.
+  function swampTile(g, x, y, seed) {
+    let r = (k) => z(x * 17 + k, y * 5 - k, seed + 823);
+    for (let k = 0; k < 4; k++) {
+      if (r(k) < 0.35) continue;
+      let a = (r(10 + k) - 0.5) * 0.85,
+        b = (r(20 + k) - 0.5) * 0.85,
+        sx = (a - b) * 32,
+        sy = (a + b) * 16;
+      (g.strokeStyle = "#7a8a4a"), (g.lineWidth = 0.9), g.beginPath();
+      for (let j = -2; j <= 2; j++) g.moveTo(sx + j, sy), g.quadraticCurveTo(sx + j * 1.6, sy - 4, sx + j * 2.2, sy - 7 - (j & 1) * 2);
+      g.stroke();
+      (g.fillStyle = "#5a4024"), g.fillRect(sx - 0.6, sy - 9, 1.2, 3);
+    }
+    if (r(50) < 0.3) {
+      let sx = (r(51) - 0.5) * 24,
+        sy = (r(52) - 0.5) * 10;
+      (g.strokeStyle = "#5a4a38"), (g.lineWidth = 1.5), g.beginPath(),
+        g.moveTo(sx, sy), g.lineTo(sx + 0.5, sy - 16), g.moveTo(sx + 0.3, sy - 9), g.lineTo(sx - 5, sy - 14),
+        g.moveTo(sx + 0.4, sy - 12), g.lineTo(sx + 4.5, sy - 17), g.stroke();
+    }
+  }
+  // Desert: an occasional cactus or a few rocks; most of it is open sand.
+  function desertTile(g, x, y, seed) {
+    let r = (k) => z(x * 19 + k, y * 3 - k, seed + 839);
+    if (r(1) < 0.55) return;
+    let sx = (r(2) - 0.5) * 30,
+      sy = (r(3) - 0.5) * 12;
+    if (r(4) < 0.55) {
+      (g.fillStyle = "rgba(0,0,0,0.2)"), g.beginPath(), g.ellipse(sx + 2, sy + 1, 4, 1.6, 0, 0, Math.PI * 2), g.fill();
+      (g.strokeStyle = "#4e7a3a"), (g.lineCap = "round"), (g.lineWidth = 3), g.beginPath(),
+        g.moveTo(sx, sy), g.lineTo(sx, sy - 13), g.moveTo(sx, sy - 6), g.lineTo(sx - 4, sy - 6), g.lineTo(sx - 4, sy - 10),
+        g.moveTo(sx, sy - 8), g.lineTo(sx + 3.5, sy - 8), g.lineTo(sx + 3.5, sy - 12), g.stroke();
+      (g.strokeStyle = "#6e9a52"), (g.lineWidth = 1), g.beginPath(), g.moveTo(sx - 0.6, sy - 1), g.lineTo(sx - 0.6, sy - 12), g.stroke();
+    } else
+      for (let k = 0; k < 3; k++) {
+        let px = sx + (r(10 + k) - 0.5) * 10,
+          py = sy + (r(20 + k) - 0.5) * 4,
+          s = 1.6 + r(30 + k) * 1.8;
+        (g.fillStyle = "#9a8462"), g.beginPath(), g.ellipse(px, py - s * 0.4, s, s * 0.7, 0, 0, Math.PI * 2), g.fill();
+        (g.fillStyle = "rgba(0,0,0,0.18)"), g.beginPath(), g.ellipse(px + s * 0.3, py - s * 0.2, s * 0.6, s * 0.45, 0, 0, Math.PI * 2), g.fill();
+      }
   }
   function mtnNear(map, x, y) {
     let w = map.width,
@@ -5818,7 +5940,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       p = new Float32Array(o * r),
       m = new Float32Array(o * r),
       mt = new Float32Array(o * r),
-      ht = new Float32Array(o * r);
+      ht = new Float32Array(o * r),
+      sw = new Float32Array(o * r),
+      ds = new Float32Array(o * r);
     for (let N = 0; N < i.length; N++) {
       let _ = i[N],
         q = _.terrain === "ocean" || _.terrain === "coast";
@@ -5832,13 +5956,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (c[N * 3] = J[0] + pe),
         (c[N * 3 + 1] = J[1] + pe),
         (c[N * 3 + 2] = J[2] + pe * 0.6),
-        (h[N] = _.terrain === "forest" ? 1 : 0),
+        (h[N] = _.terrain === "forest" ? 1 : _.terrain === "woods" ? 0.45 : 0),
         (p[N] = _.terrain === "plains" ? 1 : 0),
         (m[N] = _.terrain === "mountains" ? 1 : 0),
         (mt[N] = m[N]),
-        (ht[N] = _.terrain === "hills" ? 1 : 0);
+        (ht[N] = _.terrain === "hills" ? 1 : 0),
+        (sw[N] = _.terrain === "swamp" ? 1 : 0),
+        (ds[N] = _.terrain === "desert" ? 1 : 0);
     }
-    let base = { o, r, s, l, d, u, c, h, p, m, mt, ht, rivers: riverLines(e) };
+    let base = { o, r, s, l, d, u, c, h, p, m, mt, ht, sw, ds, rivers: riverLines(e) };
     return Tbase.set(e, base), base;
   }
   // Relief height field for a patch: ridged ranges on mountains, rolling
@@ -5907,7 +6033,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // `bleed` extra pixels on every side. Returns a canvas.
   function terrainPatch(e, tx0, ty0, tw, th, HE, bleed) {
     let B = terrainBase(e),
-      { o, r, s, l, d, u, c, h, p, m } = B,
+      { o, r, s, l, d, u, c, h, p, m, sw, ds } = B,
       MG = TMARGIN,
       x0 = tx0 - MG,
       y0 = ty0 - MG,
@@ -5999,6 +6125,26 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           if (Rn > 0) {
             let ie = (Ee(gq / 7, gN / 4, s + 13) - 0.5) * 22 * Rn;
             (oe += ie), (re += ie * 1.1);
+          }
+          let Sw = (sw[me] * Te + sw[le] * de + sw[ne] * G + sw[Se] * ue) / ve,
+            Ds = (ds[me] * Te + ds[le] * de + ds[ne] * G + ds[Se] * ue) / ve;
+          if (Sw > 0) {
+            // Standing pools of dark water among sedge and moss.
+            let mot = (Ee(gq / 5, gN / 5, s + 53) - 0.5) * 26 * Sw;
+            (oe += mot * 0.7), (re += mot), (x += mot * 0.5);
+            let pool = Ee(gq / 11 + 3.3, gN / 11, s + 51) * 0.7 + Ee(gq / 4, gN / 4, s + 57) * 0.3,
+              f = Math.max(0, Math.min(1, (pool - 0.56) * 9)) * Sw;
+            f > 0 &&
+              ((oe += (48 - oe) * f * 0.85),
+              (re += (70 - re) * f * 0.85),
+              (x += (68 - x) * f * 0.85),
+              pool > 0.62 && pool < 0.64 && ((oe += 18 * Sw), (re += 22 * Sw), (x += 18 * Sw)));
+          }
+          if (Ds > 0) {
+            // Wind ripples and paler drifts of sand.
+            let rip = Math.sin(gq * 0.42 + gN * 0.18 + Ee(gq / 38, gN / 38, s + 61) * 14) * 5 * Ds,
+              drift = (Ee(gq / 26, gN / 26, s + 63) - 0.5) * 24 * Ds;
+            (oe += rip + drift), (re += rip * 0.92 + drift * 0.9), (x += rip * 0.7 + drift * 0.6);
           }
           let Mk = RL.M[H];
           if (Mk > 0) {
@@ -6587,27 +6733,37 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let p = YL(c, h, o, terracePx(n.map, c, h, o.zoom));
       if (!Nn(p, r) || i.explored[C(c, h, a)] !== "1") continue;
       let m = t[C(c, h, a)],
-        y = s.get(`${c},${h}`);
+        y = s.get(`${c},${h}`),
+        lm = l.get(`${c},${h}`);
       if (y) {
         y.anchor && ft(e, n, o, y);
+        // A landmark stays on the map when something is built on it.
+        lm && finds.push([p, lm, !0]);
         continue;
       }
       m.terrain === "forest" &&
         d >= Vi &&
         Ye(e, p.x, p.y, d, (M) => st(M, c, h, u, !!m.riverId));
+      m.terrain === "woods" && d >= Vi && Ye(e, p.x, p.y, d, (M) => woodsTile(M, c, h, u));
+      m.terrain === "swamp" && d >= Vi && Ye(e, p.x, p.y, d, (M) => swampTile(M, c, h, u));
+      m.terrain === "desert" && d >= Ji && Ye(e, p.x, p.y, d, (M) => desertTile(M, c, h, u));
       m.terrain === "mountains" &&
         !m.riverId &&
         Ye(e, p.x, p.y, d, (M) => mtnTile(M, n.map, c, h, u, m));
       m.terrain === "hills" &&
         d >= Ji &&
         Ye(e, p.x, p.y, d, (M) => hillTile(M, c, h, u));
-      let S = l.get(`${c},${h}`);
-      S && finds.push([p, S]);
+      lm && finds.push([p, lm, !1]);
     }
     // Discoveries go on last so a mountain peak in front can never hide one.
-    for (let [p, S] of finds) {
-      let M = ke[S.kind];
-      Ye(e, p.x, p.y, Math.max(d * 1.3, 0.7), (P) => discIcon(P, M));
+    // On a built square the marker sits smaller at the square's front corner,
+    // clear of the building.
+    for (let [p, S, built] of finds) {
+      let M = ke[S.kind],
+        k = Math.max(d * 1.3, 0.7);
+      built
+        ? Ye(e, p.x, p.y + 11 * d, k * 0.62, (P) => discIcon(P, M))
+        : Ye(e, p.x, p.y, k, (P) => discIcon(P, M));
     }
   }
   function tt(e, n) {
@@ -9328,6 +9484,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function R() {
       if (!t || o.hidden) return;
+      (!T || !y) && tipEl && ((tipEl.hidden = !0), (i.style.cursor = ""));
       M = null;
       let f = V(t),
         g = on.find((w) => w.id === f.nationId);
@@ -9804,6 +9961,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           hit = unitAt(g.x, g.y),
           k = hit || tileAt(t.map, g.x, g.y, d);
         (u && u.x === k.x && u.y === k.y) || ((u = k), T && y ? R() : pe());
+        placeTip(f);
       }),
       i.addEventListener(
         "wheel",
@@ -9905,6 +10063,32 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           Math.max(Math.abs(b), Math.abs(v)) <= g &&
             k.add(`${f.x + b},${f.y + v}`);
       return k;
+    }
+    // While placing a building the pointer becomes a crosshair and a label
+    // follows it: what is being placed, and whether it can go here.
+    let tipEl = null;
+    function placeTip(ev) {
+      let col = y ? t.colonies.find((q) => q.id === y) : null;
+      if (!T || !col || !u || !ev) {
+        (i.style.cursor = ""), tipEl && (tipEl.hidden = !0);
+        return;
+      }
+      i.style.cursor = "crosshair";
+      tipEl ||
+        ((tipEl = document.createElement("div")),
+        (tipEl.className = "place-tip"),
+        document.body.appendChild(tipEl));
+      let B = ae[T] || ye(T),
+        here = an(t, col.id, T, u.x, u.y),
+        val = here.ok && $.yield[T] ? (Ve(t, T, u.x, u.y) || 0) + rn(t, T, u.x, u.y, col.owner).total : null;
+      (tipEl.innerHTML = `<b>${G(B.name)}</b> ${
+        here.ok
+          ? `<span class="ok">${val != null ? `${val > 0 ? "+" : ""}${Math.round(val)}% here · ` : ""}click to build</span>`
+          : `<span class="no">${G(here.error || "Not here")}</span>`
+      }`),
+        (tipEl.style.left = `${ev.clientX + 16}px`),
+        (tipEl.style.top = `${ev.clientY + 14}px`),
+        (tipEl.hidden = !1);
     }
     // Every square in the colony's land where the building would fit, with
     // the productivity it would get there, and the best of them.
