@@ -4951,6 +4951,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       Q.canvas.height / a,
     );
   }
+  function backTrees(g, x, y, seed, n) {
+    let r = (k) => z(x * 23 + k, y * 11 - k, seed + 851),
+      spots = [
+        [-0.42, -0.1],
+        [-0.1, -0.42],
+        [-0.36, -0.36],
+      ].slice(0, n);
+    for (let [a, b] of spots) {
+      let sx = (a - b) * 32 + (r(a * 10) - 0.5) * 4,
+        sy = (a + b) * 16,
+        sz = 0.7 + r(b * 10) * 0.3,
+        pine = r(a * 7 + b) < 0.5;
+      g.save(), g.translate(sx, sy), g.scale(sz, sz);
+      (g.fillStyle = "rgba(0,0,0,0.2)"), g.beginPath(), g.ellipse(2, 1, 6, 2.2, 0, 0, Math.PI * 2), g.fill();
+      pine
+        ? ((g.fillStyle = "#26401f"), g.beginPath(), g.moveTo(0, -17), g.lineTo(-6, 0), g.lineTo(6, 0), g.closePath(), g.fill(),
+          (g.fillStyle = "#37592b"), g.beginPath(), g.moveTo(0, -17), g.lineTo(6, 0), g.lineTo(1, 0), g.closePath(), g.fill())
+        : ((g.strokeStyle = "#3b2a18"), (g.lineWidth = 1.4), g.beginPath(), g.moveTo(0, 0), g.lineTo(0, -6), g.stroke(),
+          (g.fillStyle = "#2f4c25"), g.beginPath(), g.arc(0, -10, 6, 0, Math.PI * 2), g.fill(),
+          (g.fillStyle = "#4a6d33"), g.beginPath(), g.arc(1.8, -11.5, 3.6, 0, Math.PI * 2), g.fill());
+      g.restore();
+    }
+  }
   // Open woods: a few broadleaf trees and the odd pine, with room between.
   function woodsTile(g, x, y, seed) {
     let r = (k) => z(x * 13 + k, y * 7 - k, seed + 811),
@@ -6717,9 +6740,76 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           u = Y(t.x, t.y, cam);
         Nn(u, r, 200) &&
           (t.id === "farm" && t.building !== "new"
-            ? ut(e, cam, t.x, t.y, l, d, n.map.seed)
-            : ct(e, cam, t.x, t.y, l, d, t.id === "center"));
+            ? ut(e, cam, t.x, t.y, l, d, n.map.seed, n.map)
+            : ct(e, cam, t.x, t.y, l, d, t.id === "center"),
+          riversOver(e, cam, n.map, t.x, t.y, l, d),
+          l === 1 && d === 1 && riverBridge(e, cam, n.map, t.x, t.y));
       }
+  }
+  // Which way a river runs through a square, as a unit step along it in map
+  // squares, or null if no river crosses it.
+  function riverDir(map, x, y) {
+    let tl = se({ map }, x, y);
+    if (!tl || !tl.riverId) return null;
+    let dx = 0,
+      dy = 0;
+    for (let [a, b] of Z(x, y, map.width, map.height)) {
+      let q = map.tiles[b * map.width + a];
+      (q.riverId === tl.riverId || q.terrain === "coast" || q.terrain === "ocean") &&
+        ((dx += Math.abs(a - x)), (dy += Math.abs(b - y)));
+    }
+    let L = Math.hypot(dx, dy);
+    return L ? { x: dx / L, y: dy / L } : { x: 1, y: 0 };
+  }
+  // Rivers stay visible through farmland and building yards.
+  function riversOver(e, cam, map, x, y, w, hh) {
+    let any = !1;
+    for (let b = y; b < y + hh && !any; b++)
+      for (let a = x; a < x + w && !any; a++) {
+        let q = se({ map }, a, b);
+        q && q.riverId && (any = !0);
+      }
+    if (!any) return;
+    let i = (64 * cam.zoom) / 2,
+      s = (32 * cam.zoom) / 2;
+    e.save(),
+      Qe(e, cam, x, y, w, hh, 0),
+      e.clip(),
+      e.transform(i / 20, s / 20, -i / 20, s / 20, cam.ox, cam.oy - s),
+      drawRivers(e, terrainBase(map).rivers, 20, x - 1, y - 1, x + w, y + hh),
+      e.restore();
+  }
+  // A plank footbridge across a river running through a building's square.
+  function riverBridge(e, cam, map, x, y) {
+    let dir = riverDir(map, x, y);
+    if (!dir) return;
+    let px = -dir.y,
+      py = dir.x,
+      along = 0.09,
+      half = 0.3,
+      P = (u, v) => Y(x + px * u + dir.x * v, y + py * u + dir.y * v, cam),
+      a = P(-half, -along),
+      b = P(half, -along),
+      c = P(half, along),
+      d = P(-half, along);
+    e.beginPath(), e.moveTo(a.x, a.y), e.lineTo(b.x, b.y), e.lineTo(c.x, c.y), e.lineTo(d.x, d.y), e.closePath();
+    (e.fillStyle = "#8a6a42"), e.fill(), (e.strokeStyle = "rgba(40,26,12,0.7)"), (e.lineWidth = Math.max(0.6, cam.zoom)), e.stroke();
+    if (cam.zoom >= 0.75) {
+      e.beginPath();
+      for (let k = 1; k < 5; k++) {
+        let t = -half + (2 * half * k) / 5,
+          m = P(t, -along),
+          n = P(t, along);
+        e.moveTo(m.x, m.y), e.lineTo(n.x, n.y);
+      }
+      (e.strokeStyle = "rgba(60,40,20,0.55)"), (e.lineWidth = Math.max(0.4, cam.zoom * 0.6)), e.stroke();
+    }
+  }
+  // How far, in map squares, a building on a river square stands off the
+  // water so the river and its bridge stay in view.
+  function riverShift(map, x, y) {
+    let dir = riverDir(map, x, y);
+    return dir ? { x: -dir.y * 0.3, y: dir.x * 0.3 } : null;
   }
   function it(e, n, o, r, i, s) {
     let { width: a, tiles: t } = n.map,
@@ -6736,6 +6826,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         y = s.get(`${c},${h}`),
         lm = l.get(`${c},${h}`);
       if (y) {
+        // A clearing, not a bare plate: trees stay standing behind a building
+        // put up in forest.
+        (m.terrain === "forest" || m.terrain === "woods") &&
+          d >= Vi &&
+          (y.building.w || 1) === 1 &&
+          Ye(e, p.x, p.y, d, (M) => backTrees(M, c, h, u, m.terrain === "forest" ? 3 : 2));
         y.anchor && ft(e, n, o, y);
         // A landmark stays on the map when something is built on it.
         lm && finds.push([p, lm, !0]);
@@ -7042,10 +7138,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       e.closePath();
   }
   function ct(e, n, o, r, i, s, a) {
-    Qe(e, n, o, r, i, s, 0.08),
-      (e.fillStyle = a
-        ? "rgba(196, 170, 120, 0.85)"
-        : "rgba(150, 128, 92, 0.6)"),
+    // A trodden yard of bare earth that lets the lie of the land show through.
+    Qe(e, n, o, r, i, s, a ? 0.08 : 0.16),
+      (e.fillStyle = a ? "rgba(170, 146, 102, 0.55)" : "rgba(140, 118, 84, 0.32)"),
       e.fill();
   }
   // ---- Buildings -----------------------------------------------------------
@@ -7483,7 +7578,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
   }
 
-  function ut(e, n, o, r, i, s, a) {
+  function ut(e, n, o, r, i, s, a, map) {
     // A patchwork of fields: each quarter its own crop, ploughed in rows,
     // hedged round, with a fence when zoomed in.
     let crops = [
@@ -7504,7 +7599,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           p3 = Y(x0 + hw - 0.04, y0 + hh - 0.04, n),
           p4 = Y(x0 + 0.04, y0 + hh - 0.04, n);
         e.beginPath(), e.moveTo(p1.x, p1.y), e.lineTo(p2.x, p2.y), e.lineTo(p3.x, p3.y), e.lineTo(p4.x, p4.y), e.closePath();
-        (e.fillStyle = c[0]), e.fill(), e.save(), e.clip(), (e.strokeStyle = c[1]), (e.lineWidth = Math.max(0.5, n.zoom * 1.1));
+        let wet = map && (se({ map }, Math.round(x0 + 0.5), Math.round(y0 + 0.5)) || {}).riverId;
+        if (wet) {
+          // Water meadow along the river: grazing, no plough.
+          (e.fillStyle = "rgba(118, 156, 72, 0.6)"), e.fill();
+          continue;
+        }
+        (e.globalAlpha = 0.86), (e.fillStyle = c[0]), e.fill(), (e.globalAlpha = 1), e.save(), e.clip(), (e.strokeStyle = c[1]), (e.lineWidth = Math.max(0.5, n.zoom * 1.1));
         let rows = Math.round(7 * hw),
           alongX = (qx + qy) % 2 === 0;
         for (let k = 0; k <= rows; k++) {
@@ -7809,8 +7910,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }),
       d = n.players.find((h) => h.id === s.owner),
       u = d ? ee[d.nationId].color : "#c8b89a",
-      c = ye(i.id);
-    Ye(e, l.x, l.y, o.zoom, (h) => {
+      c = ye(i.id),
+      off = a === 1 && t === 1 ? riverShift(n.map, i.x, i.y) : null;
+    off && (l = Y(i.x + off.x, i.y + off.y, o));
+    // A farmstead goes up on a dry corner of its fields, not in the river.
+    if (i.id === "farm" && a === 2 && t === 2) {
+      let wet = (qx, qy) => !!(se(n, i.x + qx, i.y + qy) || {}).riverId;
+      if (wet(1, 0)) {
+        let dry = [[0, 0], [1, 1], [0, 1]].find(([qx, qy]) => !wet(qx, qy));
+        if (dry) {
+          let from = Y(i.x + 1, i.y, o),
+            to = Y(i.x + dry[0], i.y + dry[1], o);
+          l = { x: l.x + to.x - from.x, y: l.y + to.y - from.y };
+        }
+      }
+    }
+    Ye(e, l.x, l.y, o.zoom * (off ? 0.86 : 1), (h) => {
       if (i.building === "new") {
         buildSite(h, i.id, u, o.zoom >= 0.75, i.x * 31 + i.y);
         return;
@@ -9188,6 +9303,40 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           (Pe = !1), _e();
         }));
     }
+    // Keyboard scrolling: held keys move the camera smoothly each frame.
+    let PAN_KEYS = {
+        w: "up",
+        a: "left",
+        s: "down",
+        d: "right",
+        ArrowUp: "up",
+        ArrowLeft: "left",
+        ArrowDown: "down",
+        ArrowRight: "right",
+      },
+      panHeld = new Set(),
+      panShift = !1,
+      panLast = 0,
+      panOn = !1;
+    function panStart() {
+      if (panOn) return;
+      (panOn = !0), (panLast = performance.now()), requestAnimationFrame(panStep);
+    }
+    function panStep(now) {
+      if (!panHeld.size || !t || o.hidden) {
+        panOn = !1;
+        return;
+      }
+      let dt = Math.min(0.05, (now - panLast) / 1e3),
+        v = (panShift ? 1700 : 750) * dt;
+      panLast = now;
+      panHeld.has("left") && (d.ox += v),
+        panHeld.has("right") && (d.ox -= v),
+        panHeld.has("up") && (d.oy += v),
+        panHeld.has("down") && (d.oy -= v),
+        pe(),
+        requestAnimationFrame(panStep);
+    }
     let Ln = 170,
       O = null,
       tearArm = null;
@@ -9815,7 +9964,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (a.innerHTML = `
       <div class="card">
         <h2>Keys</h2>
-        <p>Drag to pan. Wheel to zoom. Drag a unit to send it. A click only picks it up.</p>
+        <p>Drag to pan, or hold W A S D or the arrow keys to scroll (Shift scrolls faster). Wheel to zoom. Drag a unit to send it. A click only picks it up.</p>
         <p>Enter ends the turn and opens the dispatch. Enter or Esc closes it. N selects the next unit with movement left. U undoes a move. E sends the selected explorer or ship exploring.</p>
         <p>Tick Keep exploring and an explorer or ship explores on its own at the start of every turn until there is nothing left it can reach. On a ship, Explorers ashore lands every explorer aboard and sets them all exploring.</p>
         <p>Moves play out on the map. Clicking still picks units and squares while they do. Press any key to skip ahead. A find stops everyone until you close its card.</p>
@@ -10373,6 +10522,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.querySelector("#help").onclick = () => ue()),
       window.addEventListener("keydown", (f) => {
         if (!t || o.hidden || (f.target.matches && f.target.matches("input, textarea"))) return;
+        // W A S D or the arrow keys scroll the map while held. They never
+        // skip moves that are playing.
+        let pan = PAN_KEYS[f.key.length === 1 ? f.key.toLowerCase() : f.key];
+        if (pan && !f.ctrlKey && !f.metaKey && !f.altKey) {
+          f.preventDefault(), panHeld.add(pan), panShift = f.shiftKey, panStart();
+          return;
+        }
         if (O && O.hold) return;
         if ((f.key === "n" || f.key === "N") && !m) {
           f.preventDefault(), nextUnit();
@@ -10410,13 +10566,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           (p = !1), (l = null), R();
         }
         f.key === "?" && ue();
-        let g = 40;
-        f.key === "ArrowLeft" && (d.ox += g),
-          f.key === "ArrowRight" && (d.ox -= g),
-          f.key === "ArrowUp" && (d.oy += g),
-          f.key === "ArrowDown" && (d.oy -= g),
-          f.key.startsWith("Arrow") && R();
       }),
+      window.addEventListener("keyup", (f) => {
+        let pan = PAN_KEYS[f.key.length === 1 ? f.key.toLowerCase() : f.key];
+        pan && panHeld.delete(pan), (panShift = f.shiftKey);
+      }),
+      window.addEventListener("blur", () => panHeld.clear()),
       window.addEventListener("resize", () => {
         titleCoast(), R();
       });
