@@ -1308,7 +1308,7 @@ ul.colony-list small { color: #5c5144; }
       startYear: 1500,
       yearsPerTurn: 1,
       storeshipTurn: 6,
-      zoom: { start: 0.1, min: 0.05, max: 2, colony: 1.1 },
+      zoom: { start: 0.85, min: 0.05, max: 2, colony: 1.1 },
       skillPoints: 6,
       invasionScale: { easy: 0.4, normal: 0.6, hard: 0.8, ruthless: 1 },
       move: {
@@ -7625,8 +7625,17 @@ ul.colony-list small { color: #5c5144; }
         (e.lineWidth = 2),
         e.stroke());
     }
+    if (r.plan) drawPlan(e, o, r.plan);
     if ((r.route && bt(e, o, r.route, n.map), r.ghost)) {
       let s = ye(r.ghost.buildingId);
+      if (s && r.ghost.ok) {
+        let gp = Y(r.ghost.x + (s.w - 1) / 2, r.ghost.y + (s.h - 1) / 2, o);
+        Ye(e, gp.x, gp.y, o.zoom, (gg) => {
+          (gg.globalAlpha = 0.72),
+            bldgSprite(gg, r.ghost.buildingId, s.color || "#c8b89a", r.ghost.flag || "#c8b89a", 1, 1, o.zoom >= 0.75, 1),
+            (gg.globalAlpha = 1);
+        });
+      }
       s &&
         (Qe(
           e,
@@ -7667,6 +7676,50 @@ ul.colony-list small { color: #5c5144; }
       (e.strokeStyle = "rgba(255, 255, 255, 0.75)"),
       (e.lineWidth = 1.2),
       e.stroke());
+  }
+  function drawPlan(e, cam, plan) {
+    let s = ye(plan.id),
+      w = s ? s.w : 1,
+      hh = s ? s.h : 1,
+      vals = plan.spots.map((q) => q.val).filter((v) => v != null),
+      hi = vals.length ? Math.max(...vals) : 0,
+      lo = vals.length ? Math.min(...vals) : 0;
+    // Shade each spot by how good it is; label it when there is room.
+    for (let q of plan.spots) {
+      if (q.val == null) continue;
+      let k = hi > lo ? (q.val - lo) / (hi - lo) : 1,
+        p = Y(q.x + (w - 1) / 2, q.y + (hh - 1) / 2, cam);
+      Qe(e, cam, q.x, q.y, 1, 1, 0.12),
+        (e.fillStyle = `rgba(${Math.round(200 - 140 * k)}, ${Math.round(120 + 100 * k)}, 70, 0.22)`),
+        e.fill();
+      if (cam.zoom >= 0.55) {
+        let txt = `${q.val > 0 ? "+" : ""}${Math.round(q.val)}%`;
+        (e.font = `600 ${Math.round(Math.max(9, 11 * cam.zoom))}px "Segoe UI", sans-serif`),
+          (e.textAlign = "center"),
+          (e.lineWidth = 3),
+          (e.strokeStyle = "rgba(20,16,10,0.75)"),
+          e.strokeText(txt, p.x, p.y + 4),
+          (e.fillStyle = q.val > 0 ? "#d8f0b0" : q.val < 0 ? "#f0b0a0" : "#f0ead8"),
+          e.fillText(txt, p.x, p.y + 4);
+      }
+    }
+    if (plan.best) {
+      Qe(e, cam, plan.best.x, plan.best.y, w, hh, 0.02),
+        (e.strokeStyle = "#ffd65a"),
+        (e.lineWidth = 2.5),
+        e.setLineDash([6, 4]),
+        e.stroke(),
+        e.setLineDash([]);
+      let p = Y(plan.best.x + (w - 1) / 2, plan.best.y + (hh - 1) / 2, cam),
+        top = p.y - 16 * cam.zoom * Math.max(w, hh) - 18;
+      (e.font = `700 ${Math.round(Math.max(10, 12 * cam.zoom))}px "Segoe UI", sans-serif`),
+        (e.textAlign = "center"),
+        (e.lineWidth = 3),
+        (e.strokeStyle = "rgba(20,16,10,0.85)"),
+        e.strokeText("Best", p.x, top),
+        (e.fillStyle = "#ffd65a"),
+        e.fillText("Best", p.x, top);
+    }
   }
   function bt(e, n, o, map) {
     let r = YL(o.x, o.y, n, map ? terracePx(map, o.x, o.y, n.zoom) : 0),
@@ -8915,8 +8968,15 @@ ul.colony-list small { color: #5c5144; }
         w = b ? Vn(b) : null,
         F =
           b && T && u
-            ? { x: u.x, y: u.y, buildingId: T, ok: an(t, b.id, T, u.x, u.y).ok }
+            ? {
+                x: u.x,
+                y: u.y,
+                buildingId: T,
+                ok: an(t, b.id, T, u.x, u.y).ok,
+                flag: ee[V(t).nationId].color,
+              }
             : null,
+        plan = b && T ? placePlan(b) : null,
         D = u ? ro(t, u.x, u.y) : null,
         L = V(t),
         K =
@@ -8935,6 +8995,7 @@ ul.colony-list small { color: #5c5144; }
         selected: l,
         zone: w,
         ghost: F,
+        plan,
         find: K,
         route,
         picked: b ? S : null,
@@ -9421,7 +9482,7 @@ ul.colony-list small { color: #5c5144; }
         let g = Fe(f),
           hit = unitAt(g.x, g.y),
           k = hit || tileAt(t.map, g.x, g.y, d);
-        (u && u.x === k.x && u.y === k.y) || ((u = k), pe());
+        (u && u.x === k.x && u.y === k.y) || ((u = k), T && y ? R() : pe());
       }),
       i.addEventListener(
         "wheel",
@@ -9495,6 +9556,10 @@ ul.colony-list small { color: #5c5144; }
         let w = ln(t, f, g);
         if (w && w.colony.owner === k.id) {
           w.colony.id !== y && Re(w.colony.id);
+          // A click on a building picks that building; the colony center
+          // stands for the whole colony.
+          w.building.id !== "center" &&
+            ((S = { x: w.building.x, y: w.building.y }), (T = null), R());
           return;
         }
       }
@@ -9520,6 +9585,20 @@ ul.colony-list small { color: #5c5144; }
             k.add(`${f.x + b},${f.y + v}`);
       return k;
     }
+    // Every square in the colony's land where the building would fit, with
+    // the productivity it would get there, and the best of them.
+    function placePlan(f) {
+      let r = $.buildReach[f.level] || 1,
+        yields = !!$.yield[T],
+        spots = [];
+      for (let yy = f.y - r; yy <= f.y + r; yy++)
+        for (let xx = f.x - r; xx <= f.x + r; xx++) {
+          if (!an(t, f.id, T, xx, yy).ok) continue;
+          let val = yields ? (Ve(t, T, xx, yy) || 0) + rn(t, T, xx, yy, f.owner).total : null;
+          spots.push({ x: xx, y: yy, val });
+        }
+      return { spots, best: fi(t, f, T), id: T };
+    }
     function Jn(f, g, k) {
       let v = ye(T),
         b = an(t, f.id, T, g, k),
@@ -9531,6 +9610,18 @@ ul.colony-list small { color: #5c5144; }
       if (w == null) return L ? `${F} ${L}.` : F;
       let K = w > 0 ? `+${w}` : `${w}`;
       return `${F} Terrain ${K}%.${L ? ` ${L}.` : ""}`;
+    }
+    // What the building being placed would get on the square pointed at.
+    function placingPanel(f) {
+      let B = ae[T] || ye(T),
+        here = u ? an(t, f.id, T, u.x, u.y) : null;
+      return `
+        <div class="pick placing">
+          <h3 class="side-sub">Placing: ${G(B.name)}</h3>
+          <p class="muted">${G(B.produces || "")}. Costs ${qe(ge(T))}.</p>
+          ${u ? (here && here.ok ? `<p>Here:</p>${Ht(t, f, { id: T, x: u.x, y: u.y })}` : `<p class="down">${G((here && here.error) || "Not here.")}</p>`) : ""}
+          <button type="button" id="cancel-place">Cancel</button>
+        </div>`;
     }
     function pn(f) {
       let g = yn(t, f),
@@ -9598,7 +9689,7 @@ ul.colony-list small { color: #5c5144; }
         <p class="muted">${Ae ? `${G(Ze[Ae].blurb)} It starts several buildings now, then more at the start of each turn.` : "Turn it on and the colony builds and grows on its own toward the goal you pick."}</p>
       </div>
       ${F ? `<h3 class="side-sub">Under construction</h3>${F}` : ""}
-      ${te}
+      ${T ? placingPanel(f) : te}
       <h3 class="side-sub">Build</h3>
       <div class="build-list">${v}</div>
       <div class="row">${f.level >= 4 ? '<span class="muted">The colony is at the top level.</span>' : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land one square all round.</small></button>`}</div>
@@ -9643,11 +9734,22 @@ ul.colony-list small { color: #5c5144; }
         }),
         s.querySelectorAll("[data-tool]").forEach((E) => {
           E.onclick = () => {
-            (T = T === E.dataset.tool ? null : E.dataset.tool),
-              (S = null),
-              (h = ""),
-              R();
+            (T = T === E.dataset.tool ? null : E.dataset.tool), (S = null), (h = "");
+            if (T) {
+              let best = fi(t, f, T),
+                nm = ae[T] ? ae[T].name : T;
+              best
+                ? ((u = best),
+                  (h = `Placing a ${nm.toLowerCase()}. It is shown on the best spot, marked Best. Point at any pale square to compare, then click to build there.`))
+                : (h = `There is no room for a ${nm.toLowerCase()} in this colony's land.`);
+            }
+            R();
           };
+        });
+      let cp = s.querySelector("#cancel-place");
+      cp &&
+        (cp.onclick = () => {
+          (T = null), (h = ""), R();
         });
       let No = s.querySelector("#minimap");
       To(No.getContext("2d"), No, t, d, i),
