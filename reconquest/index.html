@@ -4901,7 +4901,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         .filter((s) => s.foundBy != null)
         .map((s) => s.id)
         .join(",");
-    return `${n.explored}#${[...o].join(";")}#${r}#${i}`;
+    return `${n.explored}#${r}#${i}`;
   }
   function Zi(e, n, o, r, i, s) {
     let a = e.getTransform().a || 1,
@@ -5993,7 +5993,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // Relief height field for a patch: ridged ranges on mountains, rolling
   // ground on hills, faint texture everywhere. a x t pixels, HE per tile,
   // pixel (0,0) at tile corner (x0 - 0.5, y0 - 0.5).
-  function reliefOf(B, x0, y0, a, t, y, HE) {
+  function* reliefOf(B, x0, y0, a, t, y, HE) {
     let { o, r, s, mt, ht } = B,
       n = a * t,
       M = new Float32Array(n),
@@ -6001,6 +6001,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       H = new Float32Array(n),
       G = new Float32Array(n);
     for (let N = 0; N < t; N++) {
+      N % 32 || (yield);
       let _ = y0 + (N + 0.5) / HE - 0.5;
       for (let q = 0; q < a; q++) {
         let J = x0 + (q + 0.5) / HE - 0.5,
@@ -6009,8 +6010,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     let b = Math.max(1, Math.round(HE * 0.42));
-    Dr(M, a, t, b), Dr(Hm, a, t, b);
+    yield, Dr(M, a, t, b), yield, Dr(Hm, a, t, b), yield;
     for (let N = 0; N < t; N++) {
+      N % 4 || (yield);
       let _ = y0 + (N + 0.5) / HE - 0.5;
       for (let q = 0; q < a; q++) {
         let J = x0 + (q + 0.5) / HE - 0.5,
@@ -6049,12 +6051,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     let Bl = new Float32Array(H);
-    Dr(Bl, a, t, Math.max(1, Math.round(HE * 0.22)));
+    yield, Dr(Bl, a, t, Math.max(1, Math.round(HE * 0.22)));
     return { H, B: Bl, M, Hm, G };
   }
   // Paint tiles [tx0, tx0+tw) x [ty0, ty0+th) at HE pixels per tile, plus
   // `bleed` extra pixels on every side. Returns a canvas.
-  function terrainPatch(e, tx0, ty0, tw, th, HE, bleed) {
+  function* terrainPatch(e, tx0, ty0, tw, th, HE, bleed) {
     let B = terrainBase(e),
       { o, r, s, l, d, u, c, h, p, m, sw, ds } = B,
       MG = TMARGIN,
@@ -6065,6 +6067,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       sc = 20 / HE,
       y = new Float32Array(a * t);
     for (let N = 0; N < t; N++) {
+      N % 48 || (yield);
       let _ = y0 + (N + 0.5) / HE - 0.5;
       for (let q = 0; q < a; q++) {
         let J = x0 + (q + 0.5) / HE - 0.5;
@@ -6072,8 +6075,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     let S = Math.max(1, Math.floor(HE / 2));
-    Dr(y, a, t, S), Dr(y, a, t, S);
-    let RL = reliefOf(B, x0, y0, a, t, y, HE),
+    yield, Dr(y, a, t, S), yield, Dr(y, a, t, S), yield;
+    let RL = yield* reliefOf(B, x0, y0, a, t, y, HE),
       bl = bleed || 0,
       ox = MG * HE - bl,
       oy = MG * HE - bl,
@@ -6084,6 +6087,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       T = P.createImageData(cw, ch),
       A = T.data;
     for (let NN = 0; NN < ch; NN++) {
+      NN % 4 || (yield);
       let N = NN + oy,
         _ = y0 + (N + 0.5) / HE - 0.5,
         gN = (_ + 0.5) * 20;
@@ -6339,34 +6343,51 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Whole-map ground at low resolution, for zoomed-out views and as a
   // stand-in while detailed chunks are still being painted.
+  function runAll(gen) {
+    for (;;) {
+      let r = gen.next();
+      if (r.done) return r.value;
+    }
+  }
   function Qi(e) {
     let st = terrainOf(e);
-    return st.over || (st.over = terrainPatch(e, 0, 0, e.width, e.height, TOVER, 0)), st.over;
+    return st.over || (st.over = runAll(terrainPatch(e, 0, 0, e.width, e.height, TOVER, 0))), st.over;
   }
+  // Detailed ground is painted in the background a few milliseconds at a
+  // time, nearest the middle of the view first. Anything no longer on
+  // screen when its turn comes is skipped.
   function queueChunk(e, st, key) {
-    st.queue.includes(key) || st.queue.push(key);
     if (st.busy) return;
     st.busy = !0;
-    let step = () => {
-      let k = st.queue.shift();
-      if (k == null) {
-        st.busy = !1;
-        return;
-      }
-      if (!st.chunks.has(k)) {
-        let [cx, cy] = k.split(",").map(Number),
-          tw = Math.min(TCH, e.width - cx * TCH),
-          th = Math.min(TCH, e.height - cy * TCH);
-        st.chunks.set(k, { canvas: terrainPatch(e, cx * TCH, cy * TCH, tw, th, he, 2), used: ++st.tick });
-        // Keep memory in check: drop the chunks least recently on screen.
-        if (st.chunks.size > TMAXCH) {
-          let old = [...st.chunks.entries()].sort((a, b) => a[1].used - b[1].used);
-          for (let i = 0; i < st.chunks.size - TMAXCH; i++) st.chunks.delete(old[i][0]);
+    let job = null,
+      step = () => {
+        let t0 = performance.now();
+        for (;;) {
+          if (!job) {
+            let k = (st.wanted || []).find((q) => !st.chunks.has(q));
+            if (k == null) {
+              st.busy = !1;
+              return;
+            }
+            let [cx, cy] = k.split(",").map(Number),
+              tw = Math.min(TCH, e.width - cx * TCH),
+              th = Math.min(TCH, e.height - cy * TCH);
+            job = { k, gen: terrainPatch(e, cx * TCH, cy * TCH, tw, th, he, 2) };
+          }
+          let r = job.gen.next();
+          if (r.done) {
+            st.chunks.set(job.k, { canvas: r.value, used: ++st.tick });
+            // Keep memory in check: drop the chunks least recently on screen.
+            if (st.chunks.size > TMAXCH) {
+              let old = [...st.chunks.entries()].sort((a, b) => a[1].used - b[1].used);
+              for (let i = 0; i < st.chunks.size - TMAXCH; i++) st.chunks.delete(old[i][0]);
+            }
+            (job = null), onTerrainReady && onTerrainReady();
+          }
+          if (performance.now() - t0 > 7) break;
         }
-        onTerrainReady && onTerrainReady();
-      }
-      setTimeout(step, 0);
-    };
+        setTimeout(step, 0);
+      };
     setTimeout(step, 0);
   }
   function drawPatch(ctx, cam, canvas, HE, tx0, ty0, bleed) {
@@ -6404,13 +6425,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ty0 = Math.max(0, Math.min(...pts.map((q) => q.y)) - 1),
       ty1 = Math.min(map.height - 1, Math.max(...pts.map((q) => q.y)) + 1),
       need = [],
-      missing = !1;
+      want = [],
+      mx = (tx0 + tx1) / 2 / TCH,
+      my = (ty0 + ty1) / 2 / TCH;
     for (let cy = Math.floor(ty0 / TCH); cy <= Math.floor(ty1 / TCH); cy++)
       for (let cx = Math.floor(tx0 / TCH); cx <= Math.floor(tx1 / TCH); cx++) {
         let key = `${cx},${cy}`,
           ch = st.chunks.get(key);
-        ch ? need.push([cx, cy, ch]) : ((missing = !0), queueChunk(map, st, key));
+        ch ? need.push([cx, cy, ch]) : want.push([key, Math.hypot(cx + 0.5 - mx, cy + 0.5 - my)]);
       }
+    let missing = want.length > 0;
+    (st.wanted = want.sort((a, b) => a[1] - b[1]).map((q) => q[0])), missing && queueChunk(map, st);
     missing && drawPatch(ctx, cam, Qi(map), TOVER, 0, 0, 0);
     for (let [cx, cy, ch] of need)
       (ch.used = ++st.tick), drawPatch(ctx, cam, ch.canvas, he, cx * TCH, cy * TCH, 2);
@@ -6707,6 +6732,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ctx.restore();
   }
 
+  // The squares under a screen frame, back to front, with a margin for tall
+  // peaks and trees that reach into view from just below or beside it.
+  function tilesInView(map, cam, frame) {
+    let xa = frame.x0 || 0,
+      ya = frame.y0 || 0,
+      xb = frame.w - xa,
+      yb = frame.h - ya,
+      pts = [
+        [xa, ya],
+        [xb, ya],
+        [xa, yb],
+        [xb, yb],
+      ].map(([sx, sy]) => $n(sx, sy, cam)),
+      x0 = Math.max(0, Math.min(...pts.map((q) => q.x)) - 3),
+      x1 = Math.min(map.width - 1, Math.max(...pts.map((q) => q.x)) + 3),
+      y0 = Math.max(0, Math.min(...pts.map((q) => q.y)) - 3),
+      y1 = Math.min(map.height - 1, Math.max(...pts.map((q) => q.y)) + 3),
+      out = [];
+    for (let k = x0 + y0; k <= x1 + y1; k++)
+      for (let x = Math.max(x0, k - y1); x <= Math.min(x1, k - y0); x++) out.push([x, k - x]);
+    return out;
+  }
   function ot(e) {
     let n = Ar.get(e);
     if (n) return n;
@@ -6819,7 +6866,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let d = o.zoom,
       u = n.map.seed >>> 0,
       finds = [];
-    for (let [c, h] of ot(n.map)) {
+    for (let [c, h] of tilesInView(n.map, o, r)) {
       let p = YL(c, h, o, terracePx(n.map, c, h, o.zoom));
       if (!Nn(p, r) || i.explored[C(c, h, a)] !== "1") continue;
       let m = t[C(c, h, a)],
@@ -8694,6 +8741,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.fillStyle = n),
       e.fillRect(-12, 3, 4, 4);
   }
+  var miniCache = { key: "", canvas: null };
   function To(e, n, o, r, mapEl) {
     let { width: s, height: a } = o.map,
       t = V(o),
@@ -8701,20 +8749,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       d = n.height;
     (e.fillStyle = "#000000"), e.fillRect(0, 0, l, d);
     let u = l / s,
-      c = d / a;
-    for (let h = 0; h < a; h++)
-      for (let p = 0; p < s; p++) {
-        if (t.explored[C(p, h, s)] !== "1") continue;
-        let m = o.map.tiles[C(p, h, s)],
-          y =
-            m.terrain === "ocean"
-              ? W.deep
-              : m.terrain === "coast"
-                ? W.shallow
-                : W[m.terrain];
-        (e.fillStyle = `rgb(${y.join(",")})`),
-          e.fillRect(p * u, h * c, Math.ceil(u), Math.ceil(c));
+      c = d / a,
+      // The charted land is one pixel per square, redrawn only when the
+      // charts change, then stretched onto the minimap.
+      key = `${o.map.seed}|${s}|${t.explored}`;
+    if (miniCache.key !== key) {
+      let cv = miniCache.canvas && miniCache.canvas.width === s && miniCache.canvas.height === a ? miniCache.canvas : $o(s, a),
+        g = cv.getContext("2d"),
+        img = g.createImageData(s, a),
+        px = img.data;
+      for (let k = 0; k < s * a; k++) {
+        if (t.explored[k] !== "1") continue;
+        let m = o.map.tiles[k],
+          y = m.terrain === "ocean" ? W.deep : m.terrain === "coast" ? W.shallow : W[m.terrain] || W.plains;
+        (px[k * 4] = y[0]), (px[k * 4 + 1] = y[1]), (px[k * 4 + 2] = y[2]), (px[k * 4 + 3] = 255);
       }
+      g.putImageData(img, 0, 0), (miniCache = { key, canvas: cv });
+    }
+    (e.imageSmoothingEnabled = !1), e.drawImage(miniCache.canvas, 0, 0, l, d), (e.imageSmoothingEnabled = !0);
     for (let h of o.colonies) {
       if (t.explored[C(h.x, h.y, s)] !== "1") continue;
       let p = o.players.find((m) => m.id === h.owner);
@@ -9341,8 +9393,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       O = null,
       tearArm = null;
     // Repaint when a detailed piece of ground finishes painting.
+    let readyTimer = 0;
     onTerrainReady = () => {
-      (Q = null), pe();
+      readyTimer ||
+        (readyTimer = setTimeout(() => {
+          (readyTimer = 0), (Q = null), pe();
+        }, 200));
     };
     // How long one square of a move takes on screen. Everyone walks or sails
     // at a pace you can follow: an explorer's full run takes about twelve
