@@ -10408,10 +10408,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           p = YL(u.x, u.y, o, terracePx(n.map, u.x, u.y, o.zoom));
         // Facing follows the screen: east and north go right, west and south left.
         let sx = (u.dx || 0) - (u.dy || 0);
-        sx && (c.face = sx < 0 ? -1 : 1);
+        u.moving && sx && (c.face = sx < 0 ? -1 : 1);
         Nn(p, r, 200) &&
           Ye(e, p.x, p.y, a, (m) =>
-            _r(m, c, ee[h.nationId].color, u.count, u.active || (s.selected != null && (u.ids || [u.id]).includes(s.selected)), { phase: performance.now() / 90 + c.id * 1.7, face: c.face || 1 }, h.nationId),
+            _r(m, c, ee[h.nationId].color, u.count, u.active || (s.selected != null && (u.ids || [u.id]).includes(s.selected)), { phase: u.moving ? performance.now() / 90 + c.id * 1.7 : null, face: c.face || 1 }, h.nationId),
           );
       }
     for (let rd of natives(n).raids) {
@@ -11696,6 +11696,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             y: U.y,
             dx: U.dx,
             dy: U.dy,
+            // Only a leg under way walks; one waiting its turn or done stands.
+            moving: lg > 0 && lg < L.path.length - 1,
             count: (L.ids || []).length || 1,
             ids: L.ids || [L.unitId],
             active: !1,
