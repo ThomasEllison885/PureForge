@@ -241,6 +241,26 @@ ul.colony-list small { color: #5c5144; }
 .bside h3 { margin-top: 0; }
 .blog { font: 12px/1.45 "Segoe UI", sans-serif; color: #d5dee4; padding-left: 16px; max-height: 60vh; overflow: auto; }
 .battle-card { max-width: 560px; }
+.attack-opts { list-style: none; padding: 0; margin: 10px 0; }
+.diplo-card { max-width: 640px; max-height: 86vh; overflow: auto; }
+.drow { border-top: 1px solid rgba(60,40,20,0.2); padding: 8px 0; }
+.drow h3 { margin: 4px 0; display: flex; align-items: center; gap: 8px; }
+.drow .flag { display: inline-block; width: 16px; height: 11px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); }
+.drow h3 small { font: 12px "Segoe UI", sans-serif; color: #6a5a44; margin-left: auto; }
+.dsteps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; margin: 6px 0; }
+.dsteps span { font: 10.5px "Segoe UI", sans-serif; text-align: center; padding: 4px 1px; background: rgba(60,40,20,0.08); color: #8a7a62; border-radius: 3px; }
+.dsteps span.on { color: #fff; font-weight: 700; background: #7a6a4a; }
+.dsteps span.on.war, .dsteps span.on.hostile { background: #a0302a; }
+.dsteps span.on.tense, .dsteps span.on.wary { background: #b0702a; }
+.dsteps span.on.cordial, .dsteps span.on.understanding, .dsteps span.on.alliance { background: #3a7a2a; }
+label.pick { display: block; margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
+label.pick select { margin-left: 6px; max-width: 100%; }
+.summary-card { max-width: 600px; max-height: 86vh; overflow: auto; }
+ul.summary { list-style: none; padding: 0; margin: 8px 0; }
+ul.summary li { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(60,40,20,0.12); font: 13.5px/1.4 "Segoe UI", sans-serif; }
+ul.summary li button { flex: none; }
+.attack-opts li { margin: 8px 0; font: 13px/1.4 "Segoe UI", sans-serif; display: flex; gap: 10px; align-items: flex-start; }
+.attack-opts button { min-width: 90px; flex: none; }
 ul.natives { list-style: none; padding: 0; margin: 6px 0; }
 ul.natives li { margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
 .att.friendly { color: #3a7a2a; font-weight: 600; }
@@ -2914,7 +2934,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let t = ce(e, n);
       t &&
         t.isHuman &&
-        (e.pendingSpecials.push({ id: s.id, ownerId: n }),
+        (pushEvent(e, `${ke[s.kind].name} found${s.prize ? `: ${s.prize}` : "."}`, s.x, s.y),
         e.log.push(
           `You found ${/^[AEIOU]/.test(ke[s.kind].name) ? "an" : "a"} ${ke[s.kind].name}.`,
         ));
@@ -3015,7 +3035,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         s.kind === "ancient_ruins" && ruinsPrize(e, n, s);
         p &&
           p.isHuman &&
-          (e.pendingSpecials.push({ id: s.id, ownerId: n, at: [x, y], by: ids && ids[0], year: e.year }),
+          (pushEvent(e, `${ke[s.kind].name} found${s.prize ? `: ${s.prize}` : "."}`, s.x, s.y),
           e.log.push(
             `You found ${/^[AEIOU]/.test(ke[s.kind].name) ? "an" : "a"} ${ke[s.kind].name}.`,
           ));
@@ -3585,7 +3605,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // adds a gun. Soldiers in the colony join in, and a leader there takes
   // command of the whole defence.
   var MILITIA_BY_LEVEL = [0, 2, 3, 4, 6];
-  function colonyDefence(e, col) {
+  function colonyDefence(e, col, exceptNation) {
     let units = [],
       here = e.units.filter((u) => u.owner === col.owner && !u.aboard && u.x === col.x && u.y === col.y),
       leader = here.find((u) => u.kind === "leader") || null;
@@ -3596,7 +3616,44 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         for (let k = 0; k < (b.level || 1); k++) units.push({ id: `f${b.x},${b.y},${k}`, kind: "artillery", str: 3, name: "Fort guns" });
     for (let u of here)
       arm(u.kind) && units.push({ id: u.id, kind: u.kind, str: u.strength || 3, max: u.maxStr || u.strength || 3, name: u.name });
-    return { name: col.name, leader: leader ? leaderStats(leader) : null, leaderId: leader ? leader.id : null, units };
+    // Rival crowns keep regulars in their colonies, since their governors
+    // do not recruit: one more each level, under a garrison commander.
+    let rival = e.players.find((p) => p.id === col.owner && !p.isHuman);
+    if (rival) {
+      for (let k = 0; k < 1 + (col.level || 1); k++) units.push({ id: `r${k}`, kind: k === 2 ? "artillery" : "infantry", str: 3 + Math.min(1, (col.level || 1) - 1), name: k === 2 ? "Garrison guns" : "Regulars" });
+      leader || (leader = { name: `Commander of ${col.name}`, attacks: 2, charisma: 2, rep: 0, cmd: 12 });
+    }
+    // Friendly villages close by send warriors to help, never against
+    // their own nation. Up to four come.
+    let allies = 0;
+    for (let v of nativeAllies(e, col, exceptNation)) {
+      let n = Math.min(2, Math.max(1, Math.floor(v.warriors / 3)));
+      for (let k = 0; k < n && allies < 4; k++, allies++)
+        units.push({ id: `a${v.id}-${k}`, kind: k % 2 ? "rider" : "brave", str: 3, ally: !0, village: v.id, name: k % 2 ? "Allied riders" : "Allied warriors" });
+    }
+    return { name: col.name, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
+  }
+  function nativeAllies(e, col, exceptNation) {
+    if (!e.natives) return [];
+    return e.natives.villages
+      .filter((v) => {
+        let nat = nationOf(e, v);
+        return nat && nat.id !== exceptNation && (nat.att[col.owner] || 0) >= 30 && v.warriors >= 2 && Math.max(Math.abs(v.x - col.x), Math.abs(v.y - col.y)) <= 10;
+      })
+      .sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y));
+  }
+  // Allied warriors who fell are lost to their village; when the colony
+  // held, their nation thinks the better of it.
+  function allyLosses(e, B, sideKey, owner) {
+    let won = B.over.winner === sideKey,
+      seen = new Set();
+    for (let bu of B.sides[sideKey].units) {
+      if (!bu.ally) continue;
+      let v = e.natives && e.natives.villages.find((q) => q.id === +String(bu.id).slice(1).split("-")[0]);
+      if (!v) continue;
+      bu.str <= 0 && (v.warriors = Math.max(1, v.warriors - 1));
+      won && !seen.has(v.nation) && (seen.add(v.nation), shiftAttitude(nationOf(e, v), owner, 4));
+    }
   }
   // Put a finished battle's losses back onto real units.
   function applyLosses(e, side, B, sideKey) {
@@ -3775,6 +3832,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       owner && owner.isHuman ? out.human.push(rd) : resolveRaid(e, rd, null);
     }
     N.raids = still;
+    // Villages slowly make good their losses.
+    for (let v of N.villages) {
+      v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < 0.3 && (v.warriors += 1);
+      v.gold < 10 + v.size * 20 && (v.gold += 1);
+    }
     // Hostile villages may send a new party at a colony within reach.
     for (let v of N.villages) {
       if (v.raidCool > 0) {
@@ -3804,10 +3866,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       sec.lines.push(item);
     } else (e.battleNews || (e.battleNews = [])).push(item);
   }
+  function nationAdj(p) {
+    return (p && { spain: "Spanish", portugal: "Portuguese", england: "English", france: "French", netherlands: "Dutch" }[p.nationId]) || "rival";
+  }
   function whoseColony(e, col) {
     let p = e.players.find((q) => q.id === col.owner);
     if (!p) return col.name;
-    let adj = { spain: "Spanish", portugal: "Portuguese", england: "English", france: "French", netherlands: "Dutch" }[p.nationId] || "rival";
+    let adj = nationAdj(p);
     return p.isHuman ? `our colony of ${col.name}` : `the ${adj} colony of ${col.name}`;
   }
   // Settle a raid. With a finished battle the result comes from it;
@@ -3816,9 +3881,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let col = e.colonies.find((c) => c.id === rd.target),
       v = natives(e).villages.find((q) => q.id === rd.village);
     if (!col || !v) return "";
-    let def = colonyDefence(e, col);
+    let def = colonyDefence(e, col, v.nation);
     B || (B = bAutoFinish(battleNew({ kind: "raid", title: "", att: villageForce(e, v, !0), def }, rd.id * 31 + e.year)));
-    applyLosses(e, col.owner, B, "def");
+    applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner);
     let rounds = B.raidRounds + (B.over.winner === "att" ? 3 : 0),
       took = [];
     for (let k of ["food", "wood", "goods", "gold"]) {
@@ -3870,6 +3935,635 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       p = ce(e, pid);
     col ? (col.stock.gold += v.gold) : (p.treasury = (p.treasury || 0) + v.gold);
     return `${v.name} is burned and ${v.gold} gold taken${col ? ` to ${col.name}` : ""}. The ${nat.name} nation is at war with you.${up ? " " + up : ""}`;
+  }
+  // Plunder where the colony or village is nearest: gold and supplies go
+  // to the attacker's closest colony, or into the treasury.
+  function nearestOwn(e, pid, x, y) {
+    return e.colonies.filter((c) => c.owner === pid).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0] || null;
+  }
+  function bankLoot(e, pid, x, y, k, n) {
+    let c = nearestOwn(e, pid, x, y);
+    if (c) c.stock[k] += n;
+    else if (k === "gold") {
+      let p = ce(e, pid);
+      p.treasury = (p.treasury || 0) + n;
+    }
+    return c;
+  }
+  // Your soldiers raid a village: no need to win, only to hold on inside it.
+  // The longer they stay, the more gold they carry off. The village stands,
+  // but its nation turns hostile.
+  function resolveVillageRaid(e, pid, v, B, leaderId) {
+    let nat = nationOf(e, v);
+    shiftAttitude(nat, pid, -70), (nat.att[pid] = Math.min(nat.att[pid], -40));
+    applyLosses(e, pid, B, "att");
+    v.warriors = Math.max(1, v.warriors - B.sides.def.units.filter((u) => u.str <= 0).length);
+    let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      won = B.over.winner === "att",
+      up = leaderWon(e, L, won),
+      tl = battleTally(B),
+      rounds = B.raidRounds + (won ? 3 : 0),
+      g = Math.floor(v.gold * Math.min(0.6, rounds * 0.12)),
+      col = g > 0 ? bankLoot(e, pid, v.x, v.y, "gold", g) : null;
+    v.gold -= g;
+    battleNews(
+      e,
+      `Raid on ${v.name}`,
+      `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} raided ${v.name} of the ${nat.name} nation. After ${tl.rounds} round${tl.rounds === 1 ? "" : "s"} ${g ? `they came away with ${g} gold` : "they came away with nothing"}. We lost ${tl.attLost}; the warriors lost ${tl.defLost}. The ${nat.name} nation is now hostile to us.`,
+      !1,
+    );
+    return `${g ? `The raid on ${v.name} took ${g} gold${col ? ` to ${col.name}` : ""}.` : `The raid on ${v.name} took nothing.`} The ${nat.name} nation is hostile to you.${up ? " " + up : ""}`;
+  }
+  // Knock down building levels: a level off a building, or the building
+  // itself when it has only one. The colony center is spared.
+  function wreckBuildings(e, col, n, seed) {
+    let gone = [];
+    for (let k = 0; k < n; k++) {
+      let list = col.buildings.filter((b) => b.id !== "center" && !b.building);
+      if (!list.length) break;
+      let b = list[Math.floor(z(seed + k, col.id, 4111) * list.length)],
+        nm = ae[b.id] ? ae[b.id].name.toLowerCase() : b.id;
+      (b.level || 1) > 1 ? (b.level -= 1) : (col.buildings = col.buildings.filter((q) => q !== b));
+      gone.push(nm);
+    }
+    return gone;
+  }
+  // Your soldiers attack a rival's colony, to raid it or to take it.
+  // A raid needs no victory: every round the raiders hold part of the town
+  // they carry off supplies, and from the fifth round on they wreck a
+  // building a round. Raiders who wipe out or drive off the defence burn
+  // the colony to the ground. To capture it, you must win; it changes
+  // hands with some damage.
+  function resolveColonyAttack(e, pid, col, mode, B, leaderId) {
+    let owner = e.players.find((p) => p.id === col.owner),
+      _w = owner && startWar(e, ce(e, pid), owner),
+      before = col.name,
+      L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      won = B.over.winner === "att",
+      up = leaderWon(e, L, won),
+      tl = battleTally(B),
+      def = B.sides.def,
+      DL = def.leaderId ? e.units.find((u) => u.id === def.leaderId) : null;
+    applyLosses(e, pid, B, "att"), applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner), leaderWon(e, DL, !won);
+    let dead = Math.min(col.population - 1, Math.round(B.killed * 0.75));
+    dead > 0 && (col.population -= dead);
+    let out = "",
+      where = `the ${nationAdj(owner)} colony of ${before}`;
+    if (mode === "capture") {
+      if (won) {
+        let wrecked = wreckBuildings(e, col, 1, e.year);
+        for (let u of e.units.filter((q) => q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y)) e.units = e.units.filter((q) => q !== u);
+        (col.owner = pid), (col.governor = null);
+        for (let id of B.sides.att.units.map((u) => u.id)) {
+          let u = e.units.find((q) => q.id === id);
+          u && ((u.x = col.x), (u.y = col.y));
+        }
+        L && ((L.x = col.x), (L.y = col.y));
+        out = `${before} is ours. The fighting cost it ${wrecked.length ? `its ${wrecked[0]}` : "little"}${dead > 0 ? ` and ${dead} colonists` : ""}.`;
+      } else out = `The assault on ${before} failed.`;
+    } else {
+      let r = raidSpoils(e, col, B, pid);
+      out = r.burned
+        ? `${before} is burned to the ground${r.took.length ? `; we carried off ${r.took.join(", ")}` : ""}.`
+        : `Our raiders ${r.took.length ? `carried off ${r.took.join(", ")}` : "took nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.${dead > 0 ? ` ${dead} colonists were killed.` : ""}`;
+    }
+    battleNews(
+      e,
+      `${mode === "capture" ? "Assault" : "Raid"} on ${before}`,
+      `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} ${mode === "capture" ? "stormed" : "raided"} ${where}, held by ${bLabel(def.units)}${def.leader ? ` under ${def.leader.name}` : ""}. The fight lasted ${tl.rounds} round${tl.rounds === 1 ? "" : "s"}. ${out} We lost ${tl.attLost}; they lost ${tl.defLost}.`,
+      !1,
+    );
+    return out + (up ? " " + up : "");
+  }
+  // Your soldiers attack a rival's men in the open. Win and every one of
+  // theirs on that square is killed or scattered.
+  function resolveUnitAttack(e, pid, x, y, B, leaderId) {
+    let theirs = e.units.filter((q) => q.owner !== pid && !q.aboard && q.x === x && q.y === y),
+      owner = theirs[0] && e.players.find((p) => p.id === theirs[0].owner),
+      _w = owner && startWar(e, ce(e, pid), owner),
+      L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      won = B.over.winner === "att",
+      up = leaderWon(e, L, won),
+      tl = battleTally(B),
+      DL = B.sides.def.leaderId ? e.units.find((u) => u.id === B.sides.def.leaderId) : null;
+    applyLosses(e, pid, B, "att"), owner && applyLosses(e, owner.id, B, "def"), leaderWon(e, DL, !won);
+    let lost = [];
+    if (won)
+      for (let u of e.units.filter((q) => q.owner !== pid && !q.aboard && q.x === x && q.y === y)) lost.push(u.name || u.kind), (e.units = e.units.filter((q) => q !== u));
+    let out = won ? `The ${nationAdj(owner)} party is destroyed${lost.length ? `: ${lost.join(", ")}` : ""}.` : "Our attack was beaten off.";
+    battleNews(e, `Skirmish with the ${nationAdj(owner)}`, `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} fell on a ${nationAdj(owner)} party in the open. ${out} We lost ${tl.attLost}; they lost ${tl.defLost}.`, !1);
+    return out + (up ? " " + up : "");
+  }
+  // Rival men on one square, ready to fight: soldiers and their leader.
+  // Explorers and settlers do not fight; they are lost if the fight is.
+  function fieldForce(e, x, y, pid) {
+    let here = e.units.filter((q) => q.owner !== pid && !q.aboard && q.x === x && q.y === y),
+      lead = here.find((q) => q.kind === "leader"),
+      owner = here[0] && e.players.find((p) => p.id === here[0].owner),
+      units = here.filter((q) => arm(q.kind)).map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name }));
+    // Men with no soldiers to guard them still put up a fight of sorts.
+    units.length || here.filter((q) => q.kind !== "ship").forEach((q, k) => units.push({ id: `c${k}`, kind: "militia", str: 2, militia: !0, name: q.name || "Colonists" }));
+    return { name: `${nationAdj(owner)} party`.replace(/^./, (c) => c.toUpperCase()), leader: lead ? leaderStats(lead) : null, leaderId: lead ? lead.id : null, units };
+  }
+  // ---- Diplomacy, the crown, rival armies, and the end of the game ---------
+  // Every pair of European players stands somewhere on an eight-step scale
+  // from War to Alliance. Back in Europe the crowns are at war or at peace
+  // with one another, and your king expects you to follow suit: fight the
+  // nations he is fighting, keep the peace with the rest. Going against his
+  // wishes breeds resentment at court, and the angrier the court, the more
+  // tax it takes from your colonies each year.
+  var DIPLO = [
+      { id: "war", name: "War", min: -100 },
+      { id: "hostile", name: "Hostile", min: -74 },
+      { id: "tense", name: "Tense", min: -49 },
+      { id: "wary", name: "Wary", min: -24 },
+      { id: "neutral", name: "Neutral", min: -9 },
+      { id: "cordial", name: "Cordial", min: 10 },
+      { id: "understanding", name: "Understanding", min: 35 },
+      { id: "alliance", name: "Alliance", min: 70 },
+    ],
+    GAME_LENGTHS = [
+      { turns: 100, target: 2500 },
+      { turns: 150, target: 4000 },
+      { turns: 200, target: 6000 },
+    ],
+    LEADER_COST = [0, 40, 70, 110, 160],
+    ARMY_SPEED = 4;
+  function pol(e) {
+    let P = e.politics;
+    if (!P) {
+      P = e.politics = { rel: {}, europe: {}, armies: [], nextArmy: 1, events: [], offers: [], pool: {}, length: 150, target: 4000, over: null, met: {} };
+      let rng = bn(((e.seed >>> 0) ^ 0x7a11) >>> 0);
+      for (let a of e.players)
+        for (let b of e.players) {
+          if (a.id >= b.id) continue;
+          P.rel[`${a.id}|${b.id}`] = -5 + Math.round((rng() - 0.5) * 10);
+          P.europe[eKey(a.nationId, b.nationId)] = rng() < 0.35 ? "war" : "peace";
+        }
+    }
+    return P;
+  }
+  function eKey(a, b) {
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+  }
+  function relOf(e, a, b) {
+    let k = a < b ? `${a}|${b}` : `${b}|${a}`,
+      v = pol(e).rel[k];
+    return v == null ? -5 : v;
+  }
+  function setRel(e, a, b, v) {
+    // Nations at war know each other.
+    v < DIPLO[1].min && ((pol(e).met[a] = pol(e).met[a] || e.year), (pol(e).met[b] = pol(e).met[b] || e.year));
+    pol(e).rel[a < b ? `${a}|${b}` : `${b}|${a}`] = Math.max(-100, Math.min(100, Math.round(v)));
+  }
+  function shiftRel(e, a, b, d) {
+    setRel(e, a, b, relOf(e, a, b) + d);
+  }
+  function diploLevel(v) {
+    let L = DIPLO[0];
+    for (let q of DIPLO) v >= q.min && (L = q);
+    return L;
+  }
+  function atWar(e, a, b) {
+    return relOf(e, a, b) < DIPLO[1].min;
+  }
+  function europeAt(e, pa, pb) {
+    return pol(e).europe[eKey(pa.nationId, pb.nationId)] || "peace";
+  }
+  // What the king wants between you and that rival: war or peace.
+  function crownWish(e, me, rival) {
+    return europeAt(e, me, rival) === "war" ? "war" : "peace";
+  }
+  function pushEvent(e, text, x, y) {
+    let P = pol(e);
+    P.events.push({ text, x: x == null ? null : x, y: y == null ? null : y });
+    P.events.length > 60 && P.events.shift();
+  }
+  function nationName(p) {
+    return (ee[p.nationId] || {}).name || "A rival";
+  }
+  // Starting or joining a fight with a rival: you are now at war with them,
+  // and if the crowns are at peace in Europe the king will not like it.
+  function startWar(e, me, rival) {
+    let msgs = [];
+    if (!atWar(e, me.id, rival.id)) (pol(e).blame || (pol(e).blame = {}))[me.isHuman ? rival.id : me.id] = me.isHuman ? "you" : "them", setRel(e, me.id, rival.id, -100), msgs.push(`${nationName(me)} is now at war with ${nationName(rival)} in the New World.`);
+    if (me.isHuman && crownWish(e, me, rival) === "peace") {
+      let m = me.mother || (me.mother = { ...ir });
+      (m.resentment = (m.resentment || 0) + 10), (m.favor = Math.max(0, (m.favor || 0) - 5));
+      msgs.push(`The king is at peace with ${nationName(rival)}. Your attack angers the court.`);
+    }
+    for (let q of msgs) pushEvent(e, q);
+    return msgs;
+  }
+  // ---- Once a year ----
+  function europeTurn(e) {
+    let P = pol(e),
+      hum = e.players.find((p) => p.isHuman);
+    for (let a of e.players)
+      for (let b of e.players) {
+        if (a.id >= b.id) continue;
+        let k = eKey(a.nationId, b.nationId),
+          was = P.europe[k] || "peace";
+        if (z(a.id * 7 + b.id, e.year, (e.seed >>> 0) + 2203) >= (was === "war" ? 0.12 : 0.08)) continue;
+        let now = was === "war" ? "peace" : "war";
+        P.europe[k] = now;
+        if (hum && (a === hum || b === hum)) {
+          let other = a === hum ? b : a;
+          pushEvent(
+            e,
+            now === "war"
+              ? `War in Europe: ${nationName(hum)} and ${nationName(other)} are at war. The king expects you to fight the ${nationAdj(other)} here too.`
+              : `Peace in Europe: ${nationName(hum)} and ${nationName(other)} have signed a treaty. The king wants peace with the ${nationAdj(other)} in the New World.`,
+          );
+          // A rival follows its own crown at once: to war, or it sues for peace.
+          now === "war" ? atWar(e, hum.id, other.id) || (((P.blame || (P.blame = {}))[other.id] = "them"), setRel(e, hum.id, other.id, -100), pushEvent(e, `${nationName(other)} declares war on you.`)) : atWar(e, hum.id, other.id) && P.offers.push({ kind: "peace", from: other.id, id: P.nextArmy++ });
+        } else {
+          // Two computer nations simply follow their crowns.
+          now === "war" ? setRel(e, a.id, b.id, -100) : atWar(e, a.id, b.id) && setRel(e, a.id, b.id, -30);
+        }
+      }
+  }
+  function crownTurn(e) {
+    let out = [];
+    for (let me of e.players) {
+      if (!me.isHuman) continue;
+      let m = me.mother || (me.mother = { ...ir });
+      if (m.independent) continue;
+      let crossed = [];
+      for (let r of e.players) {
+        if (r === me || !pol(e).met[r.id]) continue;
+        let wish = crownWish(e, me, r),
+          war = atWar(e, me.id, r.id);
+        wish === "war" && !war && crossed.push(`The king wants war with ${nationName(r)}.`);
+        wish === "peace" && war && (pol(e).blame || {})[r.id] !== "them" && crossed.push(`The king wants peace with ${nationName(r)}.`);
+      }
+      crossed.length ? (m.resentment = (m.resentment || 0) + 3 * crossed.length) : (m.favor = Math.min(30, (m.favor || 0) + 1));
+      m.resentment = Math.max(0, (m.resentment || 0) - 1);
+      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)),
+        took = 0;
+      for (let c of e.colonies)
+        if (c.owner === me.id) {
+          let g = Math.floor(c.stock.gold * rate);
+          (c.stock.gold -= g), (took += g);
+        }
+      m.taxRate = rate;
+      m.taxTaken = took;
+      crossed.length && pushEvent(e, `${crossed.join(" ")} Resentment at court is ${m.resentment}.`);
+      out.push(`The crown took ${took} gold in tax this year, ${Math.round(rate * 100)}% of your colonies' gold.`);
+    }
+    return out;
+  }
+  // Who has met whom: you meet a rival once you see one of their colonies
+  // or men.
+  function meetTurn(e) {
+    let P = pol(e),
+      hum = e.players.find((p) => p.isHuman);
+    if (!hum) return;
+    let w = e.map.width,
+      seen = (x, y) => hum.explored[y * w + x] === "1";
+    for (let r of e.players) {
+      if (r === hum || P.met[r.id]) continue;
+      let c = e.colonies.find((q) => q.owner === r.id && seen(q.x, q.y)),
+        u = !c && e.units.find((q) => q.owner === r.id && !q.aboard && seen(q.x, q.y) && e.units.some((m) => m.owner === hum.id && Math.max(Math.abs(m.x - q.x), Math.abs(m.y - q.y)) <= 3));
+      if (c || u) {
+        P.met[r.id] = e.year;
+        let at = c || u;
+        pushEvent(e, `First contact with ${nationName(r)}. Relations: ${diploLevel(relOf(e, hum.id, r.id)).name}. The Diplomacy screen shows where you stand.`, at.x, at.y);
+      }
+    }
+  }
+  // Rivals are hungry for land: their goodwill toward you wears away each
+  // year, faster when your colonies crowd theirs.
+  function rivalMoodTurn(e) {
+    let hum = e.players.find((p) => p.isHuman);
+    if (!hum) return;
+    for (let r of e.players) {
+      if (r.isHuman) continue;
+      let crowd = 0;
+      for (let c of e.colonies)
+        c.owner === hum.id && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 20) && crowd++;
+      shiftRel(e, hum.id, r.id, -3 - crowd * 2);
+      // A rival follows its crown: at war in Europe, at war here once met.
+      if (!atWar(e, hum.id, r.id) && pol(e).met[r.id] && europeAt(e, hum, r) === "war") {
+        ((pol(e).blame || (pol(e).blame = {}))[r.id] = "them"), setRel(e, hum.id, r.id, -100), pushEvent(e, `${nationName(r)}, at war with your king in Europe, declares war on you here.`);
+        continue;
+      }
+      // Already sour and with men to spare: they declare war.
+      let v = relOf(e, hum.id, r.id);
+      if (!atWar(e, hum.id, r.id) && v < DIPLO[2].min && (pol(e).pool[r.id] || 0) >= 3 && z(r.id, e.year, (e.seed >>> 0) + 2207) < 0.35)
+        ((pol(e).blame || (pol(e).blame = {}))[r.id] = "them"), setRel(e, hum.id, r.id, -100), pushEvent(e, `${nationName(r)} declares war on you!`);
+    }
+  }
+  // ---- Rival armies ----
+  // Rival colonies train men every year. Once there are enough, a leader
+  // takes them toward your nearest colony. You can see the column on the
+  // march, its leader and how many men, but not what kind of men they are.
+  function landPath(e, from, to, limit) {
+    let { width: w, height: h, tiles } = e.map,
+      land = (x, y) => x >= 0 && y >= 0 && x < w && y < h && mn[tiles[y * w + x].terrain].pass === "land" && tiles[y * w + x].terrain !== "mountains",
+      start = from.y * w + from.x,
+      prev = new Map([[start, -1]]),
+      q = [start],
+      goal = null;
+    for (let k = 0; k < q.length && k < (limit || 40000); k++) {
+      let c = q[k],
+        x = c % w,
+        y = (c / w) | 0;
+      if (Math.max(Math.abs(x - to.x), Math.abs(y - to.y)) <= 1 && c !== to.y * w + to.x) {
+        goal = c;
+        break;
+      }
+      for (let [nx, ny] of Z(x, y, w, h)) {
+        let n = ny * w + nx;
+        prev.has(n) || !land(nx, ny) || (prev.set(n, c), q.push(n));
+      }
+    }
+    if (goal == null) return null;
+    let path = [];
+    for (let c = goal; c !== -1; c = prev.get(c)) path.push([c % w, (c / w) | 0]);
+    return path.reverse();
+  }
+  function rivalArmyTurn(e) {
+    let P = pol(e),
+      hum = e.players.find((p) => p.isHuman),
+      scale = { easy: 0.25, normal: 0.4, hard: 0.55, ruthless: 0.7 }[e.difficulty] || 0.4;
+    for (let r of e.players) {
+      if (r.isHuman) continue;
+      let cols = e.colonies.filter((c) => c.owner === r.id);
+      P.pool[r.id] = Math.min(14, (P.pool[r.id] || 0) + cols.reduce((a, c) => a + scale * (0.6 + 0.4 * (c.level || 1)), 0));
+      if (!hum || !atWar(e, hum.id, r.id) || P.armies.some((a) => a.owner === r.id) || P.pool[r.id] < 4) continue;
+      let mine = e.colonies.filter((c) => c.owner === hum.id);
+      if (!mine.length || !cols.length) continue;
+      let best = null;
+      for (let c of cols)
+        for (let m of mine) {
+          let d = Math.hypot(c.x - m.x, c.y - m.y);
+          (!best || d < best.d) && (best = { from: c, to: m, d });
+        }
+      if (!best || best.d > 90) continue;
+      let path = landPath(e, best.from, best.to);
+      if (!path) continue;
+      let n = Math.floor(P.pool[r.id]),
+        lvl = Math.max(1, Math.round(cols.reduce((a, c) => a + (c.level || 1), 0) / cols.length)),
+        rng = bn((e.year * 131 + r.id * 17) >>> 0),
+        troops = [];
+      for (let k = 0; k < n; k++) {
+        let q = rng(),
+          kind = q < 0.6 ? "infantry" : q < 0.85 ? "cavalry" : "artillery";
+        troops.push({ kind, str: unitStrength(kind, lvl) });
+      }
+      P.pool[r.id] -= n;
+      let names = (ee[r.nationId] || {}).leaders || ["Captain"],
+        L = { name: names[(r.nextLeader || 1) % names.length], lvl: Math.min(4, lvl), attacks: 1 + lvl, charisma: 1 + lvl, cmd: 12, rep: 0 };
+      r.nextLeader = (r.nextLeader || 1) + 1;
+      P.armies.push({ id: P.nextArmy++, owner: r.id, leader: L, troops, x: best.from.x, y: best.from.y, path, step: 0, target: best.to.id, seen: !1 });
+    }
+    // Columns on the march.
+    let still = [];
+    for (let A of P.armies) {
+      let owner = e.players.find((p) => p.id === A.owner),
+        col = e.colonies.find((c) => c.id === A.target);
+      if (!owner || !col || col.owner === A.owner) continue;
+      if (hum && col.owner === hum.id && !atWar(e, hum.id, owner.id)) {
+        pushEvent(e, `Peace holds: the ${nationAdj(owner)} column under ${A.leader.name} turns back.`, A.x, A.y);
+        P.pool[owner.id] = (P.pool[owner.id] || 0) + A.troops.length * 0.7;
+        continue;
+      }
+      A.step = Math.min(A.path.length - 1, A.step + ARMY_SPEED);
+      [A.x, A.y] = A.path[A.step];
+      let near = Math.max(Math.abs(A.x - col.x), Math.abs(A.y - col.y)) <= 1;
+      if (hum && col.owner === hum.id) {
+        let w = e.map.width,
+          visible = (e.colonies.some((c) => c.owner === hum.id && Math.max(Math.abs(c.x - A.x), Math.abs(c.y - A.y)) <= 10) || e.units.some((u) => u.owner === hum.id && !u.aboard && Math.max(Math.abs(u.x - A.x), Math.abs(u.y - A.y)) <= 4));
+        visible && !P.met[owner.id] && (P.met[owner.id] = e.year);
+        visible && !A.seen && ((A.seen = !0), pushEvent(e, `A ${nationAdj(owner)} army under ${A.leader.name}, about ${A.troops.length} men, is marching on ${col.name}.`, A.x, A.y));
+        if (near) {
+          (e.pendingArmies || (e.pendingArmies = [])).push(A.id);
+          pushEvent(e, `The ${nationAdj(owner)} army under ${A.leader.name} has reached ${col.name}!`, col.x, col.y);
+        }
+      }
+      still.push(A);
+    }
+    P.armies = still;
+  }
+  // The defence an army puts up when you attack it, or the force it brings.
+  function armyForce(e, A, hidden) {
+    let owner = e.players.find((p) => p.id === A.owner);
+    return {
+      name: `${nationAdj(owner)} army`.replace(/^./, (c) => c.toUpperCase()),
+      leader: A.leader,
+      hidden: !!hidden,
+      units: A.troops.map((q, k) => ({ id: `x${A.id}-${k}`, kind: q.kind, str: q.str, max: q.str, name: UNIT_KINDS[q.kind].name })),
+    };
+  }
+  function armyAt(e, x, y) {
+    return pol(e).armies.find((A) => A.x === x && A.y === y) || null;
+  }
+  // The army chooses: storm the colony when it likes its odds, else raid.
+  function armyPlan(e, A, col) {
+    let spec = { kind: "attack", att: armyForce(e, A), def: colonyDefence(e, col) };
+    return bOdds(spec, 16).defWin < 0.45 ? "capture" : "raid";
+  }
+  // Settle an army's attack on one of your colonies.
+  function resolveArmyAttack(e, A, col, mode, B, fresh) {
+    let P = pol(e),
+      owner = e.players.find((p) => p.id === A.owner),
+      def = B.sides.def,
+      DL = def.leaderId ? e.units.find((u) => u.id === def.leaderId) : null,
+      won = B.over.winner === "att",
+      tl = battleTally(B),
+      before = col.name,
+      out = "";
+    applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner);
+    let up = leaderWon(e, DL, !won),
+      dead = Math.min(col.population - 1, Math.round(B.killed * 0.75));
+    dead > 0 && (col.population -= dead);
+    if (mode === "capture") {
+      if (won) {
+        wreckBuildings(e, col, 1, e.year);
+        e.units = e.units.filter((q) => !(q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y));
+        (col.owner = A.owner), (col.governor = "balanced");
+        out = `${before} has fallen to the ${nationAdj(owner)}.`;
+      } else out = `${before} held against the ${nationAdj(owner)} assault.`;
+    } else {
+      let r = raidSpoils(e, col, B, owner.id);
+      out = r.burned ? `The ${nationAdj(owner)} burned ${before} to the ground.` : r.took.length || r.wrecked.length ? `The ${nationAdj(owner)} raiders carried off ${r.took.join(", ") || "nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.` : `${before} drove off the ${nationAdj(owner)} raiders.`;
+    }
+    dead > 0 && (out += ` ${dead} colonists were killed.`);
+    // The survivors go home.
+    let left = B.sides.att.units.filter((u) => u.str > 0).length;
+    P.pool[owner.id] = (P.pool[owner.id] || 0) + left * 0.8;
+    P.armies = P.armies.filter((q) => q !== A);
+    battleNews(
+      e,
+      `${mode === "capture" ? "Assault" : "Raid"} on ${before}`,
+      `A ${nationAdj(owner)} army under ${A.leader.name} ${mode === "capture" ? "stormed" : "raided"} our colony of ${before}, held by ${bLabel(def.units)}${def.leader ? ` under ${def.leader.name}` : ""}. The fight lasted ${tl.rounds} round${tl.rounds === 1 ? "" : "s"}. ${out} They lost ${tl.attLost}; we lost ${tl.defLost}.`,
+      !!fresh,
+    );
+    return out + (up ? " " + up : "");
+  }
+  // You attack a rival army in the field.
+  function resolveArmyBattle(e, pid, A, B, leaderId) {
+    let P = pol(e),
+      owner = e.players.find((p) => p.id === A.owner),
+      _w = startWar(e, ce(e, pid), owner),
+      L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      won = B.over.winner === "att",
+      up = leaderWon(e, L, won),
+      tl = battleTally(B);
+    applyLosses(e, pid, B, "att");
+    let alive = B.sides.def.units.filter((u) => u.str > 0);
+    won || !alive.length ? (P.armies = P.armies.filter((q) => q !== A)) : (A.troops = alive.map((u) => ({ kind: u.kind, str: u.str })));
+    let out = won ? `The ${nationAdj(owner)} army under ${A.leader.name} is broken.` : `The ${nationAdj(owner)} army beat off our attack.`;
+    battleNews(e, `Battle with the ${nationAdj(owner)}`, `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} attacked the ${nationAdj(owner)} army under ${A.leader.name} in the field. ${out} We lost ${tl.attLost}; they lost ${tl.defLost}.`, !1);
+    return out + (up ? " " + up : "");
+  }
+  // What a raid on a colony takes, by the manual's rules: from the third
+  // round on the raiders carry off a tenth of what is left each round; from
+  // the fifth, a building level a round goes down. Raiders who win the
+  // battle burn the colony to the ground.
+  function raidSpoils(e, col, B, pid) {
+    let rounds = Math.min(B.round, BMAXROUND),
+      share = 1 - Math.pow(0.9, Math.max(0, rounds - 2)),
+      took = [];
+    for (let k of ["food", "wood", "goods", "metal", "gold"]) {
+      if (col.stock[k] == null) continue;
+      let n = Math.floor(col.stock[k] * share);
+      n > 0 && ((col.stock[k] -= n), bankLoot(e, pid, col.x, col.y, k, n), took.push(`${n} ${Ne[k].toLowerCase()}`));
+    }
+    let wrecked = wreckBuildings(e, col, Math.max(0, rounds - 4), e.year * 3 + col.id),
+      burned = B.over.winner === "att";
+    if (burned) {
+      e.colonies = e.colonies.filter((c) => c !== col);
+      e.units = e.units.filter((q) => !(q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y));
+    }
+    return { took, wrecked, burned };
+  }
+  // ---- Trade offers ----
+  // A rival at Neutral or better may offer a trade each year. You choose
+  // which of your colonies pays and which receives.
+  function tradeOffersTurn(e) {
+    let P = pol(e),
+      hum = e.players.find((p) => p.isHuman);
+    if (!hum || !e.colonies.some((c) => c.owner === hum.id)) return;
+    let keys = ["food", "wood", "metal", "goods"];
+    for (let r of e.players) {
+      if (r.isHuman || !P.met[r.id] || relOf(e, hum.id, r.id) < DIPLO[4].min) continue;
+      if (z(r.id, e.year, (e.seed >>> 0) + 2213) > 0.55) continue;
+      let theirs = e.colonies.filter((c) => c.owner === r.id);
+      if (!theirs.length) continue;
+      let tot = {};
+      for (let k of keys) tot[k] = theirs.reduce((a, c) => a + (c.stock[k] || 0), 0);
+      let give = keys.slice().sort((a, b) => tot[b] - tot[a])[0],
+        want = keys.filter((k) => k !== give)[Math.floor(z(r.id + 3, e.year, (e.seed >>> 0) + 2217) * 3)],
+        value = { food: 1, wood: 1.2, metal: 3, goods: 5 },
+        n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
+        fair = 0.8 + z(r.id + 9, e.year, (e.seed >>> 0) + 2219) * 0.5,
+        ask = Math.max(1, Math.round((n * value[give] * fair) / value[want]));
+      P.offers.push({ kind: "trade", id: P.nextArmy++, from: r.id, give, n, want, ask });
+    }
+  }
+  function acceptTrade(e, offer, payId, getId) {
+    let hum = e.players.find((p) => p.isHuman),
+      pay = e.colonies.find((c) => c.id === payId && c.owner === hum.id),
+      get = e.colonies.find((c) => c.id === getId && c.owner === hum.id),
+      r = e.players.find((p) => p.id === offer.from);
+    if (!pay || !get) return { ok: !1, error: "Pick your colonies." };
+    if ((pay.stock[offer.want] || 0) < offer.ask) return { ok: !1, error: `${pay.name} has only ${pay.stock[offer.want] || 0} ${Ne[offer.want].toLowerCase()}.` };
+    pay.stock[offer.want] -= offer.ask;
+    get.stock[offer.give] = (get.stock[offer.give] || 0) + offer.n;
+    let theirs = e.colonies.find((c) => c.owner === offer.from);
+    theirs && ((theirs.stock[offer.give] = Math.max(0, (theirs.stock[offer.give] || 0) - offer.n)), (theirs.stock[offer.want] = (theirs.stock[offer.want] || 0) + offer.ask));
+    shiftRel(e, hum.id, r.id, 6);
+    return { ok: !0, note: `Traded ${offer.ask} ${Ne[offer.want].toLowerCase()} from ${pay.name} for ${offer.n} ${Ne[offer.give].toLowerCase()} to ${get.name}.` };
+  }
+  // ---- Your own diplomatic moves ----
+  function diploAct(e, rivalId, act, gold) {
+    let hum = e.players.find((p) => p.isHuman),
+      r = e.players.find((p) => p.id === rivalId),
+      v = relOf(e, hum.id, r.id),
+      m = hum.mother || (hum.mother = { ...ir }),
+      richest = e.colonies.filter((c) => c.owner === hum.id).sort((a, b) => b.stock.gold - a.stock.gold)[0];
+    if (act === "war") {
+      if (atWar(e, hum.id, r.id)) return "You are already at war.";
+      return startWar(e, hum, r).join(" ");
+    }
+    if (act === "peace") {
+      if (!atWar(e, hum.id, r.id)) return "You are not at war.";
+      let yes = europeAt(e, hum, r) === "peace" ? 0.75 : 0.25;
+      if (z(r.id, e.year + (r.peaceAsks = (r.peaceAsks || 0) + 1), (e.seed >>> 0) + 2221) > yes) return `${nationName(r)} refuses to make peace.`;
+      setRel(e, hum.id, r.id, DIPLO[2].min);
+      crownWish(e, hum, r) === "war" && (m.resentment = (m.resentment || 0) + 6);
+      return `${nationName(r)} agrees to peace.${crownWish(e, hum, r) === "war" ? " The king, still at war with them, is displeased." : ""}`;
+    }
+    if (act === "gift") {
+      if (!richest || richest.stock.gold < gold) return "You do not have that much gold in one colony.";
+      richest.stock.gold -= gold;
+      shiftRel(e, hum.id, r.id, Math.round(gold * 0.6));
+      return `${nationName(r)} accepts ${gold} gold from ${richest.name}. Relations: ${diploLevel(relOf(e, hum.id, r.id)).name}.`;
+    }
+    if (act === "demand") {
+      let theirs = e.colonies.filter((c) => c.owner === r.id).sort((a, b) => b.stock.gold - a.stock.gold)[0],
+        mine = e.units.filter((u) => u.owner === hum.id && arm(u.kind)).length,
+        yes = theirs && mine >= 4 && z(r.id, e.year + 77, (e.seed >>> 0) + 2223) < 0.4;
+      shiftRel(e, hum.id, r.id, -15);
+      if (!yes) return `${nationName(r)} refuses your demand. Relations sour.`;
+      let g = Math.min(theirs.stock.gold, 15 + Math.floor(mine * 2));
+      theirs.stock.gold -= g;
+      richest && (richest.stock.gold += g);
+      return `${nationName(r)} pays ${g} gold to keep the peace.`;
+    }
+    return "";
+  }
+  // ---- Recruiting a leader ----
+  function recruitLeader(e, colId) {
+    let col = e.colonies.find((c) => c.id === colId),
+      p = col && e.players.find((q) => q.id === col.owner);
+    if (!col) return { ok: !1, error: "No such colony." };
+    let lvl = Math.min(4, col.level || 1),
+      cost = LEADER_COST[lvl],
+      have = e.units.filter((u) => u.owner === p.id && u.kind === "leader").length,
+      cap = e.colonies.filter((c) => c.owner === p.id).length + 1;
+    if (have >= cap) return { ok: !1, error: `Your colonies can support only ${cap} leaders. Found or grow another colony first.` };
+    if (col.stock.gold < cost) return { ok: !1, error: `A leader costs ${cost} gold here; ${col.name} has ${col.stock.gold}.` };
+    col.stock.gold -= cost;
+    let names = (ee[p.nationId] || {}).leaders || ["Captain"],
+      nm = names[(p.nextLeader || 1) % names.length];
+    p.nextLeader = (p.nextLeader || 1) + 1;
+    let u = Le(e, p, "leader", col.x, col.y, nm);
+    (u.lvl = lvl), leaderStats(u), (u.mp = 0);
+    return { ok: !0, note: `${nm} takes command at ${col.name}: level ${lvl}, ${u.attacks} attacks a turn, commands ${u.cmd} men.` };
+  }
+  // ---- The end of the game ----
+  function diploLines(e) {
+    let hum = e.players.find((p) => p.isHuman),
+      P = pol(e),
+      out = [];
+    if (!hum) return out;
+    for (let r of e.players) {
+      if (r === hum) continue;
+      let eu = europeAt(e, hum, r);
+      out.push(
+        P.met[r.id]
+          ? `${nationName(r)}: ${diploLevel(relOf(e, hum.id, r.id)).name}. In Europe the crowns are at ${eu}; the king wants ${eu === "war" ? "war" : "peace"} here too.`
+          : `${nationName(r)}: not yet met${atWar(e, hum.id, r.id) ? ", but at war with you" : ""}. In Europe the crowns are at ${eu}.`,
+      );
+    }
+    let m = hum.mother || {};
+    m.taxRate != null && out.push(`Tax this year: ${Math.round(m.taxRate * 100)}%, ${m.taxTaken || 0} gold. Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}.`);
+    let T = P.length - (e.year - $.startYear);
+    out.push(`First to ${P.target.toLocaleString()} points wins; otherwise the best score after ${P.length} years. ${Math.max(0, T)} years remain.`);
+    return out;
+  }
+  function gameEndCheck(e) {
+    let P = pol(e);
+    if (P.over) return null;
+    let turn = e.year - $.startYear + 1,
+      best = e.players.slice().sort((a, b) => (b.score || 0) - (a.score || 0))[0],
+      hit = e.players.find((p) => (p.score || 0) / 20 >= P.target);
+    if (hit) P.over = { winner: hit.id, why: "score", year: e.year };
+    else if (turn >= P.length) P.over = { winner: best.id, why: "time", year: e.year };
+    return P.over;
   }
   // ---- Native villages and war parties on the map --------------------------
   // Three building traditions, one per nation in turn: domed bark lodges,
@@ -3931,6 +4625,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let k = 0; k < 4; k++) g.beginPath(), g.arc(3 + k * 1.6, -3 - k * 3.4, 1.4 + k * 0.6, 0, Math.PI * 2), g.fill();
       bperson(g, -5, 9, "#7a4a2a"), bperson(g, 6, 10, "#5a3a22");
     }
+  }
+  function armySprite(g, color, n) {
+    bshadow(g, 0, 4, 16, 5);
+    for (let k = 0; k < 4; k++) {
+      let x = -11 + k * 5,
+        y = 3 - (k % 2) * 2.5;
+      (g.fillStyle = "#34384a"), g.fillRect(x - 1.1, y - 6, 2.2, 6);
+      (g.fillStyle = "#d9b896"), g.beginPath(), g.arc(x, y - 7.3, 1.35, 0, Math.PI * 2), g.fill();
+      (g.fillStyle = "#1e1a14"), g.fillRect(x - 1.6, y - 9.2, 3.2, 1);
+      (g.strokeStyle = "#2a2014"), (g.lineWidth = 0.7), g.beginPath(), g.moveTo(x + 1.5, y), g.lineTo(x + 2.5, y - 12), g.stroke();
+    }
+    (g.strokeStyle = "#3a2a18"), (g.lineWidth = 1.1), g.beginPath(), g.moveTo(10, 4), g.lineTo(10, -24), g.stroke();
+    (g.fillStyle = color), g.fillRect(10, -24, 15, 10);
+    (g.strokeStyle = "rgba(0,0,0,0.55)"), (g.lineWidth = 0.6), g.strokeRect(10, -24, 15, 10);
+    (g.fillStyle = "#fff"), (g.font = "bold 7.5px sans-serif"), (g.textAlign = "center"), (g.textBaseline = "middle"), g.fillText(String(n), 17.5, -18.8);
   }
   function warPartySprite(g, n) {
     bshadow(g, 0, 4, 12, 4);
@@ -3997,6 +4706,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         u = ce(e, t.foundBy),
         c = u && u.id === r.id ? "yours" : `held by ${ee[u.nationId].name}`;
       a.push(`${d.name} (${c}): ${qn(d)}`);
+    }
+    let ar = e.politics && armyAt(e, n, o);
+    if (ar && (ar.seen || ar.owner === r.id)) {
+      let ow = e.players.find((p) => p.id === ar.owner);
+      a.push(`${nationAdj(ow).replace(/^./, (c) => c.toUpperCase())} army under ${ar.leader.name}, about ${ar.troops.length} men${ar.owner !== r.id ? `, ${diploLevel(relOf(e, r.id, ow.id)).name.toLowerCase()} with you` : ""}`);
     }
     let vg = villageAt(e, n, o);
     if (vg) {
@@ -4357,6 +5071,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         { id: "score", title: "The standings", lines: fs(e) },
         { id: "land", title: "The land", lines: gi(e, r, n, o) },
         ...((e.battleNews || []).length ? [{ id: "battles", title: "Battles and raids", lines: e.battleNews.slice() }] : []),
+        { id: "diplomacy", title: "Diplomacy", lines: diploLines(e) },
         { id: "home", title: "The old country", lines: yi(r, i, n, o, s) },
         { id: "rivals", title: "Rivals", lines: nr(e, r, n, !1) },
         { id: "natives", title: "Native nations", lines: nr(e, r, n, !0) },
@@ -4390,9 +5105,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     let l = r.named.map(Ni),
       d = new Set(o ? o.named : []);
-    for (let p of l)
-      d.has(p.token) || i.push(`${p.name} is entered on the charts.`);
-    for (let p of e.governorNews || []) i.push(p);
+    // Keep the column short: new names on one line, and only the first
+    // few pieces of colony news; the rest are in the log.
+    let fresh = l.filter((p) => !d.has(p.token)).map((p) => p.name);
+    fresh.length &&
+      i.push(
+        fresh.length === 1
+          ? `${fresh[0]} is entered on the charts.`
+          : `Entered on the charts: ${fresh.slice(0, 5).join(", ")}${fresh.length > 5 ? `, and ${fresh.length - 5} more` : ""}.`,
+      );
+    let gn = e.governorNews || [];
+    i.push(...gn.slice(0, 4));
+    gn.length > 4 && i.push(`And ${gn.length - 4} more pieces of colony news; the log at the bottom of the screen has them all.`);
     if ((e.arrivedThisTurn || []).includes(n.id))
       i.push("The storeship has arrived with two settlers and a garrison.");
     else {
@@ -4440,7 +5164,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           )
         : t.independent && s.push(`The break with ${n.name} stands.`),
       t.independent ||
-        ((t.taxUnpaid || 0) > 0 && !(o && o.taxUnpaid > 0)
+        (t.taxRate != null
+          ? s.push(`The crown took ${t.taxTaken || 0} gold in tax, ${Math.round(t.taxRate * 100)}% of your colonies' gold.`)
+          : (t.taxUnpaid || 0) > 0 && !(o && o.taxUnpaid > 0)
           ? s.push(`Unpaid tax stands at ${t.taxUnpaid}.`)
           : (t.taxUnpaid || 0) > 0
             ? s.push(`Unpaid tax still stands at ${t.taxUnpaid}.`)
@@ -5096,6 +5822,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     skills: o,
     seed: r,
     rivals: i = 2,
+    length: GL = 150,
   }) {
     let s = ee[e];
     if (!s) throw new Error("Pick a nation.");
@@ -5139,13 +5866,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       d.forEach((y) => {
         let S = yr(u, y, !1, []);
         u.players.push(S);
-        let M = lo(a, (P) => P < a.width * 0.42, h);
+        // Rivals land on your stretch of coast, near enough to fight over.
+        let M = nearStart(a, p, h) || lo(a, (P) => P < a.width * 0.42, h);
         M && Gi(u, S, M, h);
       }),
       Dn(u);
     for (let y of u.players) ze(u, y.id);
     for (let y of u.players) y.mark = y.score || 0;
     makeNatives(u);
+    let PL = pol(u),
+      GLd = GAME_LENGTHS.find((q) => q.turns === GL) || GAME_LENGTHS[1];
+    (PL.length = GLd.turns), (PL.target = GLd.target);
     let m = je(s, u.year);
     return (
       u.log.push(`${s.name} sails west in ${u.year}. ${m} rules at home.`),
@@ -5272,6 +6003,37 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     return r.length ? r[Math.floor(r.length / 2)] : null;
   }
+  // A coast square 22 to 45 squares from where you land, on the same body
+  // of land, and well clear of anyone else's landing.
+  function nearStart(M, home, taken) {
+    let { width: w, height: h, tiles } = M,
+      isLand = (k) => mn[tiles[k].terrain].pass === "land",
+      seed = Z(home[0], home[1], w, h).map(([x, y]) => y * w + x).find(isLand);
+    if (seed == null) return null;
+    let mass = new Uint8Array(w * h),
+      q = [seed];
+    mass[seed] = 1;
+    for (let k = 0; k < q.length; k++) {
+      let c = q[k];
+      for (let [x, y] of Z(c % w, (c / w) | 0, w, h)) {
+        let n = y * w + x;
+        mass[n] || !isLand(n) || ((mass[n] = 1), q.push(n));
+      }
+    }
+    let best = null,
+      bs = 1 / 0;
+    for (let y = 1; y < h - 1; y++)
+      for (let x = 1; x < w - 1; x++) {
+        if (tiles[y * w + x].terrain !== "coast") continue;
+        let d = Math.hypot(x - home[0], y - home[1]);
+        if (d < 22 || d > 45) continue;
+        if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < 20)) continue;
+        if (!Z(x, y, w, h).some(([a, b]) => mass[b * w + a])) continue;
+        let sc = Math.abs(d - 32);
+        sc < bs && ((bs = sc), (best = [x, y]));
+      }
+    return best;
+  }
   function zi(e) {
     return e.tiles.filter((n) => n.terrain !== "ocean" && n.terrain !== "coast")
       .length;
@@ -5292,6 +6054,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       natives: e.natives || null,
       pendingRaids: e.pendingRaids || [],
       battleNews: (e.battleNews || []).slice(),
+      politics: e.politics ? JSON.parse(JSON.stringify(e.politics)) : null,
       log: e.log,
       glimpsed: e.glimpsed || [],
       specials: (e.map.specials || []).map((n) => ({
@@ -5329,7 +6092,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.pendingSpecials = o.pendingSpecials || []),
       (e.shipments = o.shipments || []),
       o.natives && (e.natives = o.natives),
-      (e.pendingRaids = o.pendingRaids || []), (e.battleNews = o.battleNews || []);
+      (e.pendingRaids = o.pendingRaids || []), (e.battleNews = o.battleNews || []), o.politics && (e.politics = o.politics);
     for (let r of o.specials || []) {
       let i = (e.map.specials || []).find((s) => s.id === r.id);
       i && ((i.foundBy = r.foundBy), (i.foundYear = r.foundYear));
@@ -5560,6 +6323,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let quiet = e.log.length;
       Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), (e.log.length = quiet);
     }
+    meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
+    crownTurn(e);
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
       nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
@@ -5576,7 +6341,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let { report: i, traces: s } = cr(e, r.id);
         e.log.push(...i), e.lastTraces.push(...s);
       }
-    return tr(e), n;
+    return tr(e), gameEndCheck(e), (pol(e).showSummary = !0), n;
   }
   function yo(e) {
     let n = e.undo.pop();
@@ -5674,6 +6439,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         natives: e.natives || null,
         pendingRaids: e.pendingRaids || [],
         battleNews: e.battleNews || [],
+        politics: e.politics || null,
+        pendingArmies: e.pendingArmies || [],
         log: e.log.slice(-300),
         glimpsed: e.glimpsed || [],
         arrivals: e.arrivals || [],
@@ -5697,6 +6464,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (o.pendingSpecials = o.pendingSpecials || []),
       (o.shipments = o.shipments || []),
       (o.pendingRaids = o.pendingRaids || []),
+      (o.pendingArmies = o.pendingArmies || []),
       o.map.specials || (o.map.specials = []);
     for (let r of o.colonies) no(r);
     return o;
@@ -9464,6 +10232,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let p = YL(rd.x, rd.y, o, 0);
       Nn(p, r, 200) && Ye(e, p.x, p.y, a, (m) => warPartySprite(m, 4));
     }
+    // Rival armies on the march, once you have caught sight of them.
+    let me_ = n.players.find((q) => q.isHuman);
+    for (let A of (n.politics && n.politics.armies) || []) {
+      if (!A.seen && !i.has(`${A.x},${A.y}`) && !(me_ && A.owner === me_.id)) continue;
+      let ow = n.players.find((q) => q.id === A.owner),
+        p = YL(A.x, A.y, o, 0);
+      Nn(p, r, 200) && Ye(e, p.x, p.y, a, (m) => armySprite(m, ee[ow.nationId].color, A.troops.length));
+    }
   }
   function kt(e, n, o, r, i) {
     if (o.zoom < 0.3) return;
@@ -9902,6 +10678,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <span style="flex:1"></span>
         <button type="button" id="next-unit" class="ghost" title="Select the next unit with movement left (N)">Next unit</button>
         <button type="button" id="undo" class="ghost">Undo</button>
+        <button type="button" id="diplo" class="ghost" title="Relations with the other nations and the crown">Diplomacy</button>
+        <button type="button" id="year-sum" class="ghost" title="What happened this year">This year</button>
         <button type="button" id="end" class="primary">End turn</button>
         <button type="button" id="save" class="ghost">Save</button>
         <button type="button" id="help" class="ghost">Keys</button>
@@ -10264,6 +11042,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           difficulty: "normal",
           skills: ["navigator", "cartographer"],
           seed: Math.floor(Math.random() * 999983),
+          length: 150,
         },
         g = () => {
           let k = f.skills.reduce((b, w) => b + Zn[w].cost, 0),
@@ -10277,7 +11056,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <div class="row">${on.map((b) => `<button type="button" class="choice ${f.nationId === b.id ? "on" : ""}" data-nation="${b.id}"><span class="flag" style="background:${b.color}"></span>${b.name}</button>`).join("")}</div>
         <h2>Difficulty</h2>
         <div class="row">${qo.map((b) => `<button type="button" class="choice ${f.difficulty === b.id ? "on" : ""}" data-diff="${b.id}">${b.label}</button>`).join("")}</div>
-        <p class="sub">Harder settings raise the mother country's invasion later. They do nothing in this first stage.</p>
+        <p class="sub">Rivals are always out for your land; harder settings give them bigger armies sooner.</p>
+        <h2>Length</h2>
+        <div class="row">${GAME_LENGTHS.map((b) => `<button type="button" class="choice ${f.length === b.turns ? "on" : ""}" data-len="${b.turns}">${b.turns} years · first to ${b.target.toLocaleString()}</button>`).join("")}</div>
+        <p class="sub">The first nation to reach the target score wins. If nobody does, the best score when the years run out wins.</p>
         <h2>Skills <span class="sub">${v} points left</span></h2>
         <div class="skills">${Xn.map((b) => `<button type="button" class="skill ${f.skills.includes(b.id) ? "on" : ""}" data-skill="${b.id}"><b>${b.name}</b> \xB7 ${b.cost}<small>${b.effect}${b.stage > 1 ? ` (stage ${b.stage})` : ""}</small></button>`).join("")}</div>
         <h2>Map seed</h2>
@@ -10290,6 +11072,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             n.querySelectorAll("[data-nation]").forEach((b) => {
               b.onclick = () => {
                 (f.nationId = b.dataset.nation), g();
+              };
+            }),
+            n.querySelectorAll("[data-len]").forEach((b) => {
+              b.onclick = () => {
+                (f.length = +b.dataset.len), g();
               };
             }),
             n.querySelectorAll("[data-diff]").forEach((b) => {
@@ -10726,7 +11513,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (e.querySelector("#log").textContent = t.log.slice(-12).join(`
 `));
       let k = l ? j(t, l) : null;
-      let rdNow = !p && (t.pendingRaids || [])[0];
+      let rdNow = !p && nextFight();
       if ((De(k, f), _e(), O)) {
         if (O.hold) {
           let it = O.hold.item;
@@ -10739,8 +11526,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
         // Raids are fought before the paper is read, so it can report them.
         if (O.paused && rdNow) {
-          let w = `raid:${rdNow.id}`;
-          H !== w && ((H = w), raidPrompt(rdNow));
+          H !== rdNow.key && ((H = rdNow.key), rdNow.run());
           return;
         }
         O.paused && m && t.paper
@@ -10749,8 +11535,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       if (rdNow && m && t.paper) {
-        let w = `raid:${rdNow.id}`;
-        H !== w && ((H = w), raidPrompt(rdNow));
+        H !== rdNow.key && ((H = rdNow.key), rdNow.run());
         return;
       }
       if (m && t.paper) {
@@ -10766,10 +11551,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       } else if (b) {
         let w = `special:${b.id}`;
         H !== w && ((H = w), en(b));
-      } else if (rd && !p) {
-        let w = `raid:${rd.id}`;
-        H !== w && ((H = w), raidPrompt(rd));
+      } else if (rdNow) {
+        H !== rdNow.key && ((H = rdNow.key), rdNow.run());
+      } else if (!p && t.politics && t.politics.over && !t.politics.over.seen) {
+        H !== "end" && ((H = "end"), endScreen(t.politics.over));
+      } else if (!p && t.politics && t.politics.offers.length) {
+        let of = t.politics.offers[0],
+          w = `offer:${of.id}`;
+        H !== w && ((H = w), offerPrompt(of));
+      } else if (!p && t.politics && t.politics.showSummary && t.politics.events.length) {
+        H !== "summary" && ((H = "summary"), summaryBox(t.politics.events));
       } else p || ((a.hidden = !0), (H = null));
+    }
+    // The next fight waiting on you: a raid by warriors, or a rival army.
+    function nextFight() {
+      let rd = (t.pendingRaids || [])[0];
+      if (rd) return { key: `raid:${rd.id}`, run: () => raidPrompt(rd) };
+      let am = (t.pendingArmies || [])[0];
+      if (am != null) return { key: `army:${am}`, run: () => armyPrompt(am) };
+      return null;
     }
     function goMinimap(canvas, ev) {
       if (!t || !canvas) return;
@@ -11143,11 +11943,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (k && g) {
           l = k;
           let w = j(t, k);
-          let vg = w && !w.aboard && w.kind !== "ship" && villageAt(t, b.x, b.y);
-          if (vg) {
-            Math.max(Math.abs(w.x - vg.x), Math.abs(w.y - vg.y)) <= 1
-              ? attackVillage(w, vg)
-              : ((h = `Move next to ${vg.name} first, then drag onto it to attack.`), R());
+          let land = w && !w.aboard && w.kind !== "ship",
+            vg = land && villageAt(t, b.x, b.y),
+            am = land && !vg && armyAt(t, b.x, b.y),
+            rc = land && !vg && !am && t.colonies.find((c) => c.x === b.x && c.y === b.y && c.owner !== w.owner),
+            rp = land && !vg && !am && !rc && t.units.some((q) => q.owner !== w.owner && !q.aboard && q.kind !== "ship" && q.x === b.x && q.y === b.y),
+            near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= 1;
+          if (vg || am || rc || rp) {
+            if (!near) (h = `Move next to ${vg ? vg.name : rc ? rc.name : "them"} first, then drag onto ${vg || rc ? "it" : "them"} to attack.`), R();
+            else vg ? attackVillage(w, vg) : am ? attackArmy(w, am) : rc ? attackColony(w, rc) : attackParty(w, b.x, b.y);
             return;
           }
           if (w) {
@@ -11353,6 +12157,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // Before a fight you see both sides and a rough idea of how it will go,
     // then choose to command it on the grid or let it resolve on its own.
     function forceLine(S) {
+      if (S.hidden) return `${S.units.length} men; their kinds and training are unknown${S.leader ? `, led by ${S.leader.name}` : ""}`;
       let byKind = {};
       for (let u of S.units) {
         let k = UNIT_KINDS[u.kind].name;
@@ -11363,6 +12168,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return `${men} (strength ${str})${S.leader ? `, led by ${S.leader.name}: ${S.leader.attacks} attacks a turn, charisma ${S.leader.charisma}` : ", no leader: 1 attack a turn"}`;
     }
     function oddsWords(spec, mine) {
+      if (spec[bFoe(mine)].hidden) return "You cannot judge the odds: you do not know what kind of men they are until the fighting starts.";
       let o = bOdds(spec, 40),
         p = mine === "def" ? o.defWin : 1 - o.defWin,
         word = p >= 0.85 ? "should win easily" : p >= 0.6 ? "should win" : p >= 0.4 ? "a close fight" : p >= 0.15 ? "likely to lose" : "very likely to lose",
@@ -11379,6 +12185,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p><b>Attacking:</b> ${G(forceLine(spec.att))}</p>
         <p><b>Defending:</b> ${G(forceLine(spec.def))}</p>
         <p class="find-stat">${G(oddsWords(spec, mine))}</p>
+        ${spec.warn ? `<p class="down">${G(spec.warn)}</p>` : ""}
         <div class="row">
           <button type="button" id="b-grid" class="primary">Fight it on the grid</button>
           <button type="button" id="b-auto">Auto-resolve</button>
@@ -11532,35 +12339,277 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       _(col.x, col.y);
-      let spec = { kind: "raid", title: `Warriors from ${v.name} attack ${col.name}`, att: villageForce(t, v, !0), def: colonyDefence(t, col) };
+      let spec = { kind: "raid", title: `Warriors from ${v.name} attack ${col.name}`, att: villageForce(t, v, !0), def: colonyDefence(t, col, v.nation) };
       preBattle(spec, "def", (B) => {
         let msg = resolveRaid(t, rd, B, !0);
         (t.pendingRaids = (t.pendingRaids || []).filter((q) => q !== rd)), t.log.push(msg), (h = msg), R();
       });
     }
-    // Your soldiers attack a village they stand beside.
-    function attackVillage(u, v) {
+    // A word of warning before you attack a nation you are not at war with.
+    function warWarn(ownerId) {
+      let me = V(t),
+        r = t.players.find((q) => q.id === ownerId);
+      if (!r || atWar(t, me.id, r.id)) return "";
+      return `You are not at war with ${nationName(r)}. This attack starts one${crownWish(t, me, r) === "peace" ? ", and the king, at peace with them in Europe, will resent it" : ""}.`;
+    }
+    function attackArmy(u, A) {
+      let F = myForce(u);
+      if (!F.troops.length) return noTroops("an army");
+      let ow = t.players.find((q) => q.id === A.owner),
+        def = armyForce(t, A, !0);
+      preBattle({ kind: "attack", title: `Attack on the ${nationAdj(ow)} army under ${A.leader.name}`, att: F.att, def, warn: warWarn(A.owner) }, "att", (B) =>
+        afterAttack(F, resolveArmyBattle(t, F.me_, A, B, F.lead && F.lead.id)),
+      );
+    }
+    // A rival army has reached one of your colonies.
+    function armyPrompt(id) {
+      let P = pol(t),
+        A = P.armies.find((q) => q.id === id),
+        col = A && t.colonies.find((c) => c.id === A.target),
+        drop = () => (t.pendingArmies = (t.pendingArmies || []).filter((q) => q !== id));
+      if (!A || !col || col.owner !== V(t).id) return drop(), R();
+      _(col.x, col.y);
+      let ow = t.players.find((q) => q.id === A.owner),
+        mode = armyPlan(t, A, col),
+        spec = {
+          kind: mode === "raid" ? "raid" : "attack",
+          title: `The ${nationAdj(ow)} army under ${A.leader.name} ${mode === "raid" ? "raids" : "storms"} ${col.name}`,
+          att: armyForce(t, A, !0),
+          def: colonyDefence(t, col),
+          warn: mode === "raid" ? "They have come to raid: the longer they hold part of the town, the more they carry off and the more they wreck. If they win, the colony burns." : "They have come to take the colony. If they win, it is theirs.",
+        };
+      preBattle(spec, "def", (B) => {
+        let msg = resolveArmyAttack(t, A, col, mode, B, !0);
+        drop(), t.log.push(msg), (h = msg), R();
+      });
+    }
+    // The Diplomacy screen: where you stand with each nation and the crown.
+    function diploScreen(note) {
+      let me = V(t),
+        P = pol(t),
+        m = me.mother || {},
+        steps = (v) => {
+          let L = diploLevel(v);
+          return `<div class="dsteps">${DIPLO.map((q) => `<span class="${q === L ? "on " + q.id : ""}">${q.name}</span>`).join("")}</div>`;
+        },
+        rows = t.players
+          .filter((r) => r !== me)
+          .map((r) => {
+            let v = relOf(t, me.id, r.id),
+              eu = europeAt(t, me, r),
+              war = atWar(t, me.id, r.id),
+              met = P.met[r.id] || war,
+              cols = t.colonies.filter((c) => c.owner === r.id).length,
+              arms = P.armies.filter((A) => A.owner === r.id && A.seen).length;
+            return `<section class="drow">
+          <h3><span class="flag" style="background:${ee[r.nationId].color}"></span>${G(nationName(r))} <small>score ${Es(r.score || 0)}</small></h3>
+          ${met ? steps(v) : '<p class="muted">Not yet met. Find one of their colonies or men to open relations.</p>'}
+          <p class="muted">In Europe the crowns are at <b>${eu}</b>: the king wants ${eu === "war" ? "war" : "peace"} with them here too${met ? (war === (eu === "war") ? ", and you are doing as he wishes." : war && (P.blame || {})[r.id] === "them" ? ". They started this war, so the king does not hold it against you, but he would welcome peace." : ". You are going against his wishes, and the court resents it.") : "."}${met ? ` They hold ${cols} colon${cols === 1 ? "y" : "ies"}${arms ? `; ${arms} of their armies is on the march against you` : ""}.` : ""}</p>
+          ${
+            met
+              ? `<div class="row">${war ? `<button type="button" data-act="peace" data-r="${r.id}">Offer peace</button>` : `<button type="button" data-act="war" data-r="${r.id}">Declare war</button>`}
+            <button type="button" data-act="gift" data-r="${r.id}">Give 20 gold</button>
+            <button type="button" data-act="demand" data-r="${r.id}">Demand tribute</button></div>`
+              : ""
+          }
+        </section>`;
+          })
+          .join("");
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card diplo-card">
+        <p class="find-kicker">Diplomacy</p>
+        <h2>The nations of the New World</h2>
+        ${note ? `<p class="find-stat">${G(note)}</p>` : ""}
+        ${rows}
+        <section class="drow">
+          <h3>The crown</h3>
+          <p class="muted">Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}. ${m.taxRate != null ? `Last year's tax was ${Math.round(m.taxRate * 100)}% of your colonies' gold.` : "Tax is taken each year from your colonies' gold."} The angrier the court, the higher the tax.</p>
+        </section>
+        <div class="row"><button type="button" id="diplo-close" class="primary">Close</button></div>
+      </div>`);
+      a.querySelectorAll("[data-act]").forEach(
+        (el) =>
+          (el.onclick = () => {
+            let msg = diploAct(t, +el.dataset.r, el.dataset.act, 20);
+            msg && t.log.push(msg), diploScreen(msg);
+          }),
+      );
+      a.querySelector("#diplo-close").onclick = () => ((p = !1), (a.hidden = !0), R());
+    }
+    // A rival's offer, shown after the paper.
+    function offerPrompt(of) {
+      let P = pol(t),
+        me = V(t),
+        r = t.players.find((q) => q.id === of.from),
+        done = (msg) => {
+          (P.offers = P.offers.filter((q) => q !== of)), (p = !1), (a.hidden = !0), (H = null), msg && (t.log.push(msg), (h = msg)), R();
+        };
+      if (!r) return done("");
+      p = !0;
+      a.hidden = !1;
+      if (of.kind === "peace") {
+        a.innerHTML = `
+      <div class="card">
+        <p class="find-kicker">Diplomacy</p>
+        <h2>${G(nationName(r))} offers peace</h2>
+        <p>Their crown has made peace with yours in Europe, and their envoy asks for peace in the New World.${P.armies.some((A) => A.owner === r.id) ? " Their army on the march will turn back." : ""} The king wants peace with them.</p>
+        <div class="row"><button type="button" id="of-yes" class="primary">Make peace</button><button type="button" id="of-no">Refuse</button></div>
+      </div>`;
+        a.querySelector("#of-yes").onclick = () => (setRel(t, me.id, r.id, DIPLO[2].min), done(`Peace with ${nationName(r)}.`));
+        a.querySelector("#of-no").onclick = () => {
+          let m = me.mother || (me.mother = { ...ir });
+          (m.resentment = (m.resentment || 0) + 5), done(`You refused ${nationName(r)}'s peace. The king is displeased.`);
+        };
+        return;
+      }
+      let mine = t.colonies.filter((c) => c.owner === me.id),
+        payDef = mine.slice().sort((x1, x2) => (x2.stock[of.want] || 0) - (x1.stock[of.want] || 0))[0],
+        opts = (sel) => mine.map((c) => `<option value="${c.id}" ${c === sel ? "selected" : ""}>${G(c.name)} (${c.stock[of.want] || 0} ${Ne[of.want].toLowerCase()}, ${c.stock[of.give] || 0} ${Ne[of.give].toLowerCase()})</option>`).join("");
+      a.innerHTML = `
+      <div class="card">
+        <p class="find-kicker">Trade offer · ${G(diploLevel(relOf(t, me.id, r.id)).name)}</p>
+        <h2>${G(nationName(r))} offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()}</h2>
+        <p class="muted">A fair trade warms relations. The goods change hands at once.</p>
+        <label class="pick">Paid from <select id="of-pay">${opts(payDef)}</select></label>
+        <label class="pick">Delivered to <select id="of-get">${opts(payDef)}</select></label>
+        <p id="of-err" class="down"></p>
+        <div class="row"><button type="button" id="of-yes" class="primary">Accept</button><button type="button" id="of-no">Decline</button></div>
+      </div>`;
+      a.querySelector("#of-yes").onclick = () => {
+        let res = acceptTrade(t, of, +a.querySelector("#of-pay").value, +a.querySelector("#of-get").value);
+        res.ok ? done(res.note) : (a.querySelector("#of-err").textContent = res.error);
+      };
+      a.querySelector("#of-no").onclick = () => done(`You declined ${nationName(r)}'s offer.`);
+    }
+    // Everything that happened this year in one box. Show me takes you there.
+    function summaryBox(list, again) {
+      let P = pol(t),
+        close = () => {
+          again || ((P.lastEvents = list.slice()), (P.events = []), (P.showSummary = !1));
+          (p = !1), (a.hidden = !0), (H = null);
+        };
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card summary-card">
+        <p class="find-kicker">${t.year}</p>
+        <h2>This year</h2>
+        ${list.length ? `<ul class="summary">${list.map((q, k) => `<li><span>${G(q.text)}</span>${q.x != null ? `<button type="button" data-k="${k}">Show me</button>` : ""}</li>`).join("")}</ul>` : '<p class="muted">Nothing of note.</p>'}
+        <div class="row"><button type="button" id="sum-close" class="primary">Carry on</button></div>
+      </div>`);
+      a.querySelectorAll(".summary button").forEach(
+        (el) =>
+          (el.onclick = () => {
+            let q = list[+el.dataset.k];
+            close(), _(q.x, q.y), (u = { x: q.x, y: q.y }), R();
+          }),
+      );
+      a.querySelector("#sum-close").onclick = () => (close(), R());
+    }
+    // The game is decided.
+    function endScreen(over) {
+      let win = t.players.find((q) => q.id === over.winner),
+        me = V(t),
+        list = t.players.slice().sort((x1, x2) => (x2.score || 0) - (x1.score || 0));
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card">
+        <p class="find-kicker">${over.year}</p>
+        <h2>${win === me ? "Victory" : `${G(nationName(win))} wins`}</h2>
+        <p>${over.why === "score" ? `${G(win === me ? "You" : nationName(win))} reached ${pol(t).target.toLocaleString()} points first.` : `The ${pol(t).length} years are over, and ${G(win === me ? "yours is" : nationName(win) + "'s is")} the best score.`}</p>
+        <ol>${list.map((q) => `<li>${G(q === me ? `You, ${nationName(q)}` : nationName(q))}: ${Es(q.score || 0)}</li>`).join("")}</ol>
+        <div class="row"><button type="button" id="end-on" class="primary">Keep playing</button></div>
+      </div>`);
+      a.querySelector("#end-on").onclick = () => ((over.seen = !0), (p = !1), (a.hidden = !0), R());
+    }
+    // Your soldiers on one square: the leader there and as many men as he
+    // commands (all of them if there is no leader).
+    function myForce(u) {
       let me_ = V(t).id,
         stack = t.units.filter((q) => q.owner === me_ && !q.aboard && q.x === u.x && q.y === u.y && (arm(q.kind) || q.kind === "leader")),
         lead = stack.find((q) => q.kind === "leader"),
         L = lead ? leaderStats(lead) : null,
         troops = stack.filter((q) => arm(q.kind)).slice(0, L ? L.cmd : 99);
-      if (!troops.length) {
-        (h = "Only soldiers, dragoons and artillery can attack a village."), R();
-        return;
-      }
-      let nat = nationOf(t, v),
-        spec = {
-          kind: "attack",
-          title: `Attack on ${v.name} of the ${nat.name}`,
-          att: { name: "Your force", leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
-          def: villageForce(t, v, !1),
-        };
-      preBattle(spec, "att", (B) => {
-        for (let q of troops) q.mp = 0;
-        let msg = resolveVillageAttack(t, me_, troops.map((q) => q.id), v, B, lead && lead.id);
-        t.log.push(msg), (h = msg), R();
-      });
+      return {
+        me_,
+        lead,
+        troops,
+        att: { name: "Your force", leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
+      };
+    }
+    // Ask what the attack is for before the battle is shown.
+    function chooseAttack(title, sub, opts, pick) {
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card battle-card">
+        <p class="find-kicker">Attack</p>
+        <h2>${G(title)}</h2>
+        <p>${G(sub)}</p>
+        <ul class="attack-opts">${opts.map((q, k) => `<li><button type="button" class="${k ? "" : "primary"}" data-k="${k}">${G(q.label)}</button> <span>${G(q.hint)}</span></li>`).join("")}</ul>
+        <div class="row"><button type="button" id="atk-cancel">Cancel</button></div>
+      </div>`);
+      a.querySelectorAll(".attack-opts button").forEach((el) => (el.onclick = () => ((p = !1), (a.hidden = !0), pick(opts[+el.dataset.k]))));
+      a.querySelector("#atk-cancel").onclick = () => ((p = !1), (a.hidden = !0), R());
+    }
+    function noTroops(what) {
+      (h = `Only soldiers, dragoons and artillery can attack ${what}. A leader brings the men with him.`), R();
+    }
+    function afterAttack(F, msg) {
+      for (let q of F.troops) q.mp = 0;
+      F.lead && (F.lead.mp = 0);
+      t.log.push(msg), (h = msg), R();
+    }
+    // Your soldiers attack a village they stand beside: raid it for its
+    // gold, or destroy it.
+    function attackVillage(u, v) {
+      let F = myForce(u);
+      if (!F.troops.length) return noTroops("a village");
+      let nat = nationOf(t, v);
+      chooseAttack(
+        `${v.name} of the ${nat.name}`,
+        `${v.warriors} warriors defend it. Either way, the ${nat.name} nation will turn against you.`,
+        [
+          { id: "raid", label: "Raid", hint: "Break in and carry off gold. You need not win: the longer you hold part of the village, the more you take. The village survives." },
+          { id: "destroy", label: "Destroy", hint: "Win the battle and the village is burned and all its gold taken. The nation goes to war with you." },
+        ],
+        (opt) => {
+          let raid = opt.id === "raid",
+            spec = { kind: raid ? "raid" : "attack", title: `${raid ? "Raid" : "Attack"} on ${v.name} of the ${nat.name}`, att: F.att, def: villageForce(t, v, !1) };
+          preBattle(spec, "att", (B) =>
+            afterAttack(F, raid ? resolveVillageRaid(t, F.me_, v, B, F.lead && F.lead.id) : resolveVillageAttack(t, F.me_, F.troops.map((q) => q.id), v, B, F.lead && F.lead.id)),
+          );
+        },
+      );
+    }
+    // Your soldiers attack a rival colony beside them: raid it or take it.
+    function attackColony(u, col) {
+      let F = myForce(u);
+      if (!F.troops.length) return noTroops("a colony");
+      let owner = t.players.find((q) => q.id === col.owner),
+        def = colonyDefence(t, col);
+      chooseAttack(
+        `${col.name}, a ${nationAdj(owner)} colony`,
+        `Defended by ${bLabel(def.units.map((q) => ({ name: q.name || UNIT_KINDS[q.kind].name })))}${def.leader ? ` under ${def.leader.name}` : ""}.`,
+        [
+          { id: "raid", label: "Raid", hint: "From the third round on you carry off a tenth of what is left each round; from the fifth, wreck a building a round. Retreat whenever you like and keep what you took. Win and the colony is burned." },
+          { id: "capture", label: "Capture", hint: "Win the battle and the colony is yours, with some damage. Lose, and nothing changes hands." },
+        ],
+        (opt) => {
+          let spec = { kind: opt.id === "raid" ? "raid" : "attack", title: `${opt.id === "raid" ? "Raid" : "Assault"} on ${col.name}`, att: F.att, def: colonyDefence(t, col) };
+          preBattle(spec, "att", (B) => afterAttack(F, resolveColonyAttack(t, F.me_, col, opt.id, B, F.lead && F.lead.id)));
+        },
+      );
+    }
+    // Your soldiers attack a rival party in the open.
+    function attackParty(u, x, y) {
+      let F = myForce(u);
+      if (!F.troops.length) return noTroops("other men");
+      let def = fieldForce(t, x, y, F.me_);
+      preBattle({ kind: "attack", title: `Attack on the ${def.name.toLowerCase()}`, att: F.att, def }, "att", (B) => afterAttack(F, resolveUnitAttack(t, F.me_, x, y, B, F.lead && F.lead.id)));
     }
     // Every square in the colony's land where the building would fit, with
     // the productivity it would get there, and the best of them.
@@ -11653,7 +12702,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         gd = colonyDefence(t, f),
         garrison = `
       <h3 class="side-sub">Garrison</h3>
-      <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && q.name !== "Fort guns").length} soldiers` : ""}. ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 1 attack a turn. Bring a leader into the colony to command it."}</p>`,
+      <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && !q.ally && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && !q.ally && q.name !== "Fort guns").length} soldiers` : ""}.${gd.units.some((q) => q.ally) ? ` ${gd.units.filter((q) => q.ally).length} warriors from friendly villages nearby come to help.` : ""} ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 1 attack a turn. Bring a leader into the colony to command it."}</p>
+      <button type="button" class="recruit" id="recruit-leader" ${f.stock.gold >= LEADER_COST[Math.min(4, f.level || 1)] ? "" : "disabled"}>Commission a leader, level ${Math.min(4, f.level || 1)}<small>${LEADER_COST[Math.min(4, f.level || 1)]} gold. Bigger colonies train better leaders: more attacks a turn, more charisma, more men under command.</small></button>`,
         nearV = natives(t)
           .villages.filter((q) => Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= 12 && k.explored[q.y * t.map.width + q.x] === "1")
           .sort((q1, q2) => Math.hypot(q1.x - f.x, q1.y - f.y) - Math.hypot(q2.x - f.x, q2.y - f.y)),
@@ -11785,6 +12835,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             R();
           };
         });
+      let rl = s.querySelector("#recruit-leader");
+      rl &&
+        (rl.onclick = () => {
+          let res = recruitLeader(t, f.id);
+          x(res), res.ok && ((h = res.note), t.log.push(res.note)), R();
+        });
       s.querySelectorAll(".nat-trade").forEach((E) => {
         E.onclick = () => {
           let res = nativeTrade(t, f.id, +E.dataset.v, 10);
@@ -11866,6 +12922,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         R();
     }
     (e.querySelector("#next-unit").onclick = () => nextUnit()),
+    (e.querySelector("#diplo").onclick = () => t && diploScreen()),
+    (e.querySelector("#year-sum").onclick = () => t && summaryBox(pol(t).events.length ? pol(t).events : pol(t).lastEvents || [], !0)),
     (e.querySelector("#end").onclick = () => ie()),
       (e.querySelector("#undo").onclick = () => {
         yo(t) && ((h = ""), R());
@@ -11945,8 +13003,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             skills: ["navigator", "cartographer"],
             seed: Number(Ue.get("seed")) || 42,
           }),
-        ),
-        Ue.get("test") === "1" &&
+        ))
+      : Ue.get("play") === "saved" && localStorage.getItem(br)
+        ? N(vo(localStorage.getItem(br)))
+        : A();
+    Ue.get("test") === "1" &&
           (window.__test = {
             state: () => t,
             anim: () => O,
@@ -11959,8 +13020,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             select: (f) => {
               (l = f), R();
             },
-          }))
-      : A();
+          });
   }
   Gr(document.getElementById("app"));
 })();
