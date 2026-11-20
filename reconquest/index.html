@@ -3153,7 +3153,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       rivalSiteOk(e, p.siteA) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
       let s = p.siteA;
       if (s && Xe(e, store.id).some(([a, b]) => a === s.x && b === s.y)) {
-        let aboard = e.units.filter((q) => q.aboard === store.id && q.kind !== "leader"),
+        let aboard = e.units.filter((q) => q.aboard === store.id),
           settlers = aboard.filter((q) => q.kind === "settler");
         for (let q of aboard) xo(e, q.id, s.x, s.y);
         settlers[0] && !settlers[0].aboard && rivalFound(e, settlers[0]);
@@ -5179,7 +5179,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     i.push(...gn.slice(0, 4));
     gn.length > 4 && i.push(`And ${gn.length - 4} more pieces of colony news; the log at the bottom of the screen has them all.`);
     if ((e.arrivedThisTurn || []).includes(n.id))
-      i.push("The storeship has arrived with two settlers and a garrison.");
+      i.push("The storeship has arrived with two settlers, an explorer, and a second leader with his soldiers.");
     else {
       let p = (e.arrivals || []).find((m) => m.owner === n.id);
       p && i.push(`The storeship with the settlers is due in ${p.year}.`);
@@ -5613,10 +5613,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           n.kind === "explorer" && y && a && m.regionId === a
             ? $.regionPull
             : 0,
-        T = p * 10 - u * $.explorerDistance + S + M + P;
+        // The first years go to the land around the landing: good colony
+        // sites near the coast and rivers. The pull inland grows later.
+        fa = early(e, r),
+        far = fa && r.anchor ? Math.max(0, Math.hypot(c - r.anchor[0], h - r.anchor[1]) - 8) : 0,
+        site = fa && n.kind !== "ship" && Ho(m.terrain) ? (m.riverId ? 8 : 0) + (Z(c, h, s, hh).some(([q1, q2]) => { let tq = e.map.tiles[C(q1, q2, s)].terrain; return tq === "coast" || tq === "ocean"; }) ? 6 : 0) : 0,
+        T = p * 10 - u * $.explorerDistance + S * (1 - fa) + M + P * (1 - fa) + site * fa - far * 3 * fa;
       T > l && ((l = T), (t = { x: c, y: h }));
     }
     return t || Di(e, n, r, i);
+  }
+  // How strongly exploring still keeps close to home: full at the start,
+  // gone after ten years.
+  function early(e, p) {
+    return p && p.anchor ? Math.max(0, Math.min(1, 1 - (e.year - $.startYear) / 10)) : 0;
   }
   function Di(e, n, o, r) {
     let { width: i, height: s, tiles: a } = e.map,
@@ -5966,7 +5976,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         u.log.push("Your leader, two scouts, two bands of settlers and a company of warriors stand ready on home ground. Found your first town where you like."),
         u)
       : (u.log.push(`${s.name} sails west in ${u.year}. ${m} rules at home.`),
-        u.log.push(`One ship, with your leader and explorers. The storeship with your settlers is due in ${vr()}.`),
+        u.log.push(`One ship, with your leader, a few soldiers to guard the landing, and two explorers. Find good ground for colonies first. The storeship with your settlers, another explorer and a second leader is due in ${vr()}.`),
         u);
   }
   function yr(e, n, o, r) {
@@ -5996,11 +6006,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let t = Le(e, n, "explorer", o[0], o[1], "Explorer"),
       l = Le(e, n, "explorer", o[0], o[1], "Explorer");
     (t.aboard = s.id), (l.aboard = s.id);
-    let d = Le(e, n, "infantry", o[0], o[1], "Guard");
-    (d.aboard = s.id),
-      (d.leaderId = a.id),
-      (d.strength = 3),
-      e.arrivals.push({ owner: n.id, year: vr(), spot: [...o] });
+    // A few soldiers to guard the landing, not enough to go conquering.
+    for (let k = 0; k < 3; k++) {
+      let d = Le(e, n, "infantry", o[0], o[1], "Guard");
+      (d.aboard = s.id), (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
+    }
+    (n.anchor = [...o]), e.arrivals.push({ owner: n.id, year: vr(), spot: [...o] });
   }
   function Ui(e, n) {
     let o = e.players.find((t) => t.id === n.owner);
@@ -6010,22 +6021,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s = null;
     for (let [t, l] of i) if (((s = ji(e, t, l)), s)) break;
     if (!s) return null;
-    let a = Le(e, o, "ship", s[0], s[1], "Storeship");
-    for (let t of ["settler", "settler", "infantry"]) {
-      let l = Le(
-        e,
-        o,
-        t,
-        s[0],
-        s[1],
-        t === "settler" ? "Settlers" : "Garrison",
-      );
-      (l.aboard = a.id),
-        t === "infantry" &&
-          ((l.strength = 3),
-          (l.leaderId =
-            (e.units.find((d) => d.owner === o.id && d.kind === "leader") || {})
-              .id || null));
+    let a = Le(e, o, "ship", s[0], s[1], "Storeship"),
+      nat = ee[o.nationId],
+      L2 = Le(e, o, "leader", s[0], s[1], nat.leaders[(o.nextLeader || 1) % nat.leaders.length]);
+    (o.nextLeader = (o.nextLeader || 1) + 1), (L2.aboard = a.id);
+    // Settlers, an explorer, and a second leader with a few soldiers.
+    for (let t of ["settler", "settler", "explorer", "infantry", "infantry", "infantry"]) {
+      let l = Le(e, o, t, s[0], s[1], t === "settler" ? "Settlers" : t === "explorer" ? "Explorer" : "Guard");
+      (l.aboard = a.id), t === "infantry" && ((l.strength = 3), (l.maxStr = 3), (l.leaderId = L2.id));
     }
     return a;
   }
@@ -6052,7 +6055,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a = Le(e, n, "leader", o[0], o[1], i.leaders[0]);
     a.aboard = s.id;
     let t = Le(e, n, "explorer", o[0], o[1], "Explorer");
-    (t.aboard = s.id), e.arrivals.push({ owner: n.id, year: vr(), spot: [...o] });
+    t.aboard = s.id;
+    for (let k = 0; k < 3; k++) {
+      let d = Le(e, n, "infantry", o[0], o[1], "Guard");
+      (d.aboard = s.id), (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
+    }
+    (n.anchor = [...o]), e.arrivals.push({ owner: n.id, year: vr(), spot: [...o] });
   }
   function Le(e, n, o, r, i, s) {
     let a = {
@@ -6121,11 +6129,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function nativeStart(e, n, o, r) {
     let i = ee[n.nationId];
-    r.push(o);
+    r.push(o), (n.anchor = [...o]);
     let a = Le(e, n, "leader", o[0], o[1], i.leaders[0]);
     for (let k = 0; k < 2; k++) Le(e, n, "explorer", o[0], o[1], "Scout");
     for (let k = 0; k < 2; k++) Le(e, n, "settler", o[0], o[1], "Settlers");
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < 3; k++) {
       let d = Le(e, n, "infantry", o[0], o[1], "Warriors");
       (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
     }
@@ -6479,7 +6487,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s &&
         r.owner === s.id &&
         e.log.push(
-          "The storeship has arrived with two settlers and a garrison.",
+          "The storeship has arrived with two settlers, an explorer, and a second leader with his soldiers.",
         );
     }
     e.arrivedThisTurn.length && Dn(e), (e.governorNews = []);
@@ -10210,6 +10218,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       Wn(e, o, t, "rgba(255, 244, 200, 0.08)", n.map),
         Hn(e, o, t, s.color, 2, [3, 3], n.map);
     }
+    if (r.area) {
+      let a = r.area.radius,
+        t = new Set();
+      for (let l = -a; l <= a; l++)
+        for (let d = -a; d <= a; d++) t.add(`${r.area.x + d},${r.area.y + l}`);
+      Wn(e, o, t, "rgba(255, 244, 200, 0.06)", n.map), Hn(e, o, t, r.area.color, 2, [5, 3], n.map);
+    }
     r.hover &&
       (Qe(
         e,
@@ -11789,9 +11804,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         D = u ? ro(t, u.x, u.y) : null,
         L = V(t),
         K =
-          D && D.foundBy != null && L.explored[u.y * t.map.width + u.x] === "1"
-            ? D
-            : null,
+          pin && pin.kind === "special"
+            ? pinned()
+            : D && D.foundBy != null && L.explored[u.y * t.map.width + u.x] === "1"
+              ? D
+              : null,
         bound = g && g.kind === "settler" && !g.aboard && !y ? du(t, L) : null,
         rings = bound ? hu(t, L) : null,
         route =
@@ -11806,6 +11823,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ghost: F,
         plan,
         find: K,
+        area: pinArea(),
         route,
         picked: b ? S : null,
         bounds: bound,
@@ -11924,7 +11942,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s.innerHTML = `
       <p id="status">${h}</p>
       <p id="hover">${v.join("<br>") || "Drag the map. Drag one of your units to send it."}</p>
-      <h2>${f ? re(f) : "No unit selected"}</h2>
+      ${!f && pin && pinned() ? pinCard() : `<h2>${f ? re(f) : "No unit selected"}</h2>`}
       ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
       ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); return `<p class="lead-stats">Leader, level ${f.lvl}: ${L.attacks} attacks a battle turn, charisma ${L.charisma}, commands up to ${L.cmd} men, reputation ${L.rep}. In a colony he takes command of its defence.</p>`; })() : ""}
       ${f && !f.aboard && arm(f.kind) && f.leaderId ? `<div class="row"><button type="button" id="detach">Leave the leader</button></div><p class="muted">He stays on this square. Drag him after that. Dragging him before that moves the men who are still with the leader.</p>` : ""}
@@ -12025,6 +12043,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (joiner.onclick = () => {
           x(joinMan(t, f.id)), R();
         });
+      let pgo = s.querySelector("#pin-go");
+      pgo && (pgo.onclick = () => {
+        let P = pinned();
+        P && (_(P.x, P.y), R());
+      });
+      let pcl = s.querySelector("#pin-close");
+      pcl && (pcl.onclick = () => ((pin = null), R()));
       let gat = s.querySelector("#gather");
       gat && (gat.onclick = () => ne(f.id, () => gatherMen(t, f.id)));
       let ent = s.querySelector("#enter-town");
@@ -12424,6 +12449,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!b.length) {
         let w = ln(t, f, g);
         if (w && w.colony.owner === k.id) {
+          pin = null;
           w.colony.id !== y && Re(w.colony.id);
           // A click on a building picks that building; the colony center
           // stands for the whole colony.
@@ -12431,7 +12457,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             ((S = { x: w.building.x, y: w.building.y }), (T = null), R());
           return;
         }
+        // A click on a landmark, a village, a rival town or a rival army
+        // picks it: its card shows on the side and its reach on the map.
+        let seen = k.explored[g * t.map.width + f] === "1",
+          sp = seen && ro(t, f, g),
+          vg = seen && villageAt(t, f, g),
+          ar = t.politics && armyAt(t, f, g),
+          np = (q) => ((pin = q), (l = null), (y = null), (T = null), (h = ""), R());
+        if (w && w.colony.owner !== k.id && seen) return np({ kind: "colony", id: w.colony.id });
+        if (vg) return np({ kind: "village", id: vg.id });
+        if (ar && (ar.seen || ar.owner === k.id)) return np({ kind: "army", id: ar.id });
+        if (sp && sp.foundBy != null) return np({ kind: "special", id: sp.id });
       }
+      pin = null;
       b.length && ((y = null), (T = null)),
         (l = b.length ? topOf(b).id : null),
         (h = ""),
@@ -12457,6 +12495,73 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // While placing a building the pointer becomes a crosshair and a label
     // follows it: what is being placed, and whether it can go here.
     let tipEl = null;
+    // What the player last clicked on the map that is not a unit: a
+    // landmark, a village, a rival town or army.
+    var pin = null;
+    function pinned() {
+      if (!pin || !t) return null;
+      if (pin.kind === "special") return (t.map.specials || []).find((q) => q.id === pin.id) || null;
+      if (pin.kind === "village") return natives(t).villages.find((q) => q.id === pin.id) || null;
+      if (pin.kind === "colony") return t.colonies.find((q) => q.id === pin.id) || null;
+      if (pin.kind === "army") return ((t.politics && t.politics.armies) || []).find((q) => q.id === pin.id) || null;
+      return null;
+    }
+    // The pinned thing's reach, drawn as a ring on the map.
+    function pinArea() {
+      let P = pinned();
+      if (!P) return null;
+      if (pin.kind === "village") return { x: P.x, y: P.y, radius: 10, color: "#d08a3a" };
+      if (pin.kind === "colony") return { x: P.x, y: P.y, radius: reachOf(P) || 1, color: ee[(t.players.find((q) => q.id === P.owner) || {}).nationId || "england"].color };
+      return null;
+    }
+    function pinCard() {
+      let P = pinned();
+      if (!P) return (pin = null), "";
+      let me_ = V(t),
+        go = `<button type="button" id="pin-go">Show on map</button> <button type="button" id="pin-close">Close</button>`;
+      if (pin.kind === "special") {
+        let d = ke[P.kind],
+          who = P.foundBy === me_.id ? "Yours" : `Held by ${ee[ce(t, P.foundBy).nationId].name}`;
+        return `<h2>${G(d.name)}</h2>
+        <p>${G(qn(d))}.</p>
+        <p class="muted">${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach: ${d.radius} squares each way. Only its holder's buildings inside it get the bonus.` : ""}</p>
+        <div class="row">${go}</div>`;
+      }
+      if (pin.kind === "village") {
+        let nt = nationOf(t, P),
+          att = nt.att[me_.id] || 0,
+          word = attitudeWord(att),
+          of = villageOffer(t, P),
+          per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`,
+          near = t.colonies.filter((c) => c.owner === me_.id && Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= 10);
+        return `<h2>${G(P.name)}</h2>
+        <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
+        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies within 16 squares." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
+        <p class="muted">The ring shows 10 squares: ${word === "friendly" ? "while friendly, its warriors come to help defend your colonies inside it" : "friendly villages send warriors to help defend colonies inside it"}.${near.length ? ` ${near.map((c) => G(c.name)).join(", ")} ${near.length === 1 ? "is" : "are"} inside.` : ""} Drag soldiers onto the village to raid or destroy it.</p>
+        <div class="row">${go}</div>`;
+      }
+      if (pin.kind === "colony") {
+        let ow = t.players.find((q) => q.id === P.owner),
+          v = relOf(t, me_.id, ow.id),
+          war = atWar(t, me_.id, ow.id),
+          def = colonyDefence(t, P),
+          canCap = isNatNation(ow) === isNatNation(me_);
+        return `<h2>${G(P.name)}</h2>
+        <p>${/^[AEIOU]/.test(nationAdj(ow)) ? "An" : "A"} ${G(nationAdj(ow))} ${P.big ? "town" : "colony"}, level ${P.level}. ${war ? "<b>At war with you.</b>" : `Relations: ${G(diploLevel(v).name)}.`}</p>
+        <p class="muted">About ${def.units.length} defenders${def.leader ? `, commanded by ${G(def.leader.name)}` : ""}. The ring shows its land.</p>
+        <p class="muted">Drag soldiers beside it onto the town to ${canCap ? "raid or capture" : "raid"} it.${war ? "" : " That means war, and the crown may not approve."}</p>
+        <div class="row">${go}</div>`;
+      }
+      if (pin.kind === "army") {
+        let ow = t.players.find((q) => q.id === P.owner),
+          tg = t.colonies.find((c) => c.id === P.target);
+        return `<h2>${G(nationAdj(ow))} army</h2>
+        <p>Under ${G(P.leader.name)}, about ${P.troops.length} men. What kind of men, and how good, you cannot tell from here.</p>
+        <p class="muted">${tg ? `It is marching on ${G(tg.name)}.` : ""} Drag soldiers beside it onto it to attack.</p>
+        <div class="row">${go}</div>`;
+      }
+      return "";
+    }
     function placeTip(ev) {
       let col = y ? t.colonies.find((q) => q.id === y) : null;
       if (!T || !col || !u || !ev) {
