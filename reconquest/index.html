@@ -6116,7 +6116,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           return;
         }
         // Rivals land on your stretch of coast, near enough to fight over.
-        let M = nearStart(a, p, h) || lo(a, (P) => P < a.width * 0.42, h);
+        let M = nearStart(a, p, h) || nearStart(a, p, h, 26, 90, 55, 24) || lo(a, (P) => P < a.width * 0.42, h);
         M && Gi(u, S, M, h);
       }),
       Dn(u);
@@ -6264,8 +6264,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // land. On a small landmass it takes the farthest ground there is.
   function inlandStart(M, home, taken) {
     return (
-      inlandStartIn(M, home, taken, 60, 95, 75) ||
-      inlandStartIn(M, home, taken, 40, 60, 60) ||
+      inlandStartIn(M, home, taken, 70, 110, 85) ||
+      inlandStartIn(M, home, taken, 45, 70, 70) ||
       inlandStartIn(M, home, taken, 28, 40, 40) ||
       // No room on that land: any good open ground elsewhere, about 70 away.
       inlandStartIn(M, home, taken, 30, 160, 70, !0)
@@ -6312,7 +6312,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
     }
   }
-  function nearStart(M, home, taken) {
+  function nearStart(M, home, taken, dMin = 32, dMax = 62, dBest = 45, gap = 30) {
     let { width: w, height: h, tiles } = M,
       isLand = (k) => mn[tiles[k].terrain].pass === "land",
       seed = Z(home[0], home[1], w, h).map(([x, y]) => y * w + x).find(isLand);
@@ -6333,10 +6333,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let x = 1; x < w - 1; x++) {
         if (tiles[y * w + x].terrain !== "coast") continue;
         let d = Math.hypot(x - home[0], y - home[1]);
-        if (d < 22 || d > 45) continue;
-        if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < 20)) continue;
+        if (d < dMin || d > dMax) continue;
+        if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < gap)) continue;
         if (!Z(x, y, w, h).some(([a, b]) => mass[b * w + a])) continue;
-        let sc = Math.abs(d - 32);
+        let sc = Math.abs(d - dBest);
         sc < bs && ((bs = sc), (best = [x, y]));
       }
     return best;
