@@ -889,12 +889,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // Aim bonuses are in d40 points: 2 = +5% to hit.
   var NAT_AIM = { england: { gun: 2 }, france: { horse: 2 }, spain: { foot: 2 }, ixtal: { horse: 2 } },
     NAT_PERKS = {
-      spain: "Explorers move 2 squares farther, infantry shoot 5% straighter, and every leader you commission starts with 2 points to spend.",
-      portugal: "Every unit, ships included, moves a square farther each turn.",
-      england: "Ships sail 2 squares farther, and artillery shoots 5% straighter.",
-      france: "The native nations start friendlier toward you and stay that way, and dragoons shoot 5% straighter.",
+      spain: "Explorers travel farther, infantry shoot straighter, and every leader you commission starts with 2 points to spend.",
+      portugal: "Every unit, ships included, travels farther each turn.",
+      england: "Ships sail farther, and artillery shoots straighter.",
+      france: "The native nations start friendlier toward you and stay that way, and dragoons shoot straighter.",
       netherlands: "Colony gold earns 5% interest every year.",
-      ixtal: "Riders shoot 5% straighter, on top of the empire's other differences.",
+      ixtal: "Riders shoot straighter, on top of the empire's other differences.",
     };
   var NAT_CHEAP = { settler: 0.7, infantry: 0.7, cavalry: 0.7 },
     NAT_NAMES = { infantry: "Warriors", cavalry: "Riders", explorer: "Scout" };
@@ -1457,7 +1457,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       startYear: 1500,
       yearsPerTurn: 1,
       storeshipTurn: 6,
-      zoom: { start: 0.85, min: 0.05, max: 2, colony: 1.1 },
+      zoom: { start: 1.35, min: 0.05, max: 2, colony: 1.4 },
       skillPoints: 6,
       invasionScale: { easy: 0.4, normal: 0.6, hard: 0.8, ruthless: 1 },
       move: {
@@ -1834,7 +1834,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             s.id === "center"
               ? ((r.level = s.level),
                 o.push(
-                  `${r.name} is now level ${r.level}. Its land reaches one square farther.`,
+                  `${r.name} is now level ${r.level}. Its land reaches farther.`,
                 ))
               : o.push(`${r.name}'s ${a} is now level ${s.level}.`))
           : o.push(`${r.name} finished a ${a}.`),
@@ -3282,7 +3282,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         : "A lone survivor of an earlier voyage joins you as an explorer.";
     } else if (!p.perks.trail) {
       p.perks.trail = 1;
-      msg = "Carved trail markers show the old paths. From now on your explorers move one square farther each turn.";
+      msg = "Carved trail markers show the old paths. From now on your explorers travel farther each turn.";
     } else if (!p.perks.calendar) {
       p.perks.calendar = 1;
       p.score = (p.score || 0) + 60;
@@ -6898,7 +6898,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         .filter((s) => s.foundBy != null)
         .map((s) => s.id)
         .join(",");
-    return `${n.explored}#${r}#${i}`;
+    // Newly charted squares are handled tile by tile (staleAround), not here.
+    return `${r}#${i}`;
   }
   // The map is cached as a grid of 256-pixel tiles fixed to the map, so
   // panning only ever draws the few tiles coming into view, a few
@@ -6932,9 +6933,48 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (tile.zoom = r.zoom),
       (tile.dpr = a);
   }
+  // Tiles are cached per zoom level. Revealing squares re-draws only the
+  // few tiles around them, and while the wheel is turning the tiles from
+  // the last settled zoom are stretched to fit, so zooming stays smooth;
+  // fresh tiles are drawn once it settles.
+  var tileExplored = null,
+    zoomSeen = null,
+    zoomSeenAt = 0,
+    baseZoom = null,
+    settleTimer = 0;
+  function tileId(zoom, ti, tj) {
+    return `${zoom}|${ti},${tj}`;
+  }
+  function staleAround(o, explored, a) {
+    let prev = tileExplored;
+    tileExplored = explored;
+    if (prev === explored) return;
+    if (!prev || prev.length !== explored.length) {
+      for (let t of mapTiles.values()) t.key = null;
+      return;
+    }
+    let w = o.map.width,
+      TS = TILE / a,
+      zooms = new Set([...mapTiles.values()].map((t) => t.zoom));
+    for (let k = 0; k < explored.length; k++) {
+      if (prev.charCodeAt(k) === explored.charCodeAt(k)) continue;
+      let x = k % w,
+        y = (k / w) | 0;
+      for (let z of zooms) {
+        let wx = (x - y) * 32 * z,
+          wy = (x + y) * 16 * z;
+        for (let tj = Math.floor((wy - 120 * z) / TS); tj <= Math.floor((wy + 60 * z) / TS); tj++)
+          for (let ti = Math.floor((wx - 100 * z) / TS); ti <= Math.floor((wx + 100 * z) / TS); ti++) {
+            let t = mapTiles.get(tileId(z, ti, tj));
+            t && (t.key = null);
+          }
+      }
+    }
+  }
   function Zi(e, n, o, r, i, s) {
     let a = e.getTransform().a || 1,
       TS = TILE / a,
+      now = performance.now(),
       key = `${o.map.seed}|${a}|${r.zoom}|${tileEpoch}|${Xi(o, i, s)}`,
       i0 = Math.floor(-r.ox / TS),
       j0 = Math.floor(-r.oy / TS),
@@ -6942,49 +6982,70 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       j1 = Math.floor((n.h - r.oy) / TS),
       ci = (i0 + i1) / 2,
       cj = (j0 + j1) / 2,
-      show = [],
-      todo = [],
-      missing = !1;
+      todo = [];
+    staleAround(o, i.explored, a);
+    r.zoom !== zoomSeen && ((zoomSeen = r.zoom), (zoomSeenAt = now));
+    let settling = now - zoomSeenAt < 160;
+    // While zooming, or until the new tiles are ready, stretch the last
+    // settled zoom's tiles underneath.
+    let under = baseZoom != null && baseZoom !== r.zoom,
+      drawUnder = () => {
+        let k = r.zoom / baseZoom,
+          S = TS * k;
+        for (let [id, t] of mapTiles) {
+          if (t.zoom !== baseZoom || t.dpr !== a) continue;
+          let c = id.slice(id.indexOf("|") + 1).split(","),
+            x = +c[0] * S + r.ox,
+            y = +c[1] * S + r.oy;
+          x > n.w || y > n.h || x + S < 0 || y + S < 0 || e.drawImage(t.canvas, x, y, S, S);
+        }
+      };
+    if (settling && under) {
+      drawUnder();
+      clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 170));
+      return;
+    }
     for (let tj = j0; tj <= j1; tj++)
       for (let ti = i0; ti <= i1; ti++) {
-        let k = `${ti},${tj}`,
-          tile = mapTiles.get(k),
-          usable = tile && tile.zoom === r.zoom && tile.dpr === a;
-        usable ? show.push([ti, tj, tile]) : (missing = !0);
-        (!usable || tile.key !== key) && todo.push([ti, tj, Math.hypot(ti - ci, tj - cj)]);
+        let tile = mapTiles.get(tileId(r.zoom, ti, tj));
+        (!tile || tile.dpr !== a || tile.key !== key) && todo.push([ti, tj, Math.hypot(ti - ci, tj - cj)]);
       }
     // Draw what is due, nearest the middle first, within a small budget.
     if (todo.length) {
       todo.sort((p, q) => p[2] - q[2]);
       let t0 = performance.now(),
-        colonyTiles = null;
+        colonyTiles = null,
+        drew = 0;
       for (let [ti, tj] of todo) {
-        if (performance.now() - t0 > 5 && show.length) break;
+        if (performance.now() - t0 > 6 && drew) break;
         colonyTiles || (colonyTiles = Ct(o));
-        let k = `${ti},${tj}`,
+        let k = tileId(r.zoom, ti, tj),
           tile = mapTiles.get(k);
         tile || ((tile = { canvas: $o(TILE, TILE) }), mapTiles.set(k, tile));
-        drawTile(o, r, i, s, colonyTiles, tile, ti, tj, a, key);
+        drawTile(o, r, i, s, colonyTiles, tile, ti, tj, a, key), drew++;
       }
-      todo.some(([ti, tj]) => (mapTiles.get(`${ti},${tj}`) || {}).key !== key) && mapRepaint && mapRepaint();
-      (show = []), (missing = !1);
-      for (let tj = j0; tj <= j1; tj++)
-        for (let ti = i0; ti <= i1; ti++) {
-          let tile = mapTiles.get(`${ti},${tj}`);
-          tile && tile.zoom === r.zoom && tile.dpr === a ? show.push([ti, tj, tile]) : (missing = !0);
-        }
+      drew < todo.length && mapRepaint && mapRepaint();
     }
-    missing && blitTerrace(e, o.map, r, null);
+    let missing = !1,
+      show = [];
+    for (let tj = j0; tj <= j1; tj++)
+      for (let ti = i0; ti <= i1; ti++) {
+        let tile = mapTiles.get(tileId(r.zoom, ti, tj));
+        tile && tile.dpr === a && tile.canvas && tile.zoom === r.zoom ? show.push([ti, tj, tile]) : (missing = !0);
+      }
+    missing && (under ? drawUnder() : blitTerrace(e, o.map, r, null));
+    missing || (baseZoom = r.zoom);
     for (let [ti, tj, tile] of show) {
       tile.used = ++tileTick;
       let x = Math.round((ti * TS + r.ox) * a) / a,
         y = Math.round((tj * TS + r.oy) * a) / a;
       e.drawImage(tile.canvas, x, y, TS, TS);
     }
-    // Keep memory in check: forget the tiles least recently on screen.
+    // Keep memory in check: forget the tiles least recently on screen,
+    // never the ones of the zoom being stretched.
     if (mapTiles.size > TILE_MAX) {
-      let old = [...mapTiles.entries()].sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
-      for (let k = 0; k < mapTiles.size - TILE_MAX; k++) mapTiles.delete(old[k][0]);
+      let old = [...mapTiles.entries()].filter(([, t]) => t.zoom !== baseZoom || t.zoom === r.zoom).sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
+      for (let k = 0; k < Math.min(old.length, mapTiles.size - TILE_MAX); k++) mapTiles.delete(old[k][0]);
     }
   }
   function backTrees(g, x, y, seed, n) {
@@ -8560,6 +8621,48 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let r = map.width,
       i = map.height,
       key = `${map.seed}|${r}|${explored}`;
+    // Newly charted squares only repaint the fog around themselves.
+    let F = fogCache;
+    if (F.canvas && F.a && F.img && F.seed === map.seed && F.explored && F.explored.length === explored.length && F.explored !== explored) {
+      let l = r * Cn,
+        p = F.img.data,
+        x0 = 1 / 0,
+        y0 = 1 / 0,
+        x1 = -1,
+        y1 = -1,
+        ok = !0,
+        changed = [];
+      for (let k = 0; k < r * i; k++) {
+        if (F.explored.charCodeAt(k) === explored.charCodeAt(k)) continue;
+        if (explored[k] !== "1") {
+          ok = !1;
+          break;
+        }
+        (F.a[k] = 0), changed.push(k);
+      }
+      if (ok && changed.length) {
+        // Each changed square touches the fog a square either side of it.
+        for (let k of changed) {
+          let x = k % r,
+            y = (k / r) | 0,
+            a0 = Math.max(0, (x - 1) * Cn),
+            a1 = Math.min(l, (x + 2) * Cn),
+            b0 = Math.max(0, (y - 1) * Cn),
+            b1 = Math.min(i * Cn, (y + 2) * Cn);
+          (x0 = Math.min(x0, a0)), (y0 = Math.min(y0, b0)), (x1 = Math.max(x1, a1)), (y1 = Math.max(y1, b1));
+          for (let m = b0; m < b1; m++) {
+            let yy = (m + 0.5) / Cn - 0.5;
+            for (let S = a0; S < a1; S++) p[(m * l + S) * 4 + 3] = Math.round(Nt(0.18, 0.52, wo(F.a, r, i, (S + 0.5) / Cn - 0.5, yy)) * 255);
+          }
+        }
+        let sx0 = x0,
+          sx1 = x1,
+          sy0 = y0,
+          sy1 = y1;
+        F.canvas.getContext("2d").putImageData(F.img, 0, 0, sx0, sy0, sx1 - sx0, sy1 - sy0);
+        (F.key = key), (F.explored = explored);
+      } else if (ok) (F.key = key), (F.explored = explored);
+    }
     if (fogCache.key !== key || !fogCache.canvas) {
       let a = new Float32Array(r * i);
       for (let k = 0; k < r * i; k++) a[k] = explored[k] === "1" ? 0 : 1;
@@ -8580,7 +8683,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           p[A + 3] = Math.round(Nt(0.18, 0.52, wo(a, r, i, M, y)) * 255);
         }
       }
-      c.putImageData(hh, 0, 0), (fogCache = { key, canvas: u });
+      c.putImageData(hh, 0, 0), (fogCache = { key, canvas: u, a, img: hh, seed: map.seed, explored });
     }
     qr(ctx, fogCache.canvas, Cn, cam);
   }
@@ -11803,7 +11906,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <h2>Nation</h2>
         <div class="row">${on.map((b) => `<button type="button" class="choice ${f.nationId === b.id ? "on" : ""}" data-nation="${b.id}"><span class="flag" style="background:${b.color}"></span>${b.name}</button>`).join("")}</div>
         <p class="sub">${G(NAT_PERKS[f.nationId] || "")}</p>
-        ${ee[f.nationId].native ? '<p class="sub">The Ixtal Empire starts on its own ground with settlers in hand: no ship, no crown, no tax, and no trade with Europe. Its towns stop at level 2 but spread wider and house more. Settlers, warriors and riders cost less, every unit moves a square farther and scouts two, gold mines always yield, and it builds no artillery. It can raid European colonies but not capture them, and they cannot capture its towns.</p>' : ""}
+        ${ee[f.nationId].native ? '<p class="sub">The Ixtal Empire starts on its own ground with settlers in hand: no ship, no crown, no tax, and no trade with Europe. Its towns stop at level 2 but spread wider and house more. Settlers, warriors and riders cost less, every unit travels farther and scouts farther still, gold mines always yield, and it builds no artillery. It can raid European colonies but not capture them, and they cannot capture its towns.</p>' : ""}
         <h2>Difficulty</h2>
         <div class="row">${qo.map((b) => `<button type="button" class="choice ${f.difficulty === b.id ? "on" : ""}" data-diff="${b.id}">${b.label}</button>`).join("")}</div>
         <p class="sub">Rivals are always out for your land; harder settings give them bigger armies sooner.</p>
@@ -12396,7 +12499,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ${row("attacks", "Actions", L.attacks, "Attacks his side makes each battle turn. Without a leader, 3.")}
           ${row("charisma", "Charisma", L.charisma, "His men panic and fall back less often.")}
           ${row("cmd", "Organization", L.cmd, "How many soldiers he can command.")}
-          ${row("move", "Movement", `+${L.move}`, "Extra squares a turn on the map, for him and his column.")}
+          ${row("move", "Movement", `+${L.move}`, "How far he and his column travel each turn.")}
           <tr><th>Reputation</th><td class="num">${L.rep}</td><td></td></tr><tr class="hint"><td colspan="3">Earned in battle. It unsettles the enemy.</td></tr>
         </table>
         <p class="muted">${pt ? `<b>${f.pts} point${f.pts === 1 ? "" : "s"} to spend.</b> ` : ""}Experience comes from the damage his men deal and half what they take, more for a victory: the first point at 5, then 8, 11, 14 and so on${f.xp ? ` (now ${Math.floor(f.xp)} of ${5 + 3 * (f.earned || 0)})` : ""}. Actions cost 3 points, movement 2, charisma and organization 1. In a colony with soldiers he organizes the defence, and the militia fight under him on top of his organization.</p>`; })() : ""}
@@ -12543,7 +12646,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               return `<li><button type="button" class="find-link" data-find="${k.id}"><span class="swatch" style="background:${v.color}"></span>${G(v.name)}</button></li>`;
             })
             .join("")}</ul>`
-        : '<p class="muted">Veins, gems, fine timber, herbs, and rich farmland are out there. Explorers spot them from two squares away.</p>';
+        : '<p class="muted">Veins, gems, fine timber, herbs, and rich farmland are out there. Explorers spot them as they pass close by.</p>';
     }
     function oe(f) {
       return (
@@ -12989,7 +13092,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           who = P.foundBy === me_.id ? "Yours" : `Held by ${ee[ce(t, P.foundBy).nationId].name}`;
         return `<h2>${G(d.name)}</h2>
         <p>${G(qn(d))}.</p>
-        <p class="muted">${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach: ${d.radius} squares each way. Only its holder's buildings inside it get the bonus.` : ""}</p>
+        <p class="muted">${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "village") {
@@ -13001,8 +13104,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           near = t.colonies.filter((c) => c.owner === me_.id && Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= 10);
         return `<h2>${G(P.name)}</h2>
         <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
-        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies within 16 squares." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
-        <p class="muted">The ring shows 10 squares: ${word === "friendly" ? "while friendly, its warriors come to help defend your colonies inside it" : "friendly villages send warriors to help defend colonies inside it"}.${near.length ? ` ${near.map((c) => G(c.name)).join(", ")} ${near.length === 1 ? "is" : "are"} inside.` : ""} Drag soldiers onto the village to raid or destroy it.</p>
+        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
+        <p class="muted">The ring shows how far its warriors will come: ${word === "friendly" ? "while friendly, its warriors come to help defend your colonies inside it" : "friendly villages send warriors to help defend colonies inside it"}.${near.length ? ` ${near.map((c) => G(c.name)).join(", ")} ${near.length === 1 ? "is" : "are"} inside.` : ""} Drag soldiers onto the village to raid or destroy it.</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "colony") {
@@ -13625,7 +13728,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             of = villageOffer(t, q),
             per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`;
           return `<li><b>${G(q.name)}</b> · ${G(nt.name)} · <span class="att ${word}">${word}</span><br>
-            ${word === "hostile" ? '<small class="down">Will not trade. May raid colonies within 16 squares.</small>' : q.tradedYear === t.year ? "<small>Traded this year.</small>" : `<small>Wants ${Ne[of.want].toLowerCase()} this year: ${per}.</small> <button type="button" class="nat-trade" data-v="${q.id}">Trade 10</button>`}
+            ${word === "hostile" ? '<small class="down">Will not trade. May raid colonies nearby.</small>' : q.tradedYear === t.year ? "<small>Traded this year.</small>" : `<small>Wants ${Ne[of.want].toLowerCase()} this year: ${per}.</small> <button type="button" class="nat-trade" data-v="${q.id}">Trade 10</button>`}
             <button type="button" class="nat-gift" data-v="${q.id}" ${f.stock.gold >= 10 ? "" : "disabled"}>Gift 10 gold</button></li>`;
         })
         .join("")}</ul>
@@ -13664,7 +13767,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ${T ? placingPanel(f) : te}
       <h3 class="side-sub">Build</h3>
       <div class="build-list">${v}</div>
-      <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches two squares farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land one square all round.</small></button>`}</div>
+      <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land.</small></button>`}</div>
       ${garrison}
       ${X}
       ${f.big ? "" : sell}
@@ -13833,7 +13936,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           if (u.owner !== me_ || u.aboard || !(u.mp > 0) || u.dest || u.autoExplore) return !1;
           if (arm(u.kind) && u.leaderId && t.units.some((q) => q.id === u.leaderId && !q.aboard && q.x === u.x && q.y === u.y)) return !1;
           if (u.kind !== "ship" && t.colonies.some((c) => c.owner === me_ && inColony(c, u))) return !1;
-          return kn(t, u.id).size > 0;
+          // Quick check: is any neighbouring square within its movement?
+          return Z(u.x, u.y, t.map.width, t.map.height).some(([x, y]) => ii(u, se(t, x, y)) && vn(t, u, u.x, u.y, x, y) <= u.mp);
         })
         .sort((a, b) => a.id - b.id);
     }
