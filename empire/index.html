@@ -67,7 +67,8 @@ button{font:inherit;cursor:pointer}
 /* game screen */
 .game{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
 .mapwin{padding:6px}
-#map{width:100%;display:block;image-rendering:pixelated;cursor:crosshair;touch-action:manipulation}
+.mapbox{position:relative;overflow:auto;max-height:calc(100vh - 170px)}
+#map{width:140%;height:auto;max-width:none;display:block;image-rendering:pixelated;cursor:crosshair;touch-action:manipulation}
 .side .win{margin-top:16px}
 .side .win:first-child{margin-top:12px}
 .kv{display:flex;justify-content:space-between;gap:8px}
@@ -95,7 +96,7 @@ tr.me td:first-child::after{content:" *";color:var(--white)}
 .risk{color:var(--lred);font-size:18px}
 .perkline{font-size:18px;color:var(--lcyan);margin-top:4px;min-height:2.3em}
 .perkline b{font-weight:normal;color:var(--yellow)}
-.mapbox{position:relative}
+
 .tip{position:absolute;z-index:3;pointer-events:none;background:var(--gray);color:var(--black);border:2px solid var(--black);
   box-shadow:5px 5px 0 rgba(0,0,0,.75);font-size:18px;line-height:1.1;min-width:190px;white-space:nowrap}
 .tip .tt{background:var(--blue);color:var(--white);padding:1px 8px}
@@ -1626,10 +1627,11 @@ cv.addEventListener('mousemove',ev=>{
   if(t!==UI.hover){ UI.hover=t; renderInfo(); if(t>=0) tip.innerHTML=tipHTML(T_(t)); }
   if(t<0){ tip.hidden=true; return; }
   tip.hidden=false;
-  const box=cv.parentElement.getBoundingClientRect(), x=ev.clientX-box.left, y=ev.clientY-box.top;
+  const boxEl=cv.parentElement, box=boxEl.getBoundingClientRect(), x=ev.clientX-box.left, y=ev.clientY-box.top;
   const w=tip.offsetWidth, h=tip.offsetHeight;
-  tip.style.left=(x+16+w>box.width?x-16-w:x+16)+'px';
-  tip.style.top=(y+16+h>box.height?Math.max(0,y-16-h):y+16)+'px';
+  const lx=x+16+w>box.width?x-16-w:x+16, ly=y+16+h>box.height?Math.max(0,y-16-h):y+16;
+  tip.style.left=(lx+boxEl.scrollLeft)+'px';
+  tip.style.top=(ly+boxEl.scrollTop)+'px';
 });
 cv.addEventListener('mouseleave',()=>{ UI.hover=-1; tip.hidden=true; if(G) renderInfo(); });
 cv.addEventListener('click',ev=>{
