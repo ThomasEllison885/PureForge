@@ -5940,9 +5940,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!p) throw new Error("This seed has no coast to land on.");
     if (s.native) {
       // The empire starts on its own ground, west of where the strangers land.
+      // The Europeans still land on the east coast at p; the empire's home
+      // is far inland from there.
       let home = inlandStart(a, p, h);
       if (!home) throw new Error("This map has no room inland. Try another seed.");
-      (p = home), nativeStart(u, c, home, h);
+      nativeStart(u, c, home, h);
     } else Fi(u, c, p, h);
     d.forEach((y) => {
         let S = yr(u, y, !1, []);
@@ -6096,9 +6098,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // A coast square 22 to 45 squares from where you land, on the same body
   // of land, and well clear of anyone else's landing.
-  // The native power's home ground: open land 28 to 42 squares inland of
-  // the landing, on the same body of land, westward if it can be.
+  // The native power's home ground: open land well inland of the landing,
+  // 60 to 95 squares west if the land runs that far, on the same body of
+  // land. On a small landmass it takes the farthest ground there is.
   function inlandStart(M, home, taken) {
+    return (
+      inlandStartIn(M, home, taken, 60, 95, 75) ||
+      inlandStartIn(M, home, taken, 40, 60, 60) ||
+      inlandStartIn(M, home, taken, 28, 40, 40) ||
+      // No room on that land: any good open ground elsewhere, about 70 away.
+      inlandStartIn(M, home, taken, 30, 160, 70, !0)
+    );
+  }
+  function inlandStartIn(M, home, taken, dMin, dMax, dBest, anyLand) {
     let { width: w, height: h, tiles } = M,
       isLand = (k) => mn[tiles[k].terrain].pass === "land",
       seed = Z(home[0], home[1], w, h).map(([x, y]) => y * w + x).find(isLand);
@@ -6118,11 +6130,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let y = 2; y < h - 2; y++)
       for (let x = 2; x < w - 2; x++) {
         let t = tiles[y * w + x];
-        if (!mass[y * w + x] || !Ho(t.terrain) || t.terrain === "swamp") continue;
+        if ((!anyLand && !mass[y * w + x]) || !Ho(t.terrain) || t.terrain === "swamp") continue;
+        if (anyLand && Z(x, y, w, h).some(([a, b]) => !isLand(b * w + a))) continue;
         let d = Math.hypot(x - home[0], y - home[1]);
-        if (d < 28 || d > 42) continue;
-        if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < 20)) continue;
-        let sc = Math.abs(d - 34) + (x > home[0] ? 12 : 0) + (t.terrain === "plains" || t.terrain === "woods" ? 0 : 4) + (t.riverId ? -3 : 0);
+        if (d < dMin || d > dMax) continue;
+        if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < 30)) continue;
+        let sc = Math.abs(d - dBest) + (x > home[0] ? 25 : 0) + (t.terrain === "plains" || t.terrain === "woods" ? 0 : 4) + (t.riverId ? -3 : 0);
         sc < bs && ((bs = sc), (best = [x, y]));
       }
     return best;
