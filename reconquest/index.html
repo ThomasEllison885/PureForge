@@ -10953,7 +10953,107 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let b = ln(e, u.x, u.y);
     return !!b && b.colony.owner === u.owner;
   }
+  // Where each named river and region is labelled: for a region the square
+  // nearest the middle of its land, for a river a spot every forty or so
+  // squares along it. Worked out once per map.
+  var featAnchors = { key: "", rivers: new Map(), regions: new Map() };
+  function anchorsOf(map) {
+    let key = `${map.seed}|${map.width}`;
+    if (featAnchors.key === key) return featAnchors;
+    let rv = new Map(),
+      rg = new Map(),
+      w = map.width;
+    for (let k = 0; k < map.tiles.length; k++) {
+      let t = map.tiles[k],
+        x = k % w,
+        y = (k / w) | 0;
+      t.riverId && (rv.get(t.riverId) || rv.set(t.riverId, []).get(t.riverId)).push([x, y]);
+      t.regionId && (rg.get(t.regionId) || rg.set(t.regionId, { n: 0, sx: 0, sy: 0, pts: [] }).get(t.regionId)), t.regionId && ((g) => ((g.n += 1), (g.sx += x), (g.sy += y), g.pts.push([x, y])))(rg.get(t.regionId));
+    }
+    let rivers = new Map(),
+      regions = new Map();
+    for (let [id, pts] of rv) {
+      // Order the squares along the river by walking from one end.
+      let set = new Set(pts.map(([x, y]) => x * 4096 + y)),
+        start = pts.find(([x, y]) => Z(x, y, map.width, map.height).filter(([a, b]) => set.has(a * 4096 + b)).length <= 1) || pts[0],
+        line = [start],
+        seen = new Set([start[0] * 4096 + start[1]]);
+      for (let cur = start; ; ) {
+        let nx = Z(cur[0], cur[1], map.width, map.height).find(([a, b]) => set.has(a * 4096 + b) && !seen.has(a * 4096 + b));
+        if (!nx) break;
+        seen.add(nx[0] * 4096 + nx[1]), line.push(nx), (cur = nx);
+      }
+      let spots = [];
+      for (let k = Math.min(line.length - 1, 12); k < line.length; k += 40) {
+        let a = line[Math.max(0, k - 2)],
+          b = line[Math.min(line.length - 1, k + 2)];
+        spots.push({ x: line[k][0], y: line[k][1], dx: b[0] - a[0], dy: b[1] - a[1] });
+      }
+      rivers.set(id, spots);
+    }
+    for (let [id, g] of rg) {
+      let cx = g.sx / g.n,
+        cy = g.sy / g.n,
+        best = g.pts.reduce((p, q) => (Math.hypot(q[0] - cx, q[1] - cy) < Math.hypot(p[0] - cx, p[1] - cy) ? q : p), g.pts[0]);
+      regions.set(id, { x: best[0], y: best[1], size: g.n });
+    }
+    return (featAnchors = { key, rivers, regions });
+  }
+  // Names on the map: regions in faint spaced capitals, rivers in blue
+  // italics along their course, peaks beside a small mark.
+  function featLabels(e, n, o, r, i) {
+    let A = anchorsOf(n.map),
+      w = n.map.width,
+      seen = (x, y) => i.explored[C(x, y, w)] === "1",
+      z = o.zoom;
+    e.save(), (e.textAlign = "center"), (e.textBaseline = "middle");
+    if (z < 1.7)
+      for (let g of n.map.regions) {
+        let a = g.name && A.regions.get(g.id);
+        if (!a || !seen(a.x, a.y)) continue;
+        let p = YL(a.x, a.y, o, 0);
+        if (!Nn(p, r, 300)) continue;
+        let fs = Math.max(10, Math.min(22, 9 + Math.sqrt(a.size) * 0.18 * Math.max(0.6, z)));
+        (e.font = `600 ${fs}px Palatino, Georgia, serif`), "letterSpacing" in e && (e.letterSpacing = `${Math.round(fs * 0.35)}px`);
+        (e.lineWidth = 3), (e.strokeStyle = "rgba(20,14,8,0.35)"), (e.fillStyle = "rgba(250,240,214,0.55)");
+        let t = g.name.toUpperCase();
+        e.strokeText(t, p.x, p.y), e.fillText(t, p.x, p.y);
+      }
+    "letterSpacing" in e && (e.letterSpacing = "0px");
+    if (z >= 0.4) {
+      let fs = Math.max(11, Math.min(15, 12 * z));
+      e.font = `italic ${fs}px Palatino, Georgia, serif`;
+      for (let rv of n.map.rivers) {
+        let spots = rv.name && A.rivers.get(rv.id);
+        if (!spots) continue;
+        for (let sp of spots) {
+          if (!seen(sp.x, sp.y)) continue;
+          let p = YL(sp.x, sp.y, o, terracePx(n.map, sp.x, sp.y, z));
+          if (!Nn(p, r, 120)) continue;
+          // Follow the river's direction on screen, kept readable.
+          let ang = Math.atan2((sp.dx + sp.dy) * 16, (sp.dx - sp.dy) * 32);
+          ang > Math.PI / 2 ? (ang -= Math.PI) : ang < -Math.PI / 2 && (ang += Math.PI);
+          ang = Math.max(-0.6, Math.min(0.6, ang));
+          e.save(), e.translate(p.x, p.y - 9 * z), e.rotate(ang);
+          (e.lineWidth = 3.5), (e.lineJoin = "round"), (e.strokeStyle = "rgba(240,236,224,0.7)"), (e.fillStyle = "rgba(24,62,104,0.9)");
+          e.strokeText(rv.name, 0, 0), e.fillText(rv.name, 0, 0), e.restore();
+        }
+      }
+      for (let pk of n.map.peaks) {
+        if (!pk.name || !seen(pk.x, pk.y)) continue;
+        let p = YL(pk.x, pk.y, o, terracePx(n.map, pk.x, pk.y, z));
+        if (!Nn(p, r, 120)) continue;
+        e.font = `italic ${fs}px Palatino, Georgia, serif`;
+        let ty = p.y - 34 * z;
+        (e.fillStyle = "rgba(60,40,24,0.75)"), e.beginPath(), e.moveTo(p.x - 3.5, ty - 6), e.lineTo(p.x, ty - 11.5), e.lineTo(p.x + 3.5, ty - 6), e.closePath(), e.fill();
+        (e.lineWidth = 3.5), (e.lineJoin = "round"), (e.strokeStyle = "rgba(245,238,222,0.75)"), (e.fillStyle = "rgba(46,30,16,0.92)");
+        e.strokeText(pk.name, p.x, ty + 2), e.fillText(pk.name, p.x, ty + 2);
+      }
+    }
+    e.restore();
+  }
   function kt(e, n, o, r, i) {
+    featLabels(e, n, o, r, i);
     if (o.zoom < 0.3) return;
     let s = Math.max(o.zoom, 0.7),
       a = n.map.width,
