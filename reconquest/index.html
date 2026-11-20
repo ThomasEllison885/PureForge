@@ -1626,15 +1626,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let r = o.w || 1,
       i = o.h || 1,
       s = o.recruit ? 1 : 0;
+    // A fort supports the soldiers it trained wherever they march, plus
+    // any others standing in it.
+    let key = `${n.id}:${o.x},${o.y}`;
     for (let a of e.units)
       a.owner === n.owner &&
         (a.kind === "infantry" ||
           a.kind === "cavalry" ||
           a.kind === "artillery") &&
-        a.x >= o.x &&
-        a.x < o.x + r &&
-        a.y >= o.y &&
-        a.y < o.y + i &&
+        (a.fortAt ? a.fortAt === key : a.x >= o.x && a.x < o.x + r && a.y >= o.y && a.y < o.y + i) &&
         (s += 1);
     return s;
   }
@@ -1714,20 +1714,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return (
       (d.level = r.level),
       (d.home = n.id),
+      a && (d.fortAt = `${n.id}:${o.x},${o.y}`),
       (d.mp = oi(d, s) + (r.kind === "ship" ? (r.level - 1) * 2 : 0)),
       r.kind === "ship" && (d.cargo = $.shipCapacity + (r.level - 1) * 4),
       a && ((d.strength = unitStrength(r.kind, r.level)), (d.maxStr = d.strength)),
       a &&
-        (d.leaderId =
-          (
-            e.units.find(
-              (u) =>
-                u.owner === s.id &&
-                u.kind === "leader" &&
-                u.x === t.x &&
-                u.y === t.y,
-            ) || {}
-          ).id || null),
+        (() => {
+          // A leader in the colony takes new soldiers straight into his column.
+          let L = e.units.find((u) => u.owner === s.id && u.kind === "leader" && ((u.x === t.x && u.y === t.y) || inColony(n, u)));
+          L && ((d.x = L.x), (d.y = L.y)), (d.leaderId = L ? L.id : null);
+        })(),
       `${l} of level ${r.level} is ready at ${n.name}.`
     );
   }
@@ -2242,6 +2238,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           if (!l(h, m)) continue;
           let y = m % n,
             S = Math.floor(m / n);
+          // A find that helps a building needs open, buildable ground close
+          // by: a vein deep in a mountain range could never be worked.
+          if (h.building && h.radius) {
+            let ok = 0,
+              R = Math.max(2, h.radius - 1);
+            for (let yy = S - R; yy <= S + R; yy++)
+              for (let xx = y - R; xx <= y + R; xx++)
+                xx >= 0 && yy >= 0 && xx < n && yy < o && Ho(e[C(xx, yy, n)].terrain) && ok++;
+            if (ok < 8) continue;
+          }
           if (t(y, S))
             return (
               a.push({
@@ -3730,9 +3736,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // adds a gun. Soldiers in the colony join in, and a leader there takes
   // command of the whole defence.
   var MILITIA_BY_LEVEL = [0, 2, 3, 4, 6];
+  // A unit is in a colony when it stands on any of its buildings, the
+  // center or a fort alike.
+  function colonyOf(e, x, y) {
+    let b = ln(e, x, y);
+    return b ? b.colony : null;
+  }
+  function inColony(col, u) {
+    return !!col && !u.aboard && col.buildings.some((b) => u.x >= b.x && u.y >= b.y && u.x < b.x + (b.w || 1) && u.y < b.y + (b.h || 1));
+  }
   function colonyDefence(e, col, exceptNation) {
     let units = [],
-      here = e.units.filter((u) => u.owner === col.owner && !u.aboard && u.x === col.x && u.y === col.y),
+      here = e.units.filter((u) => u.owner === col.owner && inColony(col, u)),
       leader = here.find((u) => u.kind === "leader") || null;
     let n = MILITIA_BY_LEVEL[Math.min(4, col.level || 1)] || 2;
     for (let k = 0; k < n; k++) units.push({ id: `m${k}`, kind: "militia", str: 2, militia: !0, name: "Militia" });
@@ -6510,17 +6525,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let o = j(e, n);
       if (!o || !arm(o.kind))
         return B("Select a soldier, dragoon, or artillery.");
-      let r = e.units.find(
-        (i) =>
-          i.kind === "leader" &&
-          i.owner === o.owner &&
-          !i.aboard &&
-          i.x === o.x &&
-          i.y === o.y,
-      );
-      if (!r) return B("Stand him on the leader's square.");
-      return (o.leaderId = r.id), { ok: !0, discoveries: [] };
+      let r = joinTarget(e, o);
+      if (!r) return B("No leader of yours is near enough.");
+      let col = colonyOf(e, o.x, o.y);
+      // Inside a colony he simply walks over; outside he marches.
+      if ((o.x === r.x && o.y === r.y) || (col && inColony(col, r))) return (o.x = r.x), (o.y = r.y), (o.leaderId = r.id), { ok: !0, discoveries: [], note: `${o.name} join${/s$/.test(o.name) ? "" : "s"} ${r.name}.` };
+      let res = hr(e, o.id, r.x, r.y);
+      if (!res.ok) return res;
+      o.x === r.x && o.y === r.y && (o.leaderId = r.id);
+      return { ...res, note: o.leaderId === r.id ? `${o.name} join${/s$/.test(o.name) ? "" : "s"} ${r.name}.` : `${o.name} ${/s$/.test(o.name) ? "are" : "is"} marching to join ${r.name}.` };
     });
+  }
+  // The leader a soldier would join: one on his square, one in the same
+  // colony, or the nearest within a day or two's march.
+  function joinTarget(e, o) {
+    let col = colonyOf(e, o.x, o.y),
+      ls = e.units.filter((i) => i.kind === "leader" && i.owner === o.owner && !i.aboard);
+    return (
+      ls.find((i) => i.x === o.x && i.y === o.y) ||
+      (col && ls.find((i) => inColony(col, i))) ||
+      ls
+        .filter((i) => Math.max(Math.abs(i.x - o.x), Math.abs(i.y - o.y)) <= 12)
+        .sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0] ||
+      null
+    );
   }
   // Soldiers not already with a leader march to him and fall in. Those he
   // can reach this turn arrive now; the rest set off and keep coming.
@@ -6544,6 +6572,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let q of cands) {
         if (have + now + coming >= cmd) break;
         q.leaderId = null;
+        let lc = colonyOf(e, L.x, L.y);
+        lc && inColony(lc, q) && ((q.x = L.x), (q.y = L.y));
         if (q.x === L.x && q.y === L.y) {
           (q.leaderId = L.id), now++;
           continue;
@@ -12090,7 +12120,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         </table>
         <p class="muted">${pt ? `<b>${f.pts} point${f.pts === 1 ? "" : "s"} to spend.</b> ` : ""}Experience comes from the damage his men deal and half what they take, more for a victory: the first point at 5, then 8, 11, 14 and so on${f.xp ? ` (now ${Math.floor(f.xp)} of ${5 + 3 * (f.earned || 0)})` : ""}. Actions cost 3 points, movement 2, charisma and organization 1. In a colony with soldiers he organizes the defence, and the militia fight under him on top of his organization.</p>`; })() : ""}
       ${f && !f.aboard && arm(f.kind) && f.leaderId ? `<div class="row"><button type="button" id="detach">Leave the leader</button></div><p class="muted">He stays on this square. Drag him after that. Dragging him before that moves the men who are still with the leader.</p>` : ""}
-      ${f && !f.aboard && arm(f.kind) && !f.leaderId && t.units.some((I) => I.kind === "leader" && I.owner === f.owner && !I.aboard && I.x === f.x && I.y === f.y) ? `<div class="row"><button type="button" id="join">Join the leader</button></div>` : ""}
+      ${(() => {
+        if (!f || f.aboard || !arm(f.kind) || f.owner !== g.id) return "";
+        let cur = f.leaderId && t.units.find((I) => I.id === f.leaderId && !I.aboard && I.x === f.x && I.y === f.y);
+        if (cur) return "";
+        let jt = joinTarget(t, f);
+        return jt ? `<div class="row"><button type="button" id="join">Join ${G(jt.name)}</button></div>` : "";
+      })()}
       ${f && !f.aboard && f.kind === "leader" && f.owner === g.id ? `<div class="row"><button type="button" id="gather">Gather the men</button></div><p class="muted">Free soldiers, dragoons and artillery nearby march to ${G(f.name)} and fall in, up to ${leaderStats(f).cmd}. On their own they are slow; with him they march at his pace.</p>` : ""}
       ${(() => {
         if (!f || f.aboard || f.kind === "ship" || f.owner !== g.id) return "";
@@ -12183,10 +12219,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           x(detachMan(t, f.id)), R();
         });
       let joiner = s.querySelector("#join");
-      joiner &&
-        (joiner.onclick = () => {
-          x(joinMan(t, f.id)), R();
-        });
+      joiner && (joiner.onclick = () => ne(f.id, () => joinMan(t, f.id)));
       s.querySelectorAll("[data-train]").forEach((E) => {
         E.onclick = () => {
           x(trainLeader(t, f.id, E.dataset.train)), R();
@@ -13286,10 +13319,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && !q.ally && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && !q.ally && q.name !== "Fort guns").length} soldiers` : ""}.${gd.units.some((q) => q.ally) ? ` ${gd.units.filter((q) => q.ally).length} warriors from friendly villages nearby come to help.` : ""} ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 1 attack a turn. Bring a leader into the colony to command it."}</p>
       ${(() => {
         let me_ = V(t),
-          inTown = t.units.filter((q) => q.owner === me_.id && !q.aboard && q.x === f.x && q.y === f.y && (q.kind === "leader" || arm(q.kind))),
+          inTown = t.units.filter((q) => q.owner === me_.id && inColony(f, q) && (q.kind === "leader" || arm(q.kind))),
           lead = inTown.find((q) => q.kind === "leader"),
-          outside = t.units.filter((q) => q.owner === me_.id && !q.aboard && q.kind === "leader" && !(q.x === f.x && q.y === f.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= 30),
-          loose = t.units.filter((q) => q.owner === me_.id && !q.aboard && arm(q.kind) && !(q.x === f.x && q.y === f.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (reachOf(f) || 3) + 2);
+          outside = t.units.filter((q) => q.owner === me_.id && !q.aboard && q.kind === "leader" && !inColony(f, q) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= 30),
+          loose = t.units.filter((q) => q.owner === me_.id && !q.aboard && arm(q.kind) && !(lead && q.leaderId === lead.id && q.x === lead.x && q.y === lead.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (reachOf(f) || 3) + 2);
         return `${inTown.length ? `<p class="muted">In the town: ${inTown.map((q) => G(q.name)).join(", ")}.</p>` : ""}
         <div class="row">${lead && loose.length ? `<button type="button" id="town-gather" data-l="${lead.id}">${G(lead.name)}: gather the men (${loose.length} nearby)</button>` : ""}
         ${outside.map((q) => `<button type="button" class="town-call" data-u="${q.id}">Call ${G(q.name)} in (${Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y))} squares)</button>`).join("")}</div>`;
