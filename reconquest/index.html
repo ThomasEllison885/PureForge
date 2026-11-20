@@ -288,6 +288,7 @@ ul.natives li { margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
 .lead-stats td.num { text-align: right; padding: 3px 6px 0; font-variant-numeric: tabular-nums; }
 .lead-stats tr.hint td { color: #7a6a52; font-size: 11.5px; padding: 0 4px 4px; border-bottom: 1px solid rgba(120, 100, 70, 0.18); }
 .lead-stats button.train { padding: 1px 8px; font-size: 12px; }
+button.find-link.inline.rename { font-size: 12px; font-weight: 400; margin-left: 6px; }
 button.find-link.inline { display: inline; padding: 0; text-decoration: underline; font: inherit; color: #6a4a1e; }
 .place-tip { position: fixed; z-index: 50; pointer-events: none; background: rgba(24, 18, 12, 0.92); color: #f4ead2; border: 1px solid #c8a656; border-radius: 4px; padding: 4px 8px; font: 13px "Segoe UI", sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .place-tip .ok { color: #cfe8a8; }
@@ -12492,7 +12493,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             : [];
       s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
-      ${!f && pin && pinned() ? pinCard() : f ? `<h2>${re(f)}</h2>` : ""}
+      ${!f && pin && pinned() ? pinCard() : f ? `<h2>${re(f)}${f.kind === "leader" && f.owner === g.id ? ' <button type="button" class="find-link inline rename" id="rename-unit">Rename</button>' : ""}</h2>` : ""}
       ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
       ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); let own = f.owner === g.id, pt = own && f.pts > 0, row = (k, label, val, hint) => `<tr><th>${label}</th><td class="num">${val}</td><td>${pt && f.pts >= LEAD_COST[k] && (k === "move" ? L.move : L[k]) < LEAD_CAP[k] ? `<button type="button" class="train" data-train="${k}" title="Costs ${LEAD_COST[k]} point${LEAD_COST[k] === 1 ? "" : "s"}">+${LEAD_STEP[k]} · ${LEAD_COST[k]} pt</button>` : ""}</td></tr><tr class="hint"><td colspan="3">${hint}</td></tr>`;
         return `<table class="lead-stats">
@@ -12559,6 +12560,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (F.onclick = () => {
           let I = Sr(t, l);
           x(I), I.ok && I.colony ? Re(I.colony.id) : R();
+          if (I.ok && I.colony) {
+            let col = I.colony,
+              was = col.name;
+            namePrompt("A new colony", "Name it as you like, or keep the suggestion.", was, (nm) => {
+              nm !== was && ((col.name = nm), t.log.forEach((q, k) => q === `${was} is founded.` && (t.log[k] = `${nm} is founded.`)));
+            });
+          }
         }),
         s.querySelectorAll("[data-colony]").forEach((I) => {
           I.onclick = () => Re(Number(I.dataset.colony));
@@ -12616,6 +12624,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       });
       let pcl = s.querySelector("#pin-close");
       pcl && (pcl.onclick = () => ((pin = null), R()));
+      let rnu = s.querySelector("#rename-unit");
+      rnu && (rnu.onclick = () => namePrompt(`Rename ${f.name}`, "", f.name, (nm) => (f.name = nm)));
       let gat = s.querySelector("#gather");
       gat && (gat.onclick = () => ne(f.id, () => gatherMen(t, f.id)));
       let ent = s.querySelector("#enter-town");
@@ -12727,6 +12737,26 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             : `your ${label.toLowerCase()}`,
         yr = f.year || t.year;
       return who ? `Found by ${who}, in ${yr}.` : `Found in ${yr}.`;
+    }
+    // Name something of yours: a new colony, or rename a colony or leader.
+    function namePrompt(title, note, cur, done) {
+      (p = !0), (a.hidden = !1),
+        (a.innerHTML = `
+      <form class="card">
+        <h2>${G(title)}</h2>
+        ${note ? `<p>${G(note)}</p>` : ""}
+        <input name="title" maxlength="32" placeholder="Name" required autofocus value="${G(cur)}">
+        <div class="row"><button class="primary" type="submit">Use this name</button><button type="button" id="name-cancel">Keep "${G(cur)}"</button></div>
+      </form>`);
+      let k = a.querySelector("form"),
+        close = (v) => ((p = !1), (a.hidden = !0), done(v), R());
+      k.title.select();
+      k.onsubmit = (v) => {
+        v.preventDefault();
+        let nm = k.title.value.replace(/\s+/g, " ").trim().slice(0, 32);
+        close(nm || cur);
+      };
+      a.querySelector("#name-cancel").onclick = () => close(cur);
     }
     function Te(f) {
       let g =
@@ -13750,7 +13780,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       <p class="muted">${T ? "Move over the pale squares to place it." : "Click a building to see it, or pick something to build."}</p>
-      <h2>${G(f.name)} \xB7 level ${f.level}</h2>
+      <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button></h2>
       <p class="people">${f.population} people \xB7 room for ${g.housing} \xB7 ${g.jobs} jobs (${Math.round(g.staffing * 100)}% staffed)</p>
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
       <div class="auto ${Ae ? "on" : ""}">
@@ -13847,6 +13877,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s.querySelectorAll("[data-sel]").forEach((E) => {
         E.onclick = () => ((l = +E.dataset.sel), (y = null), (T = null), (S = null), (h = ""), R());
       });
+      let rnc = s.querySelector("#rename-col");
+      rnc && (rnc.onclick = () => namePrompt(`Rename ${f.name}`, "", f.name, (nm) => (f.name = nm)));
       let tg_ = s.querySelector("#town-gather");
       tg_ &&
         (tg_.onclick = () => {
