@@ -1736,7 +1736,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a &&
         (() => {
           // A leader in the colony takes new soldiers straight into his column.
-          let L = e.units.find((u) => u.owner === s.id && u.kind === "leader" && ((u.x === t.x && u.y === t.y) || inColony(n, u)));
+          let L = e.units.find(
+            (u) => u.owner === s.id && u.kind === "leader" && ((u.x === t.x && u.y === t.y) || inColony(n, u)) && e.units.filter((q) => q.leaderId === u.id && q.x === u.x && q.y === u.y).length < leaderStats(u).cmd,
+          );
           L && ((d.x = L.x), (d.y = L.y)), (d.leaderId = L ? L.id : null);
         })(),
       `${l} of level ${r.level} is ready at ${n.name}.`
@@ -2446,16 +2448,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function Fn(e, n) {
     if (!n || n.aboard) return n ? [n.id] : [];
-    if (n.kind === "leader")
-      return e.units
-        .filter(
-          (o) =>
-            !o.aboard &&
-            o.x === n.x &&
-            o.y === n.y &&
-            (o.id === n.id || o.leaderId === n.id),
-        )
-        .map((o) => o.id);
+    if (n.kind === "leader") {
+      // He takes only as many men as his organization allows; the rest
+      // stay where they are and leave his command.
+      let cap = (leaderStats(n) || {}).cmd || 99,
+        men = e.units.filter((o) => !o.aboard && o.x === n.x && o.y === n.y && o.leaderId === n.id).sort((a, b) => a.id - b.id);
+      for (let o of men.slice(cap)) o.leaderId = null;
+      return [n.id, ...men.slice(0, cap).map((o) => o.id)];
+    }
     return [n.id];
   }
   function Go(e, n, o, r) {
@@ -6553,6 +6553,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return B("Select a soldier, dragoon, or artillery.");
       let r = joinTarget(e, o);
       if (!r) return B("No leader of yours is near enough.");
+      let cap = leaderStats(r).cmd,
+        has = e.units.filter((q) => q.leaderId === r.id && !q.aboard && q.x === r.x && q.y === r.y).length;
+      if (has >= cap) return B(`${r.name} already commands all the men he can (${cap}). Raise his organization, or give the men another leader.`);
       let col = colonyOf(e, o.x, o.y);
       // Inside a colony he simply walks over; outside he marches.
       if ((o.x === r.x && o.y === r.y) || (col && inColony(col, r))) return (o.x = r.x), (o.y = r.y), (o.leaderId = r.id), { ok: !0, discoveries: [], note: `${o.name} join${/s$/.test(o.name) ? "" : "s"} ${r.name}.` };
@@ -6942,6 +6945,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     zoomSeen = null,
     zoomSeenAt = 0,
     baseZoom = null,
+    prevZoom = null,
     settleTimer = 0;
   function tileId(zoom, ti, tj) {
     return `${zoom}|${ti},${tj}`;
@@ -6985,24 +6989,42 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       cj = (j0 + j1) / 2,
       todo = [];
     staleAround(o, i.explored, a);
-    r.zoom !== zoomSeen && ((zoomSeen = r.zoom), (zoomSeenAt = now));
-    let settling = now - zoomSeenAt < 160;
-    // While zooming, or until the new tiles are ready, stretch the last
-    // settled zoom's tiles underneath.
-    let under = baseZoom != null && baseZoom !== r.zoom,
-      drawUnder = () => {
-        let k = r.zoom / baseZoom,
+    r.zoom !== zoomSeen && (zoomSeen != null && zoomSeen !== baseZoom && (prevZoom = zoomSeen), (zoomSeen = r.zoom), (zoomSeenAt = now));
+    let settling = now - zoomSeenAt < 160,
+      // Stretch another zoom's tiles to the current scale.
+      layer = (z0) => {
+        if (z0 == null || z0 === r.zoom) return;
+        let k = r.zoom / z0,
           S = TS * k;
         for (let [id, t] of mapTiles) {
-          if (t.zoom !== baseZoom || t.dpr !== a) continue;
+          if (t.zoom !== z0 || t.dpr !== a) continue;
           let c = id.slice(id.indexOf("|") + 1).split(","),
             x = +c[0] * S + r.ox,
             y = +c[1] * S + r.oy;
           x > n.w || y > n.h || x + S < 0 || y + S < 0 || e.drawImage(t.canvas, x, y, S, S);
         }
       };
-    if (settling && under) {
-      drawUnder();
+    // Every frame draws the same layers in the same order, so nothing
+    // flickers: the last complete zoom, then any half-finished one, then
+    // whatever sharp tiles are ready at this zoom.
+    let current = () => {
+      let missing = !1;
+      for (let tj = j0; tj <= j1; tj++)
+        for (let ti = i0; ti <= i1; ti++) {
+          let tile = mapTiles.get(tileId(r.zoom, ti, tj));
+          if (!(tile && tile.dpr === a && tile.canvas && tile.zoom === r.zoom)) {
+            missing = !0;
+            continue;
+          }
+          tile.used = ++tileTick;
+          let x = Math.round((ti * TS + r.ox) * a) / a,
+            y = Math.round((tj * TS + r.oy) * a) / a;
+          e.drawImage(tile.canvas, x, y, TS, TS);
+        }
+      return missing;
+    };
+    if (settling && baseZoom != null && baseZoom !== r.zoom) {
+      layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
       clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 170));
       return;
     }
@@ -7027,25 +7049,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       drew < todo.length && mapRepaint && mapRepaint();
     }
-    let missing = !1,
-      show = [];
-    for (let tj = j0; tj <= j1; tj++)
+    let complete = !0;
+    for (let tj = j0; tj <= j1 && complete; tj++)
       for (let ti = i0; ti <= i1; ti++) {
         let tile = mapTiles.get(tileId(r.zoom, ti, tj));
-        tile && tile.dpr === a && tile.canvas && tile.zoom === r.zoom ? show.push([ti, tj, tile]) : (missing = !0);
+        if (!(tile && tile.dpr === a && tile.zoom === r.zoom)) {
+          complete = !1;
+          break;
+        }
       }
-    missing && (under ? drawUnder() : blitTerrace(e, o.map, r, null));
-    missing || (baseZoom = r.zoom);
-    for (let [ti, tj, tile] of show) {
-      tile.used = ++tileTick;
-      let x = Math.round((ti * TS + r.ox) * a) / a,
-        y = Math.round((tj * TS + r.oy) * a) / a;
-      e.drawImage(tile.canvas, x, y, TS, TS);
-    }
+    if (!complete) baseZoom != null && baseZoom !== r.zoom ? (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom)) : blitTerrace(e, o.map, r, null);
+    current();
+    complete && ((baseZoom = r.zoom), (prevZoom = null));
     // Keep memory in check: forget the tiles least recently on screen,
     // never the ones of the zoom being stretched.
     if (mapTiles.size > TILE_MAX) {
-      let old = [...mapTiles.entries()].filter(([, t]) => t.zoom !== baseZoom || t.zoom === r.zoom).sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
+      let old = [...mapTiles.entries()].filter(([, t]) => t.zoom === r.zoom || (t.zoom !== baseZoom && t.zoom !== prevZoom)).sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
       for (let k = 0; k < Math.min(old.length, mapTiles.size - TILE_MAX); k++) mapTiles.delete(old[k][0]);
     }
   }
@@ -12378,6 +12397,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let f = O.done;
       (O = null), R(), f && f();
     }
+    // Move, and once the walk has played, do something else.
+    function neThen(f, g, then) {
+      let k = V(t).explored,
+        v = g();
+      if (!v.ok) return x(v), R();
+      let b = v.traces || [];
+      !b.length && v.path && (b = [{ unitId: f, ids: v.ids || [f], path: v.path }]);
+      We(b, k, () => (R(), then())), R();
+    }
     function ne(f, g) {
       let k = V(t).explored,
         v = g();
@@ -12612,6 +12640,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let jt = joinTarget(t, f);
         return jt ? `<div class="row"><button type="button" id="join">Join ${G(jt.name)}</button></div>` : "";
       })()}
+      ${f && !f.aboard && f.kind === "leader" && f.owner === g.id && garrisoned(t, f) ? `<div class="row"><button type="button" id="march-out" class="primary">March out with ${Math.min(leaderStats(f).cmd, t.units.filter((q) => q.leaderId === f.id && q.x === f.x && q.y === f.y).length)} men</button></div><p class="muted">He leads his column just outside the town; then drag him where you like.</p>` : ""}
       ${f && !f.aboard && f.kind === "leader" && f.owner === g.id ? `<div class="row"><button type="button" id="gather">Gather the men</button></div><p class="muted">Free soldiers, dragoons and artillery nearby march to ${G(f.name)} and fall in, up to ${leaderStats(f).cmd}. On their own they are slow; with him they march at his pace.</p>` : ""}
       ${(() => {
         if (!f || f.aboard || f.kind === "ship" || f.owner !== g.id) return "";
@@ -12726,6 +12755,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       pcl && (pcl.onclick = () => ((pin = null), R()));
       let rnu = s.querySelector("#rename-unit");
       rnu && (rnu.onclick = () => namePrompt(`Rename ${f.name}`, "", f.name, (nm) => (f.name = nm)));
+      let mo_ = s.querySelector("#march-out");
+      mo_ &&
+        (mo_.onclick = () => {
+          let reach = kn(t, f.id),
+            best = null;
+          for (let [key, cost] of reach) {
+            let [sx, sy] = key.split(",").map(Number);
+            colonyOf(t, sx, sy) || (best && best.cost <= cost) || (best = { x: sx, y: sy, cost });
+          }
+          if (!best) return (h = "There is no room to march out this turn."), R();
+          ne(f.id, () => mo(t, f.id, best.x, best.y));
+        });
       let gat = s.querySelector("#gather");
       gat && (gat.onclick = () => ne(f.id, () => gatherMen(t, f.id)));
       let ent = s.querySelector("#enter-town");
@@ -13000,8 +13041,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             rp = land && !vg && !am && !rc && t.units.some((q) => q.owner !== w.owner && !q.aboard && q.kind !== "ship" && q.x === b.x && q.y === b.y),
             near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= 1;
           if (vg || am || rc || rp) {
-            if (!near) (h = `Move next to ${vg ? vg.name : rc ? rc.name : "them"} first, then drag onto ${vg || rc ? "it" : "them"} to attack.`), R();
-            else vg ? attackVillage(w, vg) : am ? attackArmy(w, am) : rc ? attackColony(w, rc) : attackParty(w, b.x, b.y);
+            let strike = () => (vg ? attackVillage(w, vg) : am ? attackArmy(w, am) : rc ? attackColony(w, rc) : attackParty(w, b.x, b.y));
+            if (near) return strike();
+            // Within this turn's march: walk up beside them, then attack.
+            let reach = kn(t, w.id),
+              best = null;
+            for (let [key, cost] of reach) {
+              let [sx, sy] = key.split(",").map(Number);
+              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) === 1 && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
+            }
+            if (!best) {
+              (h = `${vg ? vg.name : rc ? rc.name : "They"} ${vg || rc ? "is" : "are"} beyond this turn's march. Move closer first.`), R();
+              return;
+            }
+            neThen(w.id, () => mo(t, w.id, best.x, best.y), () => {
+              let u2 = j(t, w.id);
+              u2 && Math.max(Math.abs(u2.x - b.x), Math.abs(u2.y - b.y)) <= 1 ? strike() : ((h = "They could not get close enough this turn."), R());
+            });
             return;
           }
           if (w) {
@@ -13739,7 +13795,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let F = myForce(u);
       if (!F.troops.length) return noTroops("other men");
       let def = fieldForce(t, x, y, F.me_);
-      preBattle({ kind: "attack", title: `Attack on the ${def.name.toLowerCase()}`, att: F.att, def }, "att", (B) => afterAttack(F, resolveUnitAttack(t, F.me_, x, y, B, F.lead && F.lead.id)));
+      preBattle({ kind: "attack", title: `Attack on the ${def.name}`, att: F.att, def }, "att", (B) => afterAttack(F, resolveUnitAttack(t, F.me_, x, y, B, F.lead && F.lead.id)));
     }
     // Every square in the colony's land where the building would fit, with
     // the productivity it would get there, and the best of them.
@@ -13839,7 +13895,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           lead = inTown.find((q) => q.kind === "leader"),
           outside = t.units.filter((q) => q.owner === me_.id && !q.aboard && q.kind === "leader" && !inColony(f, q) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= 30),
           loose = t.units.filter((q) => q.owner === me_.id && !q.aboard && arm(q.kind) && !(lead && q.leaderId === lead.id && q.x === lead.x && q.y === lead.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (reachOf(f) || 3) + 2);
-        return `${inTown.length ? `<p class="muted">In the town (click to take command): ${inTown.map((q) => `<button type="button" class="find-link inline" data-sel="${q.id}">${G(q.name)}</button>`).join(", ")}.</p>` : ""}
+        let lds = inTown.filter((q) => q.kind === "leader"),
+          men = inTown.filter((q) => q.kind !== "leader");
+        return `${lds.length ? `<p class="muted">Leaders in the town: ${lds.map((q) => `<button type="button" class="find-link inline" data-sel="${q.id}">${G(q.name)}</button> (${t.units.filter((w) => w.leaderId === q.id && w.x === q.x && w.y === q.y).length} of ${leaderStats(q).cmd} men)`).join(", ")}. Click one to lead him out.</p>` : ""}${men.length ? `<p class="muted">Soldiers in the town: ${men.length}${men.some((q) => !q.leaderId) ? `, ${men.filter((q) => !q.leaderId).length} without a leader` : ""}.</p>` : ""}: ""}
         <div class="row">${lead && loose.length ? `<button type="button" id="town-gather" data-l="${lead.id}">${G(lead.name)}: gather the men (${loose.length} nearby)</button>` : ""}
         ${outside.map((q) => `<button type="button" class="town-call" data-u="${q.id}">Call ${G(q.name)} in (${Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y))} squares)</button>`).join("")}</div>`;
       })()}
