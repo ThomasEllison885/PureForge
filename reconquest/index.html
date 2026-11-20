@@ -871,6 +871,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function natOwner(e, id) {
     return isNatNation(e.players.find((q) => q.id === id));
   }
+  // What each nation does best (after the original's Deluxe edition).
+  // Aim bonuses are in d40 points: 2 = +5% to hit.
+  var NAT_AIM = { england: { gun: 2 }, france: { horse: 2 }, spain: { foot: 2 }, ixtal: { horse: 2 } },
+    NAT_PERKS = {
+      spain: "Explorers move 2 squares farther, infantry shoot 5% straighter, and every leader you commission starts with 2 points to spend.",
+      portugal: "Every unit, ships included, moves a square farther each turn.",
+      england: "Ships sail 2 squares farther, and artillery shoots 5% straighter.",
+      france: "The native nations start friendlier toward you and stay that way, and dragoons shoot 5% straighter.",
+      netherlands: "Colony gold earns 5% interest every year.",
+      ixtal: "Riders shoot 5% straighter, on top of the empire's other differences.",
+    };
   var NAT_CHEAP = { settler: 0.7, infantry: 0.7, cavalry: 0.7 },
     NAT_NAMES = { infantry: "Warriors", cavalry: "Riders", explorer: "Scout" };
   function colMax(c) {
@@ -2397,6 +2408,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // square farther, and its runners two.
         isNatNation(n) && e.kind !== "ship" && (o += e.kind === "explorer" ? 2 : 1)),
       e.kind === "leader" && (o += e.v2 ? e.move || 0 : 1),
+      n && n.nationId === "portugal" && (o += 1),
+      n && n.nationId === "spain" && e.kind === "explorer" && (o += 2),
+      n && n.nationId === "england" && e.kind === "ship" && (o += 2),
       o
     );
   }
@@ -3176,8 +3190,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         water && (store.dest = { x: water[0], y: water[1] });
       }
     }
-    // Settlers on land walk to a spot of their own and found there.
+    // Settlers on land walk to a spot of their own and found there, with a
+    // leader and his men going along; he stays to guard the new colony.
     let walkers = e.units.filter((u) => u.owner === n && u.kind === "settler" && !u.aboard);
+    for (let L of e.units.filter((u) => u.owner === n && u.kind === "leader" && !u.aboard)) {
+      let s = L.escort && e.units.find((u) => u.id === L.escort && u.kind === "settler");
+      if (!s) {
+        L.escort = null;
+        let free = walkers.find((q) => !e.units.some((o) => o !== L && o.escort === q.id));
+        free && (L.escort = free.id), (s = free);
+      }
+      s && (L.dest = { x: s.site ? s.site.x : s.x, y: s.site ? s.site.y : s.y });
+    }
     for (let q of walkers) {
       if (!rivalSiteOk(e, q.site)) {
         let others = walkers.filter((o) => o !== q).map((o) => o.site);
@@ -3278,6 +3302,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       max: src.max || src.str,
       militia: !!src.militia,
       ally: !!src.ally,
+      taken: 0,
       pos: null,
       moved: !1,
       acted: !1,
@@ -3419,10 +3444,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       squares = new Set(group.map((u) => u.pos.join())),
       bonus = 0,
       parts = [];
-    kinds.size === 2 && ((bonus += 4), parts.push("combined arms +4")),
-      kinds.size >= 3 && ((bonus += 6), parts.push("combined arms +6"));
-    let fl = [0, 0, 4, 6, 8][Math.min(4, squares.size)];
-    fl && ((bonus += fl), parts.push(`flanking from ${squares.size} squares +${fl}`));
+    // As in the original: combined arms +5% for two kinds, +10% for three;
+    // flanking +10% from two squares, +20% from three, +30% from four.
+    kinds.size === 2 && ((bonus += 2), parts.push("combined arms +5%")),
+      kinds.size >= 3 && ((bonus += 4), parts.push("combined arms +10%"));
+    let fl = [0, 0, 4, 8, 12][Math.min(4, squares.size)];
+    fl && ((bonus += fl), parts.push(`flanking from ${squares.size} squares +${fl * 2.5}%`));
     return { bonus, parts };
   }
   // Which unit in the target square takes a unit's fire: like fires on like
@@ -3462,14 +3489,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       bHorse(u) && u.moved && (b += 6);
       if (bCls(u) === "gun") {
         let dist = Math.abs(u.pos[1] - tr);
-        (b += [0, 4, 2, 0][Math.min(3, dist)] || 0), bCls(t) === "gun" && (b -= 2);
+        // Close range +15%, two squares +5%, three nothing.
+        b += [0, 6, 2, 0][Math.min(3, dist)] || 0;
       }
-      let th = Bo({ bonus: b }),
-        hits = Ro(u.str, th, B.rng).hits;
+      // Nations train their men differently.
+      b += (NAT_AIM[S.nat] || {})[bCls(u)] || 0;
+      let th = Bo({ bonus: b });
+      // Guns firing on guns hit half as often; men and horses rushing guns
+      // that stand alone get twice the attempts.
+      bCls(u) === "gun" && bCls(t) === "gun" && (th = Math.max(1, Math.floor(th / 2)));
+      let hits = Ro(bCls(u) !== "gun" && gunsOnly ? u.str * 2 : u.str, th, B.rng).hits;
       // Guns standing on their own are overrun by men coming at them.
-      bCls(u) !== "gun" && gunsOnly && hits > 0 && (hits += 1);
       let dealt = Math.min(hits, t.str);
-      (t.str -= dealt), (total += dealt);
+      (t.str -= dealt), (total += dealt), (t.taken = (t.taken || 0) + dealt);
       t.militia && (B.killed += dealt * 2);
       dealt && hurt.set(t, (hurt.get(t) || 0) + dealt);
       t.str <= 0 && (bRemove(B, t), fell.push(t));
@@ -3483,17 +3515,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (t.str <= 0) continue;
       let mine = B.sides[t.side].leader,
         theirs = S.leader,
-        p = (1 - t.str / t.max) * 0.75 + 0.1 - (mine ? mine.charisma : 0) * 0.05 + (theirs ? theirs.rep || 0 : 0) * 0.03;
+        p = (1 - t.str / t.max) * 0.75 + 0.1 + d * 0.05 * ((theirs ? theirs.rep || 0 : 0) - (mine ? mine.charisma : 0));
       if (B.rng() >= Math.max(0, Math.min(0.85, p))) continue;
       let back = t.pos[1] - bFwd(t.side);
       if (back < 0 || back >= BROWS) bRemove(B, t), (msg += ` ${t.name} fall back into reserve.`);
       else if (bRoom(B, t, t.pos[0], back)) bPlace(B, t, t.pos[0], back), (msg += ` ${t.name} fall back.`);
       else
         (t.str -= 1),
+          (t.taken = (t.taken || 0) + 1),
           t.militia && (B.killed += 2),
           (msg += ` ${t.name} cannot fall back and take another hit.`),
           t.str <= 0 && bRemove(B, t);
     }
+    S.dealt = (S.dealt || 0) + total;
     B.log.push(msg);
     bCheck(B);
     return msg;
@@ -3648,8 +3682,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // command) and movement (squares he gains each turn on the map).
   // Reputation comes only from his record. Every second victory earns a
   // point to spend on one of the four.
+  // Experience as in the original: the damage his side deals plus half the
+  // damage it takes, half as much again for a victory. The first point
+  // costs 5 experience, then 8, 11, 14... Actions cost the most points.
   var LEAD_CAP = { attacks: 12, charisma: 8, cmd: 24, move: 6 },
-    LEAD_STEP = { attacks: 1, charisma: 1, cmd: 2, move: 1 };
+    LEAD_STEP = { attacks: 1, charisma: 1, cmd: 1, move: 1 },
+    LEAD_COST = { attacks: 3, charisma: 1, cmd: 1, move: 2 };
   function freshLeader(u, lvl, move) {
     let k = Math.max(1, lvl || 1);
     return Object.assign(u, { lvl: k, attacks: 4 + k, charisma: k, cmd: 6 + 2 * k, move: move == null ? k : move, rep: 0, xp: 0, pts: 0, v2: 1 });
@@ -3661,24 +3699,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     u.pts == null && (u.pts = 0);
     return { name: u.name, attacks: u.attacks, charisma: u.charisma, cmd: u.cmd, move: u.move || 0, rep: u.rep || 0 };
   }
-  function leaderWon(e, u, won) {
+  function leaderWon(e, u, won, B, side) {
     if (!u) return "";
     leaderStats(u);
-    if (!won) return (u.rep = Math.max(-3, u.rep - 1)), "";
-    (u.rep = Math.min(6, u.rep + 1)), (u.xp += 1);
-    if (u.xp >= 2) return (u.xp -= 2), (u.lvl += 1), (u.pts += 1), `${u.name} has earned a point to spend on actions, charisma, organization or movement.`;
-    return "";
+    u.rep = won ? Math.min(10, u.rep + 1) : Math.max(-5, u.rep - 1);
+    if (B && side) {
+      let foe = side === "att" ? "def" : "att";
+      u.xp += ((B.sides[side].dealt || 0) + (B.sides[foe].dealt || 0) / 2) * (won ? 1.5 : 1);
+    }
+    let got = 0;
+    for (let need = 5 + 3 * (u.earned || 0); u.xp >= need; need = 5 + 3 * (u.earned || 0)) (u.xp -= need), (u.earned = (u.earned || 0) + 1), (u.pts += 1), got++;
+    return got ? `${u.name} earns ${got} point${got === 1 ? "" : "s"} to spend on actions, charisma, organization or movement.` : "";
   }
   function trainLeader(e, id, what) {
     return be(e, () => {
       let u = j(e, id);
       if (!u || u.kind !== "leader") return B("Select a leader.");
       leaderStats(u);
-      if (!(u.pts > 0)) return B(`${u.name} has no points to spend. Win battles to earn them.`);
       if (!LEAD_STEP[what]) return B("Nothing to train.");
+      if (!(u.pts >= LEAD_COST[what])) return B(`That costs ${LEAD_COST[what]} point${LEAD_COST[what] === 1 ? "" : "s"}; ${u.name} has ${u.pts || 0}. Battles earn more.`);
       let now = what === "move" ? u.move || 0 : u[what];
       if (now >= LEAD_CAP[what]) return B("That is as high as it goes.");
-      what === "move" ? (u.move = now + 1) : (u[what] = now + LEAD_STEP[what]), (u.pts -= 1);
+      what === "move" ? (u.move = now + 1) : (u[what] = now + LEAD_STEP[what]), (u.pts -= LEAD_COST[what]);
       return { ok: !0, discoveries: [] };
     });
   }
@@ -3720,7 +3762,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let real = here.find((u) => u.kind === "leader"),
       armed = here.some((u) => arm(u.kind)),
       cover = real && armed ? { att: 8, def: 5, rout: 0.8 } : real ? { att: 6, def: 3, rout: 0.65 } : armed ? { att: 4, def: 2, rout: 0.5 } : { att: 3, def: 1, rout: 0.5 };
-    return { name: col.name, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
+    return { name: col.name, nat: (e.players.find((q) => q.id === col.owner) || {}).nationId, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
   }
   function nativeAllies(e, col, exceptNation) {
     if (!e.natives) return [];
@@ -3745,12 +3787,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
   }
   // Put a finished battle's losses back onto real units.
+  // Soldiers learn by surviving: every point of damage taken and lived
+  // through counts toward the next level (Europeans at 4, 7, 12 and 17 in
+  // all; the native power a little sooner). A new level adds a point of
+  // strength. Level 5 is only reached this way.
+  var VET_AT = { eu: [0, 4, 7, 12, 17], nat: [0, 3, 6, 10, 15] };
   function applyLosses(e, side, B, sideKey) {
+    let p = e.players.find((q) => q.id === side),
+      steps = isNatNation(p) ? VET_AT.nat : VET_AT.eu;
     for (let bu of B.sides[sideKey].units) {
       let u = typeof bu.id === "number" ? e.units.find((q) => q.id === bu.id) : null;
       if (!u) continue;
       u.maxStr || (u.maxStr = u.strength || bu.max);
-      bu.str <= 0 ? (e.units = e.units.filter((q) => q !== u)) : (u.strength = bu.str);
+      if (bu.str <= 0) {
+        e.units = e.units.filter((q) => q !== u);
+        continue;
+      }
+      u.strength = bu.str;
+      u.vet = (u.vet || 0) + (bu.taken || 0);
+      let lv = u.level || 1;
+      while (lv < 5 && u.vet >= steps[lv]) (lv += 1), (u.maxStr += 1), (u.strength += 1);
+      if (lv > (u.level || 1)) {
+        u.level = lv;
+        p && p.isHuman && pushEvent(e, `${u.name} come${/s$/.test(u.name) ? "" : "s"} through as veterans: now level ${lv}, strength ${u.strength} of ${u.maxStr}.`, u.x, u.y);
+      }
     }
   }
   // ---- Native nations --------------------------------------------------------
@@ -3798,7 +3858,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nations = seeds.map(([x, y], i) => {
         let temper = TEMPERS[Math.floor(rng() * 3)],
           att = {};
-        for (let p of e.players) att[p.id] = Math.round(temper.base + diff + (rng() - 0.5) * 30);
+        for (let p of e.players) att[p.id] = Math.round(temper.base + diff + (rng() - 0.5) * 30 + (p.nationId === "france" ? 15 : 0));
         return { id: i + 1, name: names[i % names.length], temper: temper.id, style: i % 3, att, cx: x, cy: y };
       }),
       villages = [],
@@ -3900,7 +3960,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let crowd = 0;
         for (let c of e.colonies)
           c.owner === p.id && N.villages.some((v) => v.nation === nat.id && Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) <= 8) && (crowd += c.level || 1);
-        crowd ? shiftAttitude(nat, p.id, -0.8 * crowd) : (nat.att[p.id] || 0) < base && shiftAttitude(nat, p.id, 0.5);
+        crowd ? shiftAttitude(nat, p.id, -0.8 * crowd) : (nat.att[p.id] || 0) < base + (p.nationId === "france" ? 15 : 0) && shiftAttitude(nat, p.id, 0.5);
       }
     }
     // Raiding parties on the way move on; those that arrive strike.
@@ -3982,7 +4042,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let dead = Math.min(col.population - 1, Math.round(B.killed * 0.75 + rounds * col.population * 0.01));
     dead > 0 && (col.population -= dead);
     let L = def.leaderId ? e.units.find((u) => u.id === def.leaderId) : null,
-      up = leaderWon(e, L, B.over.winner === "def"),
+      up = leaderWon(e, L, B.over.winner === "def", B, "def"),
       held = B.over.winner === "def" && !took.length;
     let tl = battleTally(B),
       nat = nationOf(e, v),
@@ -4008,7 +4068,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     (nat.att[pid] = -100), applyLosses(e, pid, B, "att");
     let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
-      up = leaderWon(e, L, won),
+      up = leaderWon(e, L, won, B, "att"),
       tl = battleTally(B),
       force = bLabel(B.sides.att.units.map((u) => ({ name: u.name })));
     battleNews(
@@ -4049,7 +4109,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     v.warriors = Math.max(1, v.warriors - B.sides.def.units.filter((u) => u.str <= 0).length);
     let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
-      up = leaderWon(e, L, won),
+      up = leaderWon(e, L, won, B, "att"),
       tl = battleTally(B),
       rounds = B.raidRounds + (won ? 3 : 0),
       g = Math.floor(v.gold * Math.min(0.6, rounds * 0.12)),
@@ -4089,11 +4149,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       before = col.name,
       L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
-      up = leaderWon(e, L, won),
+      up = leaderWon(e, L, won, B, "att"),
       tl = battleTally(B),
       def = B.sides.def,
       DL = def.leaderId ? e.units.find((u) => u.id === def.leaderId) : null;
-    applyLosses(e, pid, B, "att"), applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner), leaderWon(e, DL, !won);
+    applyLosses(e, pid, B, "att"), applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner), leaderWon(e, DL, !won, B, "def");
     let dead = Math.min(col.population - 1, Math.round(B.killed * 0.75));
     dead > 0 && (col.population -= dead);
     let out = "",
@@ -4132,10 +4192,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       _w = owner && startWar(e, ce(e, pid), owner),
       L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
-      up = leaderWon(e, L, won),
+      up = leaderWon(e, L, won, B, "att"),
       tl = battleTally(B),
       DL = B.sides.def.leaderId ? e.units.find((u) => u.id === B.sides.def.leaderId) : null;
-    applyLosses(e, pid, B, "att"), owner && applyLosses(e, owner.id, B, "def"), leaderWon(e, DL, !won);
+    applyLosses(e, pid, B, "att"), owner && applyLosses(e, owner.id, B, "def"), leaderWon(e, DL, !won, B, "def");
     let lost = [];
     if (won)
       for (let u of e.units.filter((q) => q.owner !== pid && !q.aboard && q.x === x && q.y === y)) lost.push(u.name || u.kind), (e.units = e.units.filter((q) => q !== u));
@@ -4152,7 +4212,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       units = here.filter((q) => arm(q.kind)).map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name }));
     // Men with no soldiers to guard them still put up a fight of sorts.
     units.length || here.filter((q) => q.kind !== "ship").forEach((q, k) => units.push({ id: `c${k}`, kind: "militia", str: 2, militia: !0, name: q.name || "Colonists" }));
-    return { name: `${nationAdj(owner)} party`.replace(/^./, (c) => c.toUpperCase()), leader: lead ? leaderStats(lead) : null, leaderId: lead ? lead.id : null, units };
+    return { name: `${nationAdj(owner)} party`.replace(/^./, (c) => c.toUpperCase()), nat: owner && owner.nationId, leader: lead ? leaderStats(lead) : null, leaderId: lead ? lead.id : null, units };
   }
   // ---- Diplomacy, the crown, rival armies, and the end of the game ---------
   // Every pair of European players stands somewhere on an eight-step scale
@@ -4390,29 +4450,38 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (since < 0 || !hum || !atWar(e, hum.id, r.id) || P.armies.some((a) => a.owner === r.id) || P.pool[r.id] < 4) continue;
       let mine = e.colonies.filter((c) => c.owner === hum.id);
       if (!mine.length || !cols.length) continue;
-      let best = null;
-      for (let c of cols)
-        for (let m of mine) {
-          let d = Math.hypot(c.x - m.x, c.y - m.y);
-          (!best || d < best.d) && (best = { from: c, to: m, d });
-        }
-      if (!best || best.d > 90) continue;
-      let path = landPath(e, best.from, best.to);
-      if (!path) continue;
+      // The column it could raise now: European crowns field about 40%
+      // infantry, 40% cavalry and 20% guns; the empire half and half.
       let n = Math.min(biggest, Math.floor(P.pool[r.id])),
         lvl = Math.max(1, Math.round(cols.reduce((a, c) => a + (c.level || 1), 0) / cols.length)),
         rng = bn((e.year * 131 + r.id * 17) >>> 0),
         troops = [];
       for (let k = 0; k < n; k++) {
         let q = rng(),
-          kind = q < 0.6 ? "infantry" : q < 0.85 || isNatNation(r) ? "cavalry" : "artillery";
+          kind = isNatNation(r) ? (q < 0.5 ? "infantry" : "cavalry") : q < 0.4 ? "infantry" : q < 0.8 ? "cavalry" : "artillery";
         troops.push({ kind, str: unitStrength(kind, lvl) });
       }
+      // It marches only on a colony it judges itself clearly stronger
+      // than, and picks the one it likes its chances against best. If none
+      // qualifies it keeps building up.
+      let best = null,
+        probe = { id: 0, owner: r.id, leader: { name: "probe", attacks: 3 + lvl, charisma: lvl, rep: 0 }, troops };
+      for (let c of cols)
+        for (let m of mine) {
+          let d = Math.hypot(c.x - m.x, c.y - m.y);
+          if (d > 90) continue;
+          let odds = bOdds({ kind: d > 25 ? "raid" : "attack", att: armyForce(e, probe), def: colonyDefence(e, m) }, 10).defWin,
+            score = odds + d / 400;
+          odds < 0.4 && (!best || score < best.score) && (best = { from: c, to: m, d, score });
+        }
+      if (!best) continue;
+      let path = landPath(e, best.from, best.to);
+      if (!path) continue;
       P.pool[r.id] -= n;
       let names = (ee[r.nationId] || {}).leaders || ["Captain"],
         L = { name: names[(r.nextLeader || 1) % names.length], lvl: Math.min(4, lvl), attacks: 3 + lvl, charisma: lvl, cmd: 12, rep: 0 };
       r.nextLeader = (r.nextLeader || 1) + 1;
-      P.armies.push({ id: P.nextArmy++, owner: r.id, leader: L, troops, x: best.from.x, y: best.from.y, path, step: 0, target: best.to.id, seen: !1 });
+      P.armies.push({ id: P.nextArmy++, owner: r.id, leader: L, troops, x: best.from.x, y: best.from.y, from: best.from.id, path, step: 0, target: best.to.id, seen: !1 });
     }
     // Columns on the march.
     let still = [];
@@ -4447,6 +4516,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let owner = e.players.find((p) => p.id === A.owner);
     return {
       name: `${nationAdj(owner)} army`.replace(/^./, (c) => c.toUpperCase()),
+      nat: owner && owner.nationId,
       leader: A.leader,
       hidden: !!hidden,
       units: A.troops.map((q, k) => ({ id: `x${A.id}-${k}`, kind: q.kind, str: q.str, max: q.str, name: UNIT_KINDS[q.kind].name })),
@@ -4459,6 +4529,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function armyPlan(e, A, col) {
     let spec = { kind: "attack", att: armyForce(e, A), def: colonyDefence(e, col) };
     if (natOwner(e, A.owner) !== natOwner(e, col.owner)) return "raid";
+    // Colonies far from its own it raids; close ones it tries to take.
+    let home = e.colonies.find((c) => c.id === A.from) || e.colonies.filter((c) => c.owner === A.owner).sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y))[0];
+    if (home && Math.hypot(home.x - col.x, home.y - col.y) > 25) return "raid";
     return bOdds(spec, 16).defWin < 0.45 ? "capture" : "raid";
   }
   // Settle an army's attack on one of your colonies.
@@ -4472,7 +4545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       before = col.name,
       out = "";
     applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner);
-    let up = leaderWon(e, DL, !won),
+    let up = leaderWon(e, DL, !won, B, "def"),
       dead = Math.min(col.population - 1, Math.round(B.killed * 0.75));
     dead > 0 && (col.population -= dead);
     if (mode === "capture") {
@@ -4506,7 +4579,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       _w = startWar(e, ce(e, pid), owner),
       L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
-      up = leaderWon(e, L, won),
+      up = leaderWon(e, L, won, B, "att"),
       tl = battleTally(B);
     applyLosses(e, pid, B, "att");
     let alive = B.sides.def.units.filter((u) => u.str > 0);
@@ -4628,7 +4701,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nm = names[(p.nextLeader || 1) % names.length];
     p.nextLeader = (p.nextLeader || 1) + 1;
     let u = Le(e, p, "leader", col.x, col.y, nm);
-    freshLeader(u, lvl), (u.mp = 0);
+    freshLeader(u, lvl), (u.mp = 0), p.nationId === "spain" && (u.pts += 2);
     return { ok: !0, note: `${nm} takes command at ${col.name}: ${u.attacks} actions a battle turn, charisma ${u.charisma}, organization ${u.cmd} men, movement +${u.move}.` };
   }
   // ---- The end of the game ----
@@ -6580,6 +6653,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
       nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
+    // Dutch colony gold earns interest.
+    for (let c of e.colonies) (e.players.find((q) => q.id === c.owner) || {}).nationId === "netherlands" && (c.stock.gold += Math.floor(c.stock.gold * 0.05));
     // The wounded mend in their own colonies, a point a year.
     for (let u of e.units)
       u.maxStr &&
@@ -11441,6 +11516,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${h ? `<p id="status">${h}</p>` : ""}
         <h2>Nation</h2>
         <div class="row">${on.map((b) => `<button type="button" class="choice ${f.nationId === b.id ? "on" : ""}" data-nation="${b.id}"><span class="flag" style="background:${b.color}"></span>${b.name}</button>`).join("")}</div>
+        <p class="sub">${G(NAT_PERKS[f.nationId] || "")}</p>
         ${ee[f.nationId].native ? '<p class="sub">The Ixtal Empire starts on its own ground with settlers in hand: no ship, no crown, no tax, and no trade with Europe. Its towns stop at level 2 but spread wider and house more. Settlers, warriors and riders cost less, every unit moves a square farther and scouts two, gold mines always yield, and it builds no artillery. It can raid European colonies but not capture them, and they cannot capture its towns.</p>' : ""}
         <h2>Difficulty</h2>
         <div class="row">${qo.map((b) => `<button type="button" class="choice ${f.difficulty === b.id ? "on" : ""}" data-diff="${b.id}">${b.label}</button>`).join("")}</div>
@@ -12004,7 +12080,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <p id="hover">${v.join("<br>") || "Drag the map. Drag one of your units to send it."}</p>
       ${!f && pin && pinned() ? pinCard() : `<h2>${f ? re(f) : "No unit selected"}</h2>`}
       ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
-      ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); let own = f.owner === g.id, pt = own && f.pts > 0, row = (k, label, val, hint) => `<tr><th>${label}</th><td class="num">${val}</td><td>${pt && val !== "" && (k === "move" ? L.move : L[k]) < LEAD_CAP[k] ? `<button type="button" class="train" data-train="${k}">+${LEAD_STEP[k]}</button>` : ""}</td></tr><tr class="hint"><td colspan="3">${hint}</td></tr>`;
+      ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); let own = f.owner === g.id, pt = own && f.pts > 0, row = (k, label, val, hint) => `<tr><th>${label}</th><td class="num">${val}</td><td>${pt && f.pts >= LEAD_COST[k] && (k === "move" ? L.move : L[k]) < LEAD_CAP[k] ? `<button type="button" class="train" data-train="${k}" title="Costs ${LEAD_COST[k]} point${LEAD_COST[k] === 1 ? "" : "s"}">+${LEAD_STEP[k]} · ${LEAD_COST[k]} pt</button>` : ""}</td></tr><tr class="hint"><td colspan="3">${hint}</td></tr>`;
         return `<table class="lead-stats">
           ${row("attacks", "Actions", L.attacks, "Attacks his side makes each battle turn. Without a leader, 3.")}
           ${row("charisma", "Charisma", L.charisma, "His men panic and fall back less often.")}
@@ -12012,7 +12088,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ${row("move", "Movement", `+${L.move}`, "Extra squares a turn on the map, for him and his column.")}
           <tr><th>Reputation</th><td class="num">${L.rep}</td><td></td></tr><tr class="hint"><td colspan="3">Earned in battle. It unsettles the enemy.</td></tr>
         </table>
-        <p class="muted">${pt ? `<b>${f.pts} point${f.pts === 1 ? "" : "s"} to spend.</b> ` : ""}Every second victory earns a point. In a colony with soldiers he organizes the defence, and raiders seldom get far.</p>`; })() : ""}
+        <p class="muted">${pt ? `<b>${f.pts} point${f.pts === 1 ? "" : "s"} to spend.</b> ` : ""}Experience comes from the damage his men deal and half what they take, more for a victory: the first point at 5, then 8, 11, 14 and so on${f.xp ? ` (now ${Math.floor(f.xp)} of ${5 + 3 * (f.earned || 0)})` : ""}. Actions cost 3 points, movement 2, charisma and organization 1. In a colony with soldiers he organizes the defence, and the militia fight under him on top of his organization.</p>`; })() : ""}
       ${f && !f.aboard && arm(f.kind) && f.leaderId ? `<div class="row"><button type="button" id="detach">Leave the leader</button></div><p class="muted">He stays on this square. Drag him after that. Dragging him before that moves the men who are still with the leader.</p>` : ""}
       ${f && !f.aboard && arm(f.kind) && !f.leaderId && t.units.some((I) => I.kind === "leader" && I.owner === f.owner && !I.aboard && I.x === f.x && I.y === f.y) ? `<div class="row"><button type="button" id="join">Join the leader</button></div>` : ""}
       ${f && !f.aboard && f.kind === "leader" && f.owner === g.id ? `<div class="row"><button type="button" id="gather">Gather the men</button></div><p class="muted">Free soldiers, dragoons and artillery nearby march to ${G(f.name)} and fall in, up to ${leaderStats(f).cmd}. On their own they are slow; with him they march at his pace.</p>` : ""}
@@ -13042,7 +13118,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         me_,
         lead,
         troops,
-        att: { name: "Your force", leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
+        att: { name: "Your force", nat: V(t).nationId, leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
       };
     }
     // Ask what the attack is for before the battle is shown.
