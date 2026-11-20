@@ -39,6 +39,9 @@ button:hover { background: #fff8ea; }
 button:disabled { opacity: 0.45; cursor: default; }
 button.primary { background: #8c6a2f; color: #fff8ea; border-color: #6d5122; }
 button.ghost { background: transparent; color: var(--paper); border-color: #3d5160; }
+#next-unit.pending { background: #2f6b5a; color: #fff8ea; border-color: #7fd0b4; box-shadow: 0 0 0 0 rgba(127, 208, 180, 0.7); animation: nextPulse 1.8s ease-out infinite; }
+@keyframes nextPulse { 0% { box-shadow: 0 0 0 0 rgba(127, 208, 180, 0.6); } 70% { box-shadow: 0 0 0 7px rgba(127, 208, 180, 0); } 100% { box-shadow: 0 0 0 0 rgba(127, 208, 180, 0); } }
+@media (prefers-reduced-motion: reduce) { #next-unit.pending { animation: none; } }
 
 #battle {
   max-width: 920px;
@@ -12013,6 +12016,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           `${g.name} \xB7 ${je(g, t.year)}`),
         (e.querySelector("#log").textContent = t.log.slice(-12).join(`
 `));
+      // The Next unit button lights up while someone still has a move to make.
+      let nu_ = e.querySelector("#next-unit"),
+        idle_ = idleUnits().length;
+      nu_ && (nu_.classList.toggle("pending", idle_ > 0), (nu_.textContent = idle_ ? `Next unit (${idle_})` : "Next unit"));
       let k = l ? j(t, l) : null;
       let rdNow = !p && nextFight();
       if ((De(k, f), _e(), O)) {
@@ -13539,12 +13546,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     // Step through your units that still have movement this turn, starting
     // after the one selected, and bring each into view.
+    // Units still waiting for orders: they could really step somewhere
+    // this turn (a point of movement left in rough country does not
+    // count), and are not already walking, exploring, marching in a
+    // leader's column, or standing guard in one of your colonies.
+    function idleUnits() {
+      if (!t) return [];
+      let me_ = V(t).id;
+      return t.units
+        .filter((u) => {
+          if (u.owner !== me_ || u.aboard || !(u.mp > 0) || u.dest || u.autoExplore) return !1;
+          if (arm(u.kind) && u.leaderId && t.units.some((q) => q.id === u.leaderId && !q.aboard && q.x === u.x && q.y === u.y)) return !1;
+          if (u.kind !== "ship" && t.colonies.some((c) => c.owner === me_ && inColony(c, u))) return !1;
+          return kn(t, u.id).size > 0;
+        })
+        .sort((a, b) => a.id - b.id);
+    }
     function nextUnit() {
       if (!t) return;
-      let me_ = V(t).id,
-        list = t.units
-          .filter((u) => u.owner === me_ && !u.aboard && u.mp > 0)
-          .sort((a, b) => a.id - b.id);
+      let list = idleUnits();
       if (!list.length) {
         (h = "Every unit has moved this turn."), R();
         return;
