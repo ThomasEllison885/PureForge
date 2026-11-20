@@ -212,6 +212,35 @@ button.recruit small { display: block; font-weight: 400; }
 ul.colony-list { padding-left: 0; list-style: none; }
 ul.colony-list li { margin: 6px 0; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 ul.colony-list small { color: #5c5144; }
+/* Battle grid */
+.bwrap { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 24px; align-items: start; }
+.bgrid { display: grid; grid-template-columns: repeat(3, 96px); grid-auto-rows: 72px; gap: 6px; margin: 10px 0; }
+.bcell { background: #1a3142; border: 1px solid #3d5160; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+.bcell.can-move { background: #23502e; border-color: #6fbf6f; }
+.bcell.can-hit { background: #5a1f1a; border-color: #e06a5a; }
+.bcell.flag-mine::after, .bcell.flag-theirs::after { content: "\2691"; position: absolute; top: 3px; right: 6px; font-size: 13px; }
+.bcell.flag-mine::after { color: #f0d890; }
+.bcell.flag-theirs::after { color: #f08a7a; }
+.bu { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 58px; height: 52px; margin: 2px; border-radius: 6px; border: 2px solid transparent; font: 12px "Segoe UI", sans-serif; cursor: pointer; padding: 0; }
+.bu b { font-size: 12px; letter-spacing: 0.5px; }
+.bu span { font-size: 18px; font-weight: 700; }
+.bu.mine { background: #2c4c7c; color: #fff; }
+.bu.theirs { background: #7a3a2a; color: #fff; }
+.bu.militia span { color: #ff9a8a; }
+.bu.sel { border-color: #ffd65a; box-shadow: 0 0 0 2px rgba(255, 214, 90, 0.4); }
+.bu.reserve { width: 50px; height: 44px; }
+.bres { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 52px; padding: 4px 6px; border: 1px dashed #3d5160; border-radius: 6px; }
+.bres > span { width: 100%; font: 12px "Segoe UI", sans-serif; color: #a9b8c4; }
+.bside h3 { margin-top: 0; }
+.blog { font: 12px/1.45 "Segoe UI", sans-serif; color: #d5dee4; padding-left: 16px; max-height: 60vh; overflow: auto; }
+.battle-card { max-width: 560px; }
+ul.natives { list-style: none; padding: 0; margin: 6px 0; }
+ul.natives li { margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
+.att.friendly { color: #3a7a2a; font-weight: 600; }
+.att.neutral { color: #7a6a3a; font-weight: 600; }
+.att.hostile { color: #a0302a; font-weight: 600; }
+.lead-stats { font: 13px "Segoe UI", sans-serif; color: #4a3a22; }
+@media (max-width: 760px) { .bwrap { grid-template-columns: 1fr; } }
 .place-tip { position: fixed; z-index: 50; pointer-events: none; background: rgba(24, 18, 12, 0.92); color: #f4ead2; border: 1px solid #c8a656; border-radius: 4px; padding: 4px 8px; font: 13px "Segoe UI", sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .place-tip .ok { color: #cfe8a8; }
 .place-tip .no { color: #f0a898; }
@@ -1602,7 +1631,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (d.home = n.id),
       (d.mp = oi(d, s) + (r.kind === "ship" ? (r.level - 1) * 2 : 0)),
       r.kind === "ship" && (d.cargo = $.shipCapacity + (r.level - 1) * 4),
-      a && (d.strength = r.level),
+      a && ((d.strength = unitStrength(r.kind, r.level)), (d.maxStr = d.strength)),
       a &&
         (d.leaderId =
           (
@@ -2519,6 +2548,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       )
     )
       return B("Too close to another colony.");
+    let nearV = natives(e).villages.find((v) => Math.max(Math.abs(v.x - o.x), Math.abs(v.y - o.y)) <= 3);
+    if (nearV) return B(`Too close to the village of ${nearV.name}.`);
     let lv = o.level || 1,
       s = ce(e, o.owner),
       t = ee[s.nationId].colonies[s.nextColony] || `Colony ${s.nextColony + 1}`;
@@ -3122,6 +3153,667 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     s.prize = msg;
     p.isHuman && e.log.push(`Ancient Ruins: ${msg}`);
   }
+  // ---- Battle engine ---------------------------------------------------------
+  // Fights are on a 3 x 4 grid. The attacker's home row is the bottom row
+  // (row 0), the defender's is the top (row 3); each side's flag stands in
+  // the middle of its home row. Every unit starts in reserve off the field.
+  // A unit's strength is its hit points and the number of 40-sided dice it
+  // rolls; a die at or under the threshold is a hit. The side's leader sets
+  // how many attacks it may make each turn; his charisma steadies his men,
+  // his reputation unsettles the enemy's. A side wins by taking the enemy
+  // flag square, or when the enemy has nobody left to fight. Raiders do not
+  // need to win: every round they hold the field past the second, they
+  // carry off supplies and kill colonists.
+  var BCOLS = 3,
+    BROWS = 4,
+    BMAXROUND = 12,
+    UNIT_KINDS = {
+      infantry: { name: "Infantry", short: "Inf", move: 1, ranged: !1 },
+      cavalry: { name: "Dragoons", short: "Cav", move: 2, ranged: !1 },
+      artillery: { name: "Artillery", short: "Art", move: 1, ranged: !0 },
+      militia: { name: "Militia", short: "Mil", move: 1, ranged: !1 },
+      brave: { name: "Warriors", short: "War", move: 1, ranged: !1 },
+      rider: { name: "Mounted warriors", short: "Rdr", move: 2, ranged: !1 },
+    };
+  // Strength by level: militia stand below level 1.
+  function unitStrength(kind, level) {
+    return kind === "militia" ? 2 : 2 + Math.max(1, level || 1);
+  }
+  function bUnit(side, src) {
+    return {
+      side,
+      id: src.id,
+      kind: src.kind,
+      name: src.name || UNIT_KINDS[src.kind].name,
+      str: src.str,
+      max: src.max || src.str,
+      militia: !!src.militia,
+      ally: !!src.ally,
+      pos: null,
+      moved: !1,
+      acted: !1,
+    };
+  }
+  function battleNew(spec, seed) {
+    let B = {
+      kind: spec.kind,
+      title: spec.title,
+      round: 1,
+      turn: "att",
+      over: null,
+      log: [],
+      rng: bn((seed >>> 0) || 1),
+      cells: new Array(BCOLS * BROWS).fill(null),
+      sides: {
+        att: { ...spec.att, units: spec.att.units.map((u) => bUnit("att", u)), attacksLeft: 0, hitsOn: {} },
+        def: { ...spec.def, units: spec.def.units.map((u) => bUnit("def", u)), attacksLeft: 0, hitsOn: {} },
+      },
+      stolen: { food: 0, wood: 0, goods: 0, gold: 0 },
+      killed: 0,
+      raidRounds: 0,
+    };
+    bStartTurn(B);
+    return B;
+  }
+  var bIdx = (c, r) => r * BCOLS + c,
+    bHome = (side) => (side === "att" ? 0 : BROWS - 1),
+    bFwd = (side) => (side === "att" ? 1 : -1),
+    bFoe = (side) => (side === "att" ? "def" : "att"),
+    bFlag = (side) => [1, bHome(side)];
+  function bAt(B, c, r) {
+    return c < 0 || r < 0 || c >= BCOLS || r >= BROWS ? void 0 : B.cells[bIdx(c, r)];
+  }
+  function bAlive(B, side) {
+    return B.sides[side].units.filter((u) => u.str > 0);
+  }
+  function bAttacks(B, side) {
+    let L = B.sides[side].leader;
+    return L ? Math.max(1, L.attacks) : 1;
+  }
+  function bStartTurn(B) {
+    let S = B.sides[B.turn];
+    S.attacksLeft = bAttacks(B, B.turn);
+    S.hitsOn = {};
+    for (let u of S.units) (u.moved = !1), (u.acted = !1);
+  }
+  function bPlace(B, u, c, r) {
+    u.pos && (B.cells[bIdx(...u.pos)] = null);
+    u.pos = [c, r];
+    B.cells[bIdx(c, r)] = u;
+  }
+  function bRemove(B, u) {
+    u.pos && (B.cells[bIdx(...u.pos)] = null), (u.pos = null);
+  }
+  // Squares a unit may move to this turn.
+  function bMoves(B, u) {
+    if (u.side !== B.turn || u.moved || u.acted || u.str <= 0) return [];
+    let home = bHome(u.side),
+      out = [];
+    if (!u.pos) {
+      for (let c = 0; c < BCOLS; c++) bAt(B, c, home) === null && out.push([c, home]);
+      return out;
+    }
+    let K = UNIT_KINDS[u.kind],
+      [c0, r0] = u.pos;
+    if (K.ranged) {
+      for (let dc of [-1, 1]) bAt(B, c0 + dc, r0) === null && out.push([c0 + dc, r0]);
+      return out;
+    }
+    let seen = new Set([`${c0},${r0}`]),
+      frontier = [[c0, r0]];
+    for (let step = 0; step < K.move; step++) {
+      let next = [];
+      for (let [c, r] of frontier)
+        for (let [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          let nc = c + dc,
+            nr = r + dr,
+            k = `${nc},${nr}`;
+          if (seen.has(k) || bAt(B, nc, nr) !== null) continue;
+          seen.add(k), out.push([nc, nr]), next.push([nc, nr]);
+        }
+      frontier = next;
+    }
+    return out;
+  }
+  // Enemy squares a unit may attack from where it stands.
+  function bTargets(B, u) {
+    let S = B.sides[u.side];
+    if (u.side !== B.turn || u.acted || u.str <= 0 || !u.pos || S.attacksLeft <= 0) return [];
+    if (u.moved && u.kind !== "cavalry" && u.kind !== "rider") return [];
+    let [c, r] = u.pos,
+      out = [];
+    if (UNIT_KINDS[u.kind].ranged) {
+      for (let rr = 0; rr < BROWS; rr++) {
+        let t = bAt(B, c, rr);
+        t && t.side !== u.side && out.push([c, rr]);
+      }
+      return out;
+    }
+    for (let [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      let t = bAt(B, c + dc, r + dr);
+      t && t.side !== u.side && out.push([c + dc, r + dr]);
+    }
+    return out;
+  }
+  function bThreshold(B, u, t) {
+    let S = B.sides[u.side],
+      rec = S.hitsOn[bIdx(...t.pos)] || { kinds: new Set(), dirs: new Set() },
+      kinds = new Set(rec.kinds).add(u.kind === "rider" ? "cavalry" : u.kind === "brave" || u.kind === "militia" ? "infantry" : u.kind),
+      dirs = new Set(rec.dirs).add(`${Math.sign(u.pos[0] - t.pos[0])},${Math.sign(u.pos[1] - t.pos[1])}`),
+      bonus = 0;
+    kinds.size === 2 && (bonus += 4), kinds.size >= 3 && (bonus += 6);
+    dirs.size === 2 && (bonus += 4), dirs.size === 3 && (bonus += 6), dirs.size >= 4 && (bonus += 8);
+    (u.kind === "cavalry" || u.kind === "rider") && u.moved && (bonus += 6);
+    UNIT_KINDS[u.kind].ranged && t.kind === "artillery" && (bonus -= 2);
+    return Bo({ bonus });
+  }
+  function bAttack(B, u, tc, tr) {
+    let t = bAt(B, tc, tr);
+    if (!t || t.side === u.side) return null;
+    let S = B.sides[u.side],
+      th = bThreshold(B, u, t),
+      roll = Ro(u.str, th, B.rng),
+      hits = roll.hits;
+    // Artillery standing alone is caught by infantry or cavalry: one more hit.
+    !UNIT_KINDS[u.kind].ranged && t.kind === "artillery" && hits > 0 && (hits += 1);
+    let key = bIdx(tc, tr),
+      rec = S.hitsOn[key] || (S.hitsOn[key] = { kinds: new Set(), dirs: new Set() });
+    rec.kinds.add(u.kind === "rider" ? "cavalry" : u.kind === "brave" || u.kind === "militia" ? "infantry" : u.kind),
+      rec.dirs.add(`${Math.sign(u.pos[0] - tc)},${Math.sign(u.pos[1] - tr)}`);
+    (u.acted = !0), (S.attacksLeft -= 1);
+    let dealt = Math.min(hits, t.str);
+    t.str -= dealt;
+    let msg = `${u.name} attacks ${t.name}: needs ${th} or less, rolls ${roll.rolls.map((q) => q.roll).join(" ")}, ${hits} hit${hits === 1 ? "" : "s"}.`;
+    t.militia && (B.killed += dealt * 4);
+    if (t.str <= 0) bRemove(B, t), (msg += ` ${t.name} ${t.militia ? "fall" : "is destroyed"}.`);
+    else if (dealt > 0) {
+      // Damaged men may panic and fall back a square toward their reserves.
+      let mine = B.sides[t.side].leader,
+        theirs = S.leader,
+        p = (1 - t.str / t.max) * 0.75 + 0.1 - (mine ? mine.charisma : 0) * 0.05 + (theirs ? theirs.rep || 0 : 0) * 0.03;
+      if (B.rng() < Math.max(0, Math.min(0.85, p))) {
+        let back = t.pos[1] - bFwd(t.side);
+        if (back < 0 || back >= BROWS) bRemove(B, t), (msg += ` ${t.name} fall back into reserve.`);
+        else if (bAt(B, t.pos[0], back) === null) bPlace(B, t, t.pos[0], back), (msg += ` ${t.name} fall back.`);
+        else (t.str -= 1), t.militia && (B.killed += 4), (msg += ` ${t.name} cannot fall back and take another hit.`), t.str <= 0 && bRemove(B, t);
+      }
+    }
+    B.log.push(msg);
+    bCheck(B);
+    return msg;
+  }
+  function bMove(B, u, c, r) {
+    if (!bMoves(B, u).some(([a, b]) => a === c && b === r)) return !1;
+    let wasIn = !!u.pos;
+    bPlace(B, u, c, r), (u.moved = !0);
+    // Infantry and guns spend their turn moving; cavalry may still charge.
+    u.kind !== "cavalry" && u.kind !== "rider" && (u.acted = !0);
+    wasIn || (u.acted = u.kind !== "cavalry" && u.kind !== "rider");
+    bCheck(B);
+    return !0;
+  }
+  function bCheck(B) {
+    if (B.over) return;
+    for (let side of ["att", "def"]) {
+      let foe = bFoe(side),
+        [fc, fr] = bFlag(foe),
+        on = bAt(B, fc, fr);
+      if (on && on.side === side) return (B.over = { winner: side, why: "flag" });
+      if (!bAlive(B, foe).length) return (B.over = { winner: side, why: "rout" });
+    }
+  }
+  function bStrength(B, side) {
+    return bAlive(B, side).reduce((a, u) => a + u.str, 0);
+  }
+  function bEndTurn(B) {
+    if (B.over) return;
+    // An attacking force breaks off once badly mauled: raiders at half
+    // strength, others at under a third.
+    let a0 = B.sides.att.start || (B.sides.att.start = B.sides.att.units.reduce((s, u) => s + u.max, 0)),
+      a1 = bStrength(B, "att");
+    if (a1 <= a0 * (B.kind === "raid" ? 0.5 : 0.3)) return (B.over = { winner: "def", why: "withdraw" });
+    if (B.turn === "def") {
+      // A round ends after the defender's turn.
+      if (B.kind === "raid") {
+        // Raiders plunder only while they hold part of the town itself.
+        bAlive(B, "att").some((u) => u.pos && u.pos[1] === bHome("def")) && (B.raidRounds += 1);
+      }
+      B.round += 1;
+      if (B.round > BMAXROUND) B.over = { winner: "def", why: "time" };
+    }
+    B.turn = bFoe(B.turn);
+    B.over || bStartTurn(B);
+  }
+  // ---- Battle AI: used for the enemy, for auto-resolve, and for the odds.
+  function bAiTurn(B) {
+    let side = B.turn,
+      S = B.sides[side],
+      foe = bFoe(side),
+      home = bHome(side),
+      fwd = bFwd(side);
+    // Bring reserves onto the field, middle first.
+    for (let u of bAlive(B, side).filter((q) => !q.pos))
+      for (let c of [1, 0, 2])
+        if (bAt(B, c, home) === null) {
+          bMove(B, u, c, home);
+          break;
+        }
+    // Attack the weakest target in reach while attacks last.
+    for (let guard = 0; guard < 20 && S.attacksLeft > 0 && !B.over; guard++) {
+      let best = null;
+      for (let u of bAlive(B, side)) {
+        if (!u.pos) continue;
+        let opts = bTargets(B, u);
+        // Cavalry: step in and charge if that opens an attack.
+        if (!opts.length && (u.kind === "cavalry" || u.kind === "rider") && !u.moved && !u.acted)
+          for (let [mc, mr] of bMoves(B, u)) {
+            let hit = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dc, dr]) => {
+              let t = bAt(B, mc + dc, mr + dr);
+              return t && t.side === foe;
+            });
+            if (hit) {
+              let t = bAt(B, mc + hit[0], mr + hit[1]),
+                sc = 20 - t.str + u.str;
+              (!best || sc > best.sc) && (best = { u, move: [mc, mr], tgt: [mc + hit[0], mr + hit[1]], sc });
+            }
+          }
+        for (let [tc, tr] of opts) {
+          let t = bAt(B, tc, tr),
+            sc = 18 - t.str + u.str + (t.pos[1] === bHome(foe) && t.pos[0] === 1 ? 3 : 0);
+          (!best || sc > best.sc) && (best = { u, tgt: [tc, tr], sc });
+        }
+      }
+      if (!best) break;
+      best.move && bMove(B, best.u, ...best.move);
+      bAttack(B, best.u, ...best.tgt);
+    }
+    if (B.over) return;
+    // Everyone else advances on the enemy flag, raiders hang back once in.
+    let [fc, fr] = bFlag(foe);
+    for (let u of bAlive(B, side)) {
+      if (!u.pos || u.moved || u.acted || UNIT_KINDS[u.kind].ranged) continue;
+      if (B.kind === "raid" && side === "att" && u.pos[1] === bHome("def")) continue;
+      let opts = bMoves(B, u);
+      if (!opts.length) continue;
+      let score = ([c, r]) => -Math.abs(c - fc) - Math.abs(r - fr) * 1.2;
+      opts.sort((a, b) => score(b) - score(a));
+      score(opts[0]) > score(u.pos) && bMove(B, u, ...opts[0]);
+    }
+  }
+  function bAutoFinish(B) {
+    for (let guard = 0; guard < 200 && !B.over; guard++) bAiTurn(B), bEndTurn(B);
+    return B;
+  }
+  // Rough odds: fight the battle out many times with different dice.
+  function bOdds(spec, n) {
+    let wins = 0,
+      lost = 0,
+      killed = 0,
+      raidRounds = 0;
+    for (let k = 0; k < (n || 40); k++) {
+      let B = bAutoFinish(battleNew(spec, 7919 * (k + 1)));
+      B.over.winner === "def" && wins++;
+      lost += spec.def.units.reduce((a, u) => a + u.str, 0) - bAlive(B, "def").reduce((a, u) => a + u.str, 0);
+      (killed += B.killed), (raidRounds += B.raidRounds);
+    }
+    let N = n || 40;
+    return { defWin: wins / N, defLoss: lost / N, killed: killed / N, raidRounds: raidRounds / N };
+  }
+  // ---- Leaders ---------------------------------------------------------------
+  // A leader sets how many attacks his men make each battle turn, how many
+  // men he can command, and through charisma how steady they are. Winning
+  // battles earns experience; reputation rises and falls with his record.
+  function leaderStats(u) {
+    if (!u) return null;
+    u.lvl || (u.lvl = 1);
+    u.attacks == null && (u.attacks = 1 + u.lvl);
+    u.charisma == null && (u.charisma = 1 + u.lvl);
+    u.cmd == null && (u.cmd = 4 + u.lvl * 2);
+    u.rep == null && (u.rep = 0);
+    u.xp == null && (u.xp = 0);
+    return { name: u.name, attacks: u.attacks, charisma: u.charisma, cmd: u.cmd, rep: u.rep };
+  }
+  function leaderWon(e, u, won) {
+    if (!u) return "";
+    leaderStats(u);
+    if (!won) return (u.rep = Math.max(-3, u.rep - 1)), "";
+    (u.rep = Math.min(6, u.rep + 1)), (u.xp += 1);
+    if (u.xp >= 2 * u.lvl && u.lvl < 4)
+      return (u.xp = 0), (u.lvl += 1), (u.attacks += 1), (u.charisma += 1), (u.cmd += 2), `${u.name} rises to level ${u.lvl}: ${u.attacks} attacks a turn, charisma ${u.charisma}, commands ${u.cmd}.`;
+    return "";
+  }
+  // ---- Colony garrisons ------------------------------------------------------
+  // Every colony turns out militia, weaker than any trained soldier, who
+  // only ever defend. More turn out as the colony grows; each level of fort
+  // adds a gun. Soldiers in the colony join in, and a leader there takes
+  // command of the whole defence.
+  var MILITIA_BY_LEVEL = [0, 2, 3, 4, 6];
+  function colonyDefence(e, col) {
+    let units = [],
+      here = e.units.filter((u) => u.owner === col.owner && !u.aboard && u.x === col.x && u.y === col.y),
+      leader = here.find((u) => u.kind === "leader") || null;
+    let n = MILITIA_BY_LEVEL[Math.min(4, col.level || 1)] || 2;
+    for (let k = 0; k < n; k++) units.push({ id: `m${k}`, kind: "militia", str: 2, militia: !0, name: "Militia" });
+    for (let b of col.buildings)
+      if (b.id === "fort" && !b.building)
+        for (let k = 0; k < (b.level || 1); k++) units.push({ id: `f${b.x},${b.y},${k}`, kind: "artillery", str: 3, name: "Fort guns" });
+    for (let u of here)
+      arm(u.kind) && units.push({ id: u.id, kind: u.kind, str: u.strength || 3, max: u.maxStr || u.strength || 3, name: u.name });
+    return { name: col.name, leader: leader ? leaderStats(leader) : null, leaderId: leader ? leader.id : null, units };
+  }
+  // Put a finished battle's losses back onto real units.
+  function applyLosses(e, side, B, sideKey) {
+    for (let bu of B.sides[sideKey].units) {
+      let u = typeof bu.id === "number" ? e.units.find((q) => q.id === bu.id) : null;
+      if (!u) continue;
+      u.maxStr || (u.maxStr = u.strength || bu.max);
+      bu.str <= 0 ? (e.units = e.units.filter((q) => q !== u)) : (u.strength = bu.str);
+    }
+  }
+  // ---- Native nations --------------------------------------------------------
+  // The land is already home to several nations, each a cluster of
+  // villages. Each nation keeps an attitude toward every European player,
+  // from -100 (at war) to 100 (allies). Some start friendly, some wary,
+  // some hostile. Colonies built close to their villages anger them; gifts
+  // and fair trade please them; attacking a village makes its whole nation
+  // hostile. Hostile villages send raiding parties against nearby colonies,
+  // not to take them, but to carry off supplies.
+  var NATION_NAMES = ["Heron", "Red Hawk", "Stone River", "Cedar", "Long Grass", "Thunder Bay", "Elk Run", "Blue Mesa", "Otter Creek", "White Pine"],
+    VILLAGE_A = ["Willow", "Bear", "Cedar", "Smoke", "Fox", "Swift", "Elk", "Otter", "Crane", "Moon", "Sun", "Hawk", "Pine", "Stone", "Raven", "Maple", "Deer", "Turtle"],
+    VILLAGE_B = ["Creek", "Hill", "Falls", "Bend", "Ridge", "Meadow", "Lake", "Spring", "Ford", "Hollow", "Point", "Bluff"],
+    TEMPERS = [
+      { id: "peaceful", name: "peaceful", base: 45 },
+      { id: "wary", name: "wary", base: 0 },
+      { id: "warlike", name: "warlike", base: -45 },
+    ];
+  function attitudeWord(v) {
+    return v >= 30 ? "friendly" : v <= -30 ? "hostile" : "neutral";
+  }
+  function makeNatives(e) {
+    let M = e.map,
+      w = M.width,
+      h = M.height,
+      rng = bn(((e.seed >>> 0) ^ 0x5eed1e) >>> 0),
+      land = [];
+    for (let k = 0; k < M.tiles.length; k++) {
+      let t = M.tiles[k];
+      ["plains", "woods", "forest", "hills", "desert"].includes(t.terrain) && !t.riverId && land.push(k);
+    }
+    let starts = e.units.filter((u) => u.kind === "ship").map((u) => [u.x, u.y]),
+      nNations = Math.max(3, Math.min(8, Math.round(land.length / 4500))),
+      seeds = [];
+    for (let tries = 0; seeds.length < nNations && tries < 4000; tries++) {
+      let k = land[Math.floor(rng() * land.length)],
+        x = k % w,
+        y = Math.floor(k / w);
+      if (seeds.some(([a, b]) => Math.hypot(a - x, b - y) < 34)) continue;
+      if (starts.some(([a, b]) => Math.hypot(a - x, b - y) < 22)) continue;
+      seeds.push([x, y]);
+    }
+    let diff = { easy: 15, normal: 0, hard: -10, ruthless: -20 }[e.difficulty] || 0,
+      names = [...NATION_NAMES].sort(() => rng() - 0.5),
+      nations = seeds.map(([x, y], i) => {
+        let temper = TEMPERS[Math.floor(rng() * 3)],
+          att = {};
+        for (let p of e.players) att[p.id] = Math.round(temper.base + diff + (rng() - 0.5) * 30);
+        return { id: i + 1, name: names[i % names.length], temper: temper.id, style: i % 3, att, cx: x, cy: y };
+      }),
+      villages = [],
+      used = new Set();
+    for (let nat of nations) {
+      let want = 4 + Math.floor(rng() * 5);
+      for (let tries = 0; tries < 600 && villages.filter((v) => v.nation === nat.id).length < want; tries++) {
+        let x = Math.round(nat.cx + (rng() - 0.5) * 36),
+          y = Math.round(nat.cy + (rng() - 0.5) * 36);
+        if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) continue;
+        let t = M.tiles[y * w + x];
+        if (!["plains", "woods", "forest", "hills", "desert"].includes(t.terrain)) continue;
+        if (villages.some((v) => Math.max(Math.abs(v.x - x), Math.abs(v.y - y)) < 7)) continue;
+        if (starts.some(([a, b]) => Math.hypot(a - x, b - y) < 14)) continue;
+        let nm;
+        for (let g = 0; g < 20; g++) {
+          nm = `${VILLAGE_A[Math.floor(rng() * VILLAGE_A.length)]} ${VILLAGE_B[Math.floor(rng() * VILLAGE_B.length)]}`;
+          if (!used.has(nm)) break;
+        }
+        used.add(nm);
+        let size = 1 + Math.floor(rng() * 3);
+        villages.push({ id: villages.length + 1, nation: nat.id, name: nm, x, y, size, warriors: size + 2, gold: 10 + size * 10 + Math.floor(rng() * 20), raidCool: 0 });
+      }
+    }
+    e.natives = { nations, villages, raids: [], nextRaid: 1 };
+    return e.natives;
+  }
+  function natives(e) {
+    return e.natives || makeNatives(e);
+  }
+  function villageAt(e, x, y) {
+    return natives(e).villages.find((v) => v.x === x && v.y === y) || null;
+  }
+  function nationOf(e, v) {
+    return natives(e).nations.find((n) => n.id === v.nation);
+  }
+  function shiftAttitude(nat, pid, d) {
+    nat.att[pid] = Math.max(-100, Math.min(100, (nat.att[pid] || 0) + d));
+  }
+  // Native villages buy what they lack this year at their own price, some
+  // better than Europe and some worse, and pay on the spot.
+  var NATIVE_WANTS = ["goods", "metal", "wood"];
+  function villageOffer(e, v) {
+    let r = (k) => z(v.id * 13 + k, e.year, (e.seed >>> 0) + 1777),
+      want = NATIVE_WANTS[Math.floor(r(1) * 3)],
+      base = { goods: 0.5, metal: 0.25, wood: 0.12 }[want],
+      price = base * (0.6 + r(2) * 1.6);
+    return { want, price };
+  }
+  function nativeTrade(e, colId, vId, amount) {
+    return be(e, () => {
+      let col = e.colonies.find((c) => c.id === colId),
+        v = natives(e).villages.find((q) => q.id === vId);
+      if (!col || !v) return { ok: !1, error: "No such village." };
+      let nat = nationOf(e, v);
+      if ((nat.att[col.owner] || 0) <= -30) return { ok: !1, error: `${v.name} will not trade with you.` };
+      if (v.tradedYear === e.year) return { ok: !1, error: `${v.name} has traded already this year.` };
+      let { want, price } = villageOffer(e, v),
+        t = Math.floor(Number(amount));
+      if (!(t > 0)) return { ok: !1, error: "Trade at least 1." };
+      if (col.stock[want] < t) return { ok: !1, error: `${col.name} has only ${col.stock[want]} ${Ne[want].toLowerCase()}.` };
+      let gold = Math.floor(t * price);
+      if (gold < 1) return { ok: !1, error: "That is not worth a gold piece to them." };
+      (col.stock[want] -= t), (col.stock.gold += gold), (v.tradedYear = e.year), shiftAttitude(nat, col.owner, 2);
+      return { ok: !0, discoveries: [], note: `${v.name} took ${t} ${Ne[want].toLowerCase()} for ${gold} gold.` };
+    });
+  }
+  function nativeGift(e, colId, vId, gold) {
+    return be(e, () => {
+      let col = e.colonies.find((c) => c.id === colId),
+        v = natives(e).villages.find((q) => q.id === vId);
+      if (!col || !v) return { ok: !1, error: "No such village." };
+      let g = Math.floor(Number(gold));
+      if (!(g > 0) || col.stock.gold < g) return { ok: !1, error: `${col.name} does not have ${g} gold.` };
+      let nat = nationOf(e, v),
+        d = Math.min(15, Math.round(g * 0.8));
+      (col.stock.gold -= g), shiftAttitude(nat, col.owner, d);
+      return { ok: !0, discoveries: [], note: `The ${nat.name} people accept the gift. They are now ${attitudeWord(nat.att[col.owner])} toward you.` };
+    });
+  }
+  // A village's warriors, for a battle in or around it.
+  function villageForce(e, v, raiding) {
+    let nat = nationOf(e, v),
+      n = raiding ? Math.max(2, Math.ceil(v.warriors * 0.7)) : v.warriors,
+      units = [];
+    for (let k = 0; k < n; k++)
+      units.push({ id: `w${v.id}-${k}`, kind: k % 3 === 2 ? "rider" : "brave", str: 3, name: k % 3 === 2 ? "Mounted warriors" : "Warriors" });
+    return { name: `${v.name} (${nat.name})`, leader: { name: `War chief of ${v.name}`, attacks: 2, charisma: 2, rep: 0 }, units };
+  }
+  // Once a year: colonies near a nation's villages anger it, distance lets
+  // it cool, and hostile villages may send a raiding party.
+  function nativesTurn(e) {
+    let N = natives(e),
+      out = { human: [], log: [] },
+      hum = e.players.find((p) => p.isHuman);
+    for (let nat of N.nations) {
+      let base = (TEMPERS.find((q) => q.id === nat.temper) || TEMPERS[1]).base;
+      for (let p of e.players) {
+        let crowd = 0;
+        for (let c of e.colonies)
+          c.owner === p.id && N.villages.some((v) => v.nation === nat.id && Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) <= 8) && (crowd += c.level || 1);
+        crowd ? shiftAttitude(nat, p.id, -0.8 * crowd) : (nat.att[p.id] || 0) < base && shiftAttitude(nat, p.id, 0.5);
+      }
+    }
+    // Raiding parties on the way move on; those that arrive strike.
+    let still = [];
+    for (let rd of N.raids) {
+      let col = e.colonies.find((c) => c.id === rd.target);
+      if (!col) continue;
+      let dx = col.x - rd.x,
+        dy = col.y - rd.y,
+        d = Math.max(Math.abs(dx), Math.abs(dy));
+      if (d > 1) {
+        let step = Math.min(4, d - 1);
+        (rd.x += Math.round((dx / d) * step)), (rd.y += Math.round((dy / d) * step));
+        still.push(rd);
+        continue;
+      }
+      let owner = e.players.find((p) => p.id === col.owner);
+      owner && owner.isHuman ? out.human.push(rd) : resolveRaid(e, rd, null);
+    }
+    N.raids = still;
+    // Hostile villages may send a new party at a colony within reach.
+    for (let v of N.villages) {
+      if (v.raidCool > 0) {
+        v.raidCool--;
+        continue;
+      }
+      let nat = nationOf(e, v),
+        near = e.colonies
+          .filter((c) => (nat.att[c.owner] || 0) <= -30 && Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 16)
+          .sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+      if (!near) continue;
+      let chance = nat.temper === "warlike" ? 0.12 : 0.07;
+      if (z(v.id, e.year, (e.seed >>> 0) + 1811) >= chance) continue;
+      N.raids.push({ id: N.nextRaid++, village: v.id, target: near.id, x: v.x, y: v.y, year: e.year });
+      v.raidCool = 4;
+      hum && near.owner === hum.id && e.log.push(`Scouts report warriors leaving ${v.name}, heading toward ${near.name}.`);
+    }
+    return out;
+  }
+  // Settle a raid. With a finished battle the result comes from it;
+  // otherwise it is fought out automatically.
+  function resolveRaid(e, rd, B) {
+    let col = e.colonies.find((c) => c.id === rd.target),
+      v = natives(e).villages.find((q) => q.id === rd.village);
+    if (!col || !v) return "";
+    let def = colonyDefence(e, col);
+    B || (B = bAutoFinish(battleNew({ kind: "raid", title: "", att: villageForce(e, v, !0), def }, rd.id * 31 + e.year)));
+    applyLosses(e, col.owner, B, "def");
+    let rounds = B.raidRounds + (B.over.winner === "att" ? 3 : 0),
+      took = [];
+    for (let k of ["food", "wood", "goods", "gold"]) {
+      let n = Math.floor(col.stock[k] * Math.min(0.6, rounds * 0.07));
+      n > 0 && ((col.stock[k] -= n), took.push(`${n} ${Ne[k].toLowerCase()}`));
+    }
+    let dead = Math.min(col.population - 1, Math.round(B.killed * 0.75 + rounds * col.population * 0.01));
+    dead > 0 && (col.population -= dead);
+    let L = def.leaderId ? e.units.find((u) => u.id === def.leaderId) : null,
+      up = leaderWon(e, L, B.over.winner === "def"),
+      held = B.over.winner === "def" && !took.length;
+    return (
+      (held
+        ? `${col.name} drove off the raid from ${v.name}.`
+        : `Raiders from ${v.name} struck ${col.name}${took.length ? ` and carried off ${took.join(", ")}` : ""}.`) +
+      (dead > 0 ? ` ${dead} colonist${dead === 1 ? " was" : "s were"} killed.` : "") +
+      (up ? ` ${up}` : "")
+    );
+  }
+  // Your soldiers attack a village. Win, and it is burned and its stores
+  // taken; either way its whole nation turns hostile.
+  function resolveVillageAttack(e, pid, stackIds, v, B, leaderId) {
+    let nat = nationOf(e, v);
+    (nat.att[pid] = -100), applyLosses(e, pid, B, "att");
+    let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      won = B.over.winner === "att",
+      up = leaderWon(e, L, won);
+    if (!won) return `The attack on ${v.name} was beaten off. The ${nat.name} nation is at war with you.${up ? " " + up : ""}`;
+    let N = natives(e);
+    N.villages = N.villages.filter((q) => q !== v);
+    let col = e.colonies.filter((c) => c.owner === pid).sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0],
+      p = ce(e, pid);
+    col ? (col.stock.gold += v.gold) : (p.treasury = (p.treasury || 0) + v.gold);
+    return `${v.name} is burned and ${v.gold} gold taken${col ? ` to ${col.name}` : ""}. The ${nat.name} nation is at war with you.${up ? " " + up : ""}`;
+  }
+  // ---- Native villages and war parties on the map --------------------------
+  // Three building traditions, one per nation in turn: domed bark lodges,
+  // conical hide lodges, and long bark houses. Bigger villages have more
+  // dwellings and a stockade; every village has a cooking fire.
+  function villageSprite(g, style, size, seed, detail) {
+    let r = (k) => z(seed * 7 + k, seed * 3 - k, 2203),
+      spots = [[-10, -4], [9, -6], [-2, 6], [12, 6], [-14, 6], [2, -10]].slice(0, 2 + size),
+      ink = "rgba(30,20,12,0.6)";
+    if (size >= 3) {
+      let pal = palisade(g, 0, 0, 30, 30, 4, !0, detail);
+      pal.back();
+    }
+    bshadow(g, 0, 2, 22, 9);
+    spots.sort((p, q) => p[1] - q[1]);
+    for (let [x, y] of spots) {
+      let s = 0.85 + r(x + y) * 0.3;
+      g.save(), g.translate(x, y), g.scale(s, s);
+      if (style === 0) {
+        // domed lodge of bark over bent poles
+        (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(1, 1, 8, 3, 0, 0, Math.PI * 2), g.fill();
+        (g.fillStyle = "#8a6a46"), g.beginPath(), g.moveTo(-7, 0), g.bezierCurveTo(-7, -11, 7, -11, 7, 0), g.closePath(), g.fill();
+        (g.fillStyle = "#6a4e32"), g.beginPath(), g.moveTo(0, -8.3), g.bezierCurveTo(5, -8, 7, -4, 7, 0), g.lineTo(0, 0), g.closePath(), g.fill();
+        if (detail) {
+          (g.strokeStyle = "rgba(50,34,20,0.6)"), (g.lineWidth = 0.5), g.beginPath();
+          for (let k = -4; k <= 4; k += 2.6) g.moveTo(k * 1.4, 0), g.quadraticCurveTo(k, -9, k * 0.3, -8.5);
+          g.stroke();
+        }
+        (g.fillStyle = "#2a1c10"), g.beginPath(), g.ellipse(-2, -1.5, 1.6, 2.4, 0, Math.PI, 0), g.fill();
+      } else if (style === 1) {
+        // conical hide lodge
+        (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(1, 1, 7, 2.6, 0, 0, Math.PI * 2), g.fill();
+        (g.fillStyle = "#d8c49a"), g.beginPath(), g.moveTo(-6, 0), g.lineTo(0, -15), g.lineTo(6, 0), g.closePath(), g.fill();
+        (g.fillStyle = "#b09a70"), g.beginPath(), g.moveTo(0, -15), g.lineTo(6, 0), g.lineTo(1, 0), g.closePath(), g.fill();
+        (g.strokeStyle = "#5a3e22"), (g.lineWidth = 0.8), g.beginPath(), g.moveTo(-1.5, -13), g.lineTo(-2.5, -18), g.moveTo(1, -13), g.lineTo(2, -18), g.stroke();
+        detail && ((g.fillStyle = "#8a3a2a"), g.fillRect(-4.5, -4, 9, 1.2), (g.fillStyle = "#2e4a6a"), g.fillRect(-3, -8, 6, 0.9));
+        (g.fillStyle = "#3a2814"), g.beginPath(), g.moveTo(-1.6, 0), g.lineTo(0, -4), g.lineTo(1.6, 0), g.closePath(), g.fill();
+      } else {
+        // long bark house with a rounded roof
+        (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(2, 1, 12, 3.4, 0, 0, Math.PI * 2), g.fill();
+        let P = (a, b, zz) => isoP(0, 0, a, b, zz);
+        bpoly(g, [P(-9, 3, 0), P(9, 3, 0), P(9, 3, 5), P(-9, 3, 5)], "#7a5a3a", ink, 0.5);
+        bpoly(g, [P(9, 3, 0), P(9, -3, 0), P(9, -3, 5), P(9, 3, 5)], "#5e4428", ink, 0.5);
+        let a0 = P(-9, 3, 5),
+          a1 = P(9, 3, 5),
+          b1 = P(9, -3, 5),
+          top0 = P(-9, 0, 9),
+          top1 = P(9, 0, 9);
+        (g.fillStyle = "#8a6a46"), g.beginPath(), g.moveTo(...a0), g.lineTo(...a1), g.quadraticCurveTo(a1[0] + 1, top1[1] + 1, top1[0], top1[1]), g.lineTo(top0[0], top0[1]), g.quadraticCurveTo(a0[0] - 1, top0[1] + 1, a0[0], a0[1]), g.closePath(), g.fill();
+        (g.fillStyle = "#6a4e32"), g.beginPath(), g.moveTo(...a1), g.lineTo(...b1), g.quadraticCurveTo(b1[0] + 1, top1[1], top1[0], top1[1]), g.closePath(), g.fill();
+        (g.fillStyle = "#2a1c10"), g.beginPath(), g.ellipse(...P(-1, 3, 1.6), 1.2, 1.8, 0, Math.PI, 0), g.fill();
+      }
+      g.restore();
+    }
+    // cooking fire and smoke
+    (g.fillStyle = "#e88a2a"), g.beginPath(), g.arc(2, 1, 1.4, 0, Math.PI * 2), g.fill();
+    if (detail) {
+      g.fillStyle = "rgba(220,220,215,0.32)";
+      for (let k = 0; k < 4; k++) g.beginPath(), g.arc(3 + k * 1.6, -3 - k * 3.4, 1.4 + k * 0.6, 0, Math.PI * 2), g.fill();
+      bperson(g, -5, 9, "#7a4a2a"), bperson(g, 6, 10, "#5a3a22");
+    }
+  }
+  function warPartySprite(g, n) {
+    bshadow(g, 0, 4, 12, 4);
+    for (let k = 0; k < Math.min(4, n); k++) {
+      let x = -7 + k * 5,
+        y = 3 - (k % 2) * 3;
+      (g.fillStyle = "#7a4a2a"), g.fillRect(x - 1, y - 6, 2, 6);
+      (g.fillStyle = "#c08a5a"), g.beginPath(), g.arc(x, y - 7.2, 1.3, 0, Math.PI * 2), g.fill();
+      (g.strokeStyle = "#3a2410"), (g.lineWidth = 0.7), g.beginPath(), g.moveTo(x + 1.6, y + 1), g.lineTo(x + 2.8, y - 11), g.stroke();
+      (g.fillStyle = "#b8b0a0"), g.beginPath(), g.moveTo(x + 2.8, y - 11), g.lineTo(x + 2.2, y - 13.5), g.lineTo(x + 3.6, y - 11.2), g.closePath(), g.fill();
+      (g.fillStyle = "#c83a2a"), g.fillRect(x - 0.4, y - 9.2, 0.8, 1.6);
+    }
+  }
   function Tn(e, n, o, by) {
     let r = [],
       i = new Set(),
@@ -3175,6 +3867,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         u = ce(e, t.foundBy),
         c = u && u.id === r.id ? "yours" : `held by ${ee[u.nationId].name}`;
       a.push(`${d.name} (${c}): ${qn(d)}`);
+    }
+    let vg = villageAt(e, n, o);
+    if (vg) {
+      let nt = nationOf(e, vg);
+      a.push(`${vg.name}, a village of the ${nt.name} (${nt.temper}), ${attitudeWord(nt.att[r.id] || 0)} toward you`);
     }
     let l = ln(e, n, o);
     return (
@@ -4317,6 +5014,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       Dn(u);
     for (let y of u.players) ze(u, y.id);
     for (let y of u.players) y.mark = y.score || 0;
+    makeNatives(u);
     let m = je(s, u.year);
     return (
       u.log.push(`${s.name} sails west in ${u.year}. ${m} rules at home.`),
@@ -4460,6 +5158,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       pendingNames: e.pendingNames,
       pendingSpecials: e.pendingSpecials || [],
       shipments: e.shipments || [],
+      natives: e.natives || null,
+      pendingRaids: e.pendingRaids || [],
       log: e.log,
       glimpsed: e.glimpsed || [],
       specials: (e.map.specials || []).map((n) => ({
@@ -4495,7 +5195,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.colonies = o.colonies),
       (e.pendingNames = o.pendingNames),
       (e.pendingSpecials = o.pendingSpecials || []),
-      (e.shipments = o.shipments || []);
+      (e.shipments = o.shipments || []),
+      o.natives && (e.natives = o.natives),
+      (e.pendingRaids = o.pendingRaids || []);
     for (let r of o.specials || []) {
       let i = (e.map.specials || []).find((s) => s.id === r.id);
       i && ((i.foundBy = r.foundBy), (i.foundYear = r.foundYear));
@@ -4726,6 +5428,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let quiet = e.log.length;
       Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), (e.log.length = quiet);
     }
+    let nt = nativesTurn(e);
+    (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
+      nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
+    // The wounded mend in their own colonies, a point a year.
+    for (let u of e.units)
+      u.maxStr &&
+        u.strength < u.maxStr &&
+        e.colonies.some((c) => c.owner === u.owner && c.x === u.x && c.y === u.y) &&
+        (u.strength += 1);
     e.log.push(...e.governorNews), (e.lastTraces = []);
     for (let r of e.players)
       if (r.isHuman) {
@@ -4828,6 +5539,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         pendingNames: e.pendingNames,
         pendingSpecials: e.pendingSpecials || [],
         shipments: e.shipments || [],
+        natives: e.natives || null,
+        pendingRaids: e.pendingRaids || [],
         log: e.log.slice(-300),
         glimpsed: e.glimpsed || [],
         arrivals: e.arrivals || [],
@@ -4850,6 +5563,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (o.arrivedThisTurn = o.arrivedThisTurn || []),
       (o.pendingSpecials = o.pendingSpecials || []),
       (o.shipments = o.shipments || []),
+      (o.pendingRaids = o.pendingRaids || []),
       o.map.specials || (o.map.specials = []);
     for (let r of o.colonies) no(r);
     return o;
@@ -6325,10 +7039,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         m = u[u.length - 1],
         y = m % r,
         S = Math.floor(m / r);
+      // The river runs to the shoreline and ends in one of four kinds of
+      // mouth, chosen per river: a delta, an estuary, a sandbar, or an
+      // open mouth fading into the sea.
+      let mouth = null;
       for (let [M, P] of Fr(y, S, r, i)) {
         let T = s[P * r + M].terrain;
         if (T === "ocean" || T === "coast") {
-          p.push([y + 0.5 + (M - y) * 0.75, S + 0.5 + (P - S) * 0.75]);
+          let sx = y + 0.5 + (M - y) * 0.5,
+            sy = S + 0.5 + (P - S) * 0.5;
+          p.push([sx, sy]);
+          mouth = {
+            x: sx,
+            y: sy,
+            dx: M - y,
+            dy: P - S,
+            style: Math.floor(z(t, o, 991) * 4),
+            flip: z(t, o, 993) < 0.5 ? -1 : 1,
+          };
           break;
         }
       }
@@ -6341,13 +7069,71 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           (by0 = Math.min(by0, py)),
           (bx1 = Math.max(bx1, px)),
           (by1 = Math.max(by1, py));
-      out.push({ p, box: [bx0, by0, bx1, by1] });
+      mouth &&
+        ((bx0 = Math.min(bx0, mouth.x - 1.6)),
+        (by0 = Math.min(by0, mouth.y - 1.6)),
+        (bx1 = Math.max(bx1, mouth.x + 1.6)),
+        (by1 = Math.max(by1, mouth.y + 1.6)));
+      out.push({ p, box: [bx0, by0, bx1, by1], mouth });
     }
     return out;
   }
+  function drawMouth(e, m, HE) {
+    let K = HE,
+      nx = -m.dy * m.flip,
+      ny = m.dx * m.flip,
+      P = (a, b) => [(m.x + m.dx * a + nx * b) * K, (m.y + m.dy * a + ny * b) * K],
+      rgb = (c, al) => `rgba(${c[0]},${c[1]},${c[2]},${al})`,
+      // A fill that is solid at the shore and fades out to sea.
+      fade = (c, a0, a1, from, to) => {
+        let p0 = P(from, 0),
+          p1 = P(to, 0),
+          g = e.createLinearGradient(p0[0], p0[1], p1[0], p1[1]);
+        return g.addColorStop(0, rgb(c, a0)), g.addColorStop(1, rgb(c, a1)), g;
+      },
+      // A closed blob through the given points with smooth, rounded sides.
+      blob = (pts, fill) => {
+        let q = pts.map(([a, b]) => P(a, b)),
+          n = q.length,
+          mid = (u, v) => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2];
+        e.beginPath(), e.moveTo(...mid(q[n - 1], q[0]));
+        for (let k = 0; k < n; k++) e.quadraticCurveTo(...q[k], ...mid(q[k], q[(k + 1) % n]));
+        e.closePath(), (e.fillStyle = fill), e.fill();
+      },
+      curve = (a, c, b, color, w) => {
+        (e.strokeStyle = color), (e.lineWidth = w), e.beginPath(), e.moveTo(...P(...a)), e.quadraticCurveTo(...P(...c), ...P(...b)), e.stroke();
+      };
+    (e.lineCap = "round"), (e.lineJoin = "round");
+    // Silty water spreading out where the river meets the sea.
+    let pc = P(0.8, 0),
+      g = e.createRadialGradient(pc[0], pc[1], 0, pc[0], pc[1], 1.3 * K);
+    g.addColorStop(0, "rgba(120,160,146,0.38)"), g.addColorStop(1, "rgba(120,160,146,0)");
+    (e.fillStyle = g), e.beginPath(), e.arc(pc[0], pc[1], 1.3 * K, 0, Math.PI * 2), e.fill();
+    if (m.style === 0) {
+      // Delta: a fan of silt and reed marsh, the river splitting across it.
+      blob([[-0.3, -0.14], [0.35, -0.6], [0.95, -1.0], [1.35, -0.45], [1.4, 0.25], [1.1, 0.95], [0.4, 0.65], [-0.3, 0.14]], fade(W.sand, 1, 0.5, 0.2, 1.45));
+      blob([[0.1, -0.32], [0.7, -0.7], [1.05, -0.25], [0.85, 0.45], [0.3, 0.36]], fade([98, 128, 60], 0.85, 0.25, 0.1, 1.1));
+      for (let [col, w] of [[rgb(W.riverBank, 0.9), 0.17 * K + 1.4], [rgb(W.river, 1), 0.12 * K]])
+        curve([-0.3, 0], [0.45, -0.3], [1.25, -0.75], col, w),
+          curve([-0.3, 0], [0.65, 0.04], [1.32, 0.08], col, w * 0.85),
+          curve([-0.3, 0], [0.5, 0.38], [1.08, 0.78], col, w * 0.75);
+    } else if (m.style === 1) {
+      // Estuary: the river opens into a broad funnel with mudflats either side.
+      blob([[-0.3, -0.24], [0.5, -0.5], [1.25, -0.85], [1.35, 0], [1.25, 0.85], [0.5, 0.5], [-0.3, 0.24]], fade(W.sand, 0.7, 0, 0.0, 1.35));
+      blob([[-0.35, -0.14], [0.45, -0.3], [1.3, -0.62], [1.4, 0], [1.3, 0.62], [0.45, 0.3], [-0.35, 0.14]], fade(W.river, 1, 0, 0.25, 1.4));
+    } else if (m.style === 2) {
+      // Sandbar: a curved spit of sand half closing the mouth.
+      blob([[-0.35, -0.15], [0.3, -0.24], [0.6, 0], [0.3, 0.24], [-0.35, 0.15]], fade(W.river, 1, 0.35, 0, 0.6));
+      curve([0.05, 0.6], [0.85, 0.55], [0.78, -0.2], rgb(W.sand, 0.95), 0.18 * K);
+      curve([0.1, 0.56], [0.8, 0.5], [0.74, -0.18], "rgba(236,226,190,0.65)", 0.06 * K);
+    } else {
+      // Open mouth: the river flares and fades into the sea.
+      blob([[-0.35, -0.15], [0.35, -0.32], [0.85, -0.42], [1.0, 0], [0.85, 0.42], [0.35, 0.32], [-0.35, 0.15]], fade(W.river, 1, 0, 0.1, 1.0));
+    }
+  }
   function drawRivers(e, lines, HE, x0, y0, x1, y1) {
     (e.lineCap = "round"), (e.lineJoin = "round");
-    for (let { p, box } of lines) {
+    for (let { p, box, mouth } of lines) {
       if (box[2] < x0 || box[0] > x1 + 1 || box[3] < y0 || box[1] > y1 + 1) continue;
       for (let [M, Pw] of [
         [W.riverBank, 2.2],
@@ -6369,6 +7155,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             e.stroke();
         }
       }
+      mouth && drawMouth(e, mouth, HE);
     }
   }
   function terrainOf(e) {
@@ -6904,13 +7691,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       c.foundBy != null && l.set(`${c.x},${c.y}`, c);
     let d = o.zoom,
       u = n.map.seed >>> 0,
-      finds = [];
+      finds = [],
+      vmap = new Map(natives(n).villages.map((v) => [v.x * 4096 + v.y, v]));
     for (let [c, h] of tilesInView(n.map, o, r)) {
       let p = YL(c, h, o, terracePx(n.map, c, h, o.zoom));
       if (!Nn(p, r) || i.explored[C(c, h, a)] !== "1") continue;
       let m = t[C(c, h, a)],
         y = s.get(`${c},${h}`),
-        lm = l.get(`${c},${h}`);
+        lm = l.get(`${c},${h}`),
+        vg = vmap.get(c * 4096 + h);
+      if (vg) {
+        let nt = nationOf(n, vg);
+        Ye(e, p.x, p.y, Math.max(d * 1.35, 0.6), (M) => villageSprite(M, nt.style, vg.size, vg.id, d >= 0.75));
+        continue;
+      }
       if (y) {
         // A clearing, not a bare plate: trees stay standing behind a building
         // put up in forest.
@@ -8529,6 +9323,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             _r(m, c, ee[h.nationId].color, u.count, u.active || (s.selected != null && (u.ids || [u.id]).includes(s.selected))),
           );
       }
+    for (let rd of natives(n).raids) {
+      if (!i.has(`${rd.x},${rd.y}`)) continue;
+      let p = YL(rd.x, rd.y, o, 0);
+      Nn(p, r, 200) && Ye(e, p.x, p.y, a, (m) => warPartySprite(m, 4));
+    }
   }
   function kt(e, n, o, r, i) {
     if (o.zoom < 0.3) return;
@@ -9765,13 +10564,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       let v = t.pendingNames.find((w) => w.ownerId === f.id),
-        b = !v && (t.pendingSpecials || []).find((w) => w.ownerId === f.id);
+        b = !v && (t.pendingSpecials || []).find((w) => w.ownerId === f.id),
+        rd = !v && !b && (t.pendingRaids || [])[0];
       if (v) {
         let w = `${v.kind}:${v.id}`;
         H !== w && ((H = w), Te(v));
       } else if (b) {
         let w = `special:${b.id}`;
         H !== w && ((H = w), en(b));
+      } else if (rd && !p) {
+        let w = `raid:${rd.id}`;
+        H !== w && ((H = w), raidPrompt(rd));
       } else p || ((a.hidden = !0), (H = null));
     }
     function goMinimap(canvas, ev) {
@@ -9811,7 +10614,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <p id="status">${h}</p>
       <p id="hover">${v.join("<br>") || "Drag the map. Drag one of your units to send it."}</p>
       <h2>${f ? re(f) : "No unit selected"}</h2>
-      ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}</p>` : ""}
+      ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
+      ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); return `<p class="lead-stats">Leader, level ${f.lvl}: ${L.attacks} attacks a battle turn, charisma ${L.charisma}, commands up to ${L.cmd} men, reputation ${L.rep}. In a colony he takes command of its defence.</p>`; })() : ""}
       ${f && !f.aboard && arm(f.kind) && f.leaderId ? `<div class="row"><button type="button" id="detach">Leave the leader</button></div><p class="muted">He stays on this square. Drag him after that. Dragging him before that moves the men who are still with the leader.</p>` : ""}
       ${f && !f.aboard && arm(f.kind) && !f.leaderId && t.units.some((I) => I.kind === "leader" && I.owner === f.owner && !I.aboard && I.x === f.x && I.y === f.y) ? `<div class="row"><button type="button" id="join">Join the leader</button></div>` : ""}
       ${b.length ? `<ul>${b.map((I) => `<li>${I.name} \xB7 ${Mo[I.kind]}</li>`).join("")}</ul>` : ""}
@@ -10142,6 +10946,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (k && g) {
           l = k;
           let w = j(t, k);
+          let vg = w && !w.aboard && w.kind !== "ship" && villageAt(t, b.x, b.y);
+          if (vg) {
+            Math.max(Math.abs(w.x - vg.x), Math.abs(w.y - vg.y)) <= 1
+              ? attackVillage(w, vg)
+              : ((h = `Move next to ${vg.name} first, then drag onto it to attack.`), R());
+            return;
+          }
           if (w) {
             let ship = w.kind === "ship" ? w : null,
               drop = ship && shoreDrop(t, ship, b.x, b.y);
@@ -10341,6 +11152,187 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (tipEl.style.top = `${ev.clientY + 14}px`),
         (tipEl.hidden = !1);
     }
+    // ---- Battle screens ------------------------------------------------------
+    // Before a fight you see both sides and a rough idea of how it will go,
+    // then choose to command it on the grid or let it resolve on its own.
+    function forceLine(S) {
+      let byKind = {};
+      for (let u of S.units) {
+        let k = UNIT_KINDS[u.kind].name;
+        byKind[k] = (byKind[k] || 0) + 1;
+      }
+      let men = Object.entries(byKind).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(", ") || "nobody",
+        str = S.units.reduce((a, u) => a + u.str, 0);
+      return `${men} (strength ${str})${S.leader ? `, led by ${S.leader.name}: ${S.leader.attacks} attacks a turn, charisma ${S.leader.charisma}` : ", no leader: 1 attack a turn"}`;
+    }
+    function oddsWords(spec, mine) {
+      let o = bOdds(spec, 40),
+        p = mine === "def" ? o.defWin : 1 - o.defWin,
+        word = p >= 0.85 ? "should win easily" : p >= 0.6 ? "should win" : p >= 0.4 ? "a close fight" : p >= 0.15 ? "likely to lose" : "very likely to lose",
+        tens = Math.round(p * 10);
+      return `Rough odds: ${word}, about ${tens} in 10.${mine === "def" && spec.kind === "raid" ? ` Expect to lose about ${Math.round(o.killed * 0.75)} colonists.` : ""}`;
+    }
+    function preBattle(spec, mine, done) {
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card battle-card">
+        <p class="find-kicker">${spec.kind === "raid" ? "Raid" : "Battle"}</p>
+        <h2>${G(spec.title)}</h2>
+        <p><b>Attacking:</b> ${G(forceLine(spec.att))}</p>
+        <p><b>Defending:</b> ${G(forceLine(spec.def))}</p>
+        <p class="find-stat">${G(oddsWords(spec, mine))}</p>
+        <div class="row">
+          <button type="button" id="b-grid" class="primary">Fight it on the grid</button>
+          <button type="button" id="b-auto">Auto-resolve</button>
+        </div>
+      </div>`),
+        (a.querySelector("#b-auto").onclick = () => {
+          (p = !1), (a.hidden = !0);
+          let B = bAutoFinish(battleNew(spec, (Date.now() >>> 0) ^ 0x9e37));
+          done(B);
+        }),
+        (a.querySelector("#b-grid").onclick = () => {
+          (p = !1), (a.hidden = !0), gridBattle(spec, mine, done);
+        });
+    }
+    // The grid: your side always at the bottom.
+    function gridBattle(spec, mine, done) {
+      let B = battleNew(spec, (Date.now() >>> 0) ^ 0x51ed),
+        sel = null,
+        flip = mine === "def",
+        foe = bFoe(mine),
+        lastLog = 0;
+      (o.hidden = !0), (r.hidden = !1);
+      let chip = (u, extra) =>
+          `<button type="button" class="bu ${u.side === mine ? "mine" : "theirs"}${u.militia ? " militia" : ""}${sel === u ? " sel" : ""}${extra || ""}" data-u="${B.sides[u.side].units.indexOf(u)}" data-s="${u.side}">
+            <b>${UNIT_KINDS[u.kind].short}</b><span>${u.str}</span></button>`,
+        draw = () => {
+          let moves = sel ? bMoves(B, sel) : [],
+            tg = sel ? bTargets(B, sel) : [],
+            rows = [];
+          for (let k = 0; k < BROWS; k++) {
+            let rr = flip ? k : BROWS - 1 - k,
+              cells = [];
+            for (let c = 0; c < BCOLS; c++) {
+              let u = bAt(B, c, rr),
+                isMove = moves.some(([a1, b1]) => a1 === c && b1 === rr),
+                isTgt = tg.some(([a1, b1]) => a1 === c && b1 === rr),
+                flag = c === 1 && (rr === 0 || rr === BROWS - 1) ? (rr === bHome(mine) ? " flag-mine" : " flag-theirs") : "";
+              cells.push(
+                `<div class="bcell${isMove ? " can-move" : ""}${isTgt ? " can-hit" : ""}${flag}" data-c="${c}" data-r="${rr}">${u ? chip(u) : ""}</div>`,
+              );
+            }
+            rows.push(cells.join(""));
+          }
+          let res = (side) =>
+              bAlive(B, side)
+                .filter((u) => !u.pos)
+                .map((u) => chip(u, " reserve"))
+                .join("") || '<span class="muted">none</span>',
+            S = B.sides[mine],
+            myTurn = B.turn === mine && !B.over,
+            newLog = B.log.slice(lastLog);
+          lastLog = B.log.length;
+          r.innerHTML = `
+        <div class="bwrap">
+          <div class="bmain">
+            <h1>${G(spec.title)}</h1>
+            <p class="sub">Round ${Math.min(B.round, BMAXROUND)} of ${BMAXROUND}. ${B.over ? "" : myTurn ? `Your turn: ${S.attacksLeft} attack${S.attacksLeft === 1 ? "" : "s"} left.` : "Their turn."}</p>
+            <div class="bres theirs"><span>${G(B.sides[foe].name)} reserves</span>${res(foe)}</div>
+            <div class="bgrid">${rows.join("")}</div>
+            <div class="bres mine"><span>Your reserves</span>${res(mine)}</div>
+            <div class="row">
+              ${B.over ? '<button type="button" id="b-done" class="primary">Back to the map</button>' : `<button type="button" id="b-end" class="primary" ${myTurn ? "" : "disabled"}>End turn</button><button type="button" id="b-auto">Auto-finish</button>`}
+            </div>
+            <p class="muted">Click one of your units, then a green square to move or a red one to attack. Bring units in from reserve onto your home row. Infantry move or attack; dragoons move two, or one and charge; artillery fire straight up their column. Take the enemy flag square, or drive them all from the field, to win.</p>
+          </div>
+          <div class="bside">
+            <h3>${B.over ? (B.over.winner === mine ? "Victory" : "Defeat") : "Battle log"}</h3>
+            ${B.over ? `<p class="find-stat">${G(overText(B, mine))}</p>` : ""}
+            <ul class="blog">${B.log.slice(-14).map((q) => `<li>${G(q)}</li>`).join("")}</ul>
+          </div>
+        </div>`;
+          r.querySelectorAll(".bu").forEach((el) => {
+            el.onclick = (ev) => {
+              ev.stopPropagation();
+              let u = B.sides[el.dataset.s].units[+el.dataset.u];
+              if (u.side === mine && myTurn) (sel = sel === u ? null : u), draw();
+              else if (sel && el.parentElement.classList.contains("can-hit")) hit(el.parentElement);
+            };
+          });
+          r.querySelectorAll(".bcell").forEach((el) => {
+            el.onclick = () => {
+              if (!sel || !myTurn) return;
+              let c = +el.dataset.c,
+                rr = +el.dataset.r;
+              el.classList.contains("can-move") ? (bMove(B, sel, c, rr), (sel = bMoves(B, sel).length || bTargets(B, sel).length ? sel : null), draw()) : el.classList.contains("can-hit") && hit(el);
+            };
+          });
+          let be_ = r.querySelector("#b-end");
+          be_ &&
+            (be_.onclick = () => {
+              (sel = null), bEndTurn(B), B.over || (bAiTurn(B), bEndTurn(B)), draw();
+            });
+          let ba = r.querySelector("#b-auto");
+          ba && (ba.onclick = () => ((sel = null), bAutoFinish(B), draw()));
+          let bd = r.querySelector("#b-done");
+          bd && (bd.onclick = () => ((r.hidden = !0), (o.hidden = !1), done(B)));
+        },
+        hit = (el) => {
+          bAttack(B, sel, +el.dataset.c, +el.dataset.r), (sel = bTargets(B, sel).length ? sel : null), draw();
+        };
+      // The defender may move first when it is the enemy's raid: the
+      // attacker always opens.
+      B.turn !== mine && (bAiTurn(B), bEndTurn(B));
+      draw();
+    }
+    function overText(B, mine) {
+      let w = B.over.winner === mine,
+        why = w
+          ? { flag: "you took their flag square", rout: "you drove them from the field", withdraw: "they broke off the attack", time: "they could not break through in time" }[B.over.why]
+          : { flag: "they took your flag square", rout: "your men were driven from the field", withdraw: "your attack broke off", time: "you could not break through in time" }[B.over.why];
+      return `${w ? "You won" : "You lost"}: ${why}.`;
+    }
+    // A raid on one of your colonies arrives: choose how to fight it.
+    function raidPrompt(rd) {
+      let col = t.colonies.find((c) => c.id === rd.target),
+        v = natives(t).villages.find((q) => q.id === rd.village);
+      if (!col || !v) {
+        (t.pendingRaids = (t.pendingRaids || []).filter((q) => q !== rd)), R();
+        return;
+      }
+      _(col.x, col.y);
+      let spec = { kind: "raid", title: `Warriors from ${v.name} attack ${col.name}`, att: villageForce(t, v, !0), def: colonyDefence(t, col) };
+      preBattle(spec, "def", (B) => {
+        let msg = resolveRaid(t, rd, B);
+        (t.pendingRaids = (t.pendingRaids || []).filter((q) => q !== rd)), t.log.push(msg), (h = msg), R();
+      });
+    }
+    // Your soldiers attack a village they stand beside.
+    function attackVillage(u, v) {
+      let me_ = V(t).id,
+        stack = t.units.filter((q) => q.owner === me_ && !q.aboard && q.x === u.x && q.y === u.y && (arm(q.kind) || q.kind === "leader")),
+        lead = stack.find((q) => q.kind === "leader"),
+        L = lead ? leaderStats(lead) : null,
+        troops = stack.filter((q) => arm(q.kind)).slice(0, L ? L.cmd : 99);
+      if (!troops.length) {
+        (h = "Only soldiers, dragoons and artillery can attack a village."), R();
+        return;
+      }
+      let nat = nationOf(t, v),
+        spec = {
+          kind: "attack",
+          title: `Attack on ${v.name} of the ${nat.name}`,
+          att: { name: "Your force", leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
+          def: villageForce(t, v, !1),
+        };
+      preBattle(spec, "att", (B) => {
+        for (let q of troops) q.mp = 0;
+        let msg = resolveVillageAttack(t, me_, troops.map((q) => q.id), v, B, lead && lead.id);
+        t.log.push(msg), (h = msg), R();
+      });
+    }
     // Every square in the colony's land where the building would fit, with
     // the productivity it would get there, and the best of them.
     function placePlan(f) {
@@ -10429,6 +11421,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <p class="muted">Supplies take a turn or more to arrive, depending on distance.</p>`
           : "",
         Ae = f.governor,
+        gd = colonyDefence(t, f),
+        garrison = `
+      <h3 class="side-sub">Garrison</h3>
+      <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && q.name !== "Fort guns").length} soldiers` : ""}. ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 1 attack a turn. Bring a leader into the colony to command it."}</p>`,
+        nearV = natives(t)
+          .villages.filter((q) => Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= 12 && k.explored[q.y * t.map.width + q.x] === "1")
+          .sort((q1, q2) => Math.hypot(q1.x - f.x, q1.y - f.y) - Math.hypot(q2.x - f.x, q2.y - f.y)),
+        natHtml = nearV.length
+          ? `
+      <h3 class="side-sub">Native villages nearby</h3>
+      <ul class="natives">${nearV
+        .map((q) => {
+          let nt = nationOf(t, q),
+            att = nt.att[k.id] || 0,
+            word = attitudeWord(att),
+            of = villageOffer(t, q),
+            per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`;
+          return `<li><b>${G(q.name)}</b> · ${G(nt.name)} · <span class="att ${word}">${word}</span><br>
+            ${word === "hostile" ? '<small class="down">Will not trade. May raid colonies within 16 squares.</small>' : q.tradedYear === t.year ? "<small>Traded this year.</small>" : `<small>Wants ${Ne[of.want].toLowerCase()} this year: ${per}.</small> <button type="button" class="nat-trade" data-v="${q.id}">Trade 10</button>`}
+            <button type="button" class="nat-gift" data-v="${q.id}" ${f.stock.gold >= 10 ? "" : "disabled"}>Gift 10 gold</button></li>`;
+        })
+        .join("")}</ul>
+      <p class="muted">Colonies close to their villages make a nation less friendly each year. Gifts and trade win them back. Drag soldiers onto a village beside them to attack it.</p>`
+          : "",
         eu = europeTurns(t, f),
         onWay = (t.shipments || []).filter((E) => E.to === "europe" && E.from === f.id),
         sell = `
@@ -10463,8 +11479,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <h3 class="side-sub">Build</h3>
       <div class="build-list">${v}</div>
       <div class="row">${f.level >= 4 ? '<span class="muted">The colony is at the top level.</span>' : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land one square all round.</small></button>`}</div>
+      ${garrison}
       ${X}
       ${sell}
+      ${natHtml}
       <p class="muted">Click anywhere outside the colony to go back to the map.</p>
       <div class="minimap-wrap"><canvas id="minimap" width="288" height="216"></canvas></div>`),
         (s.querySelector("#auto-toggle").onclick = () => {
@@ -10536,6 +11554,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
                 : (h = `There is no room for a ${nm.toLowerCase()} in this colony's land.`);
             }
             R();
+          };
+        });
+      s.querySelectorAll(".nat-trade").forEach((E) => {
+        E.onclick = () => {
+          let res = nativeTrade(t, f.id, +E.dataset.v, 10);
+          x(res), res.ok && res.note && (h = res.note), R();
+        };
+      }),
+        s.querySelectorAll(".nat-gift").forEach((E) => {
+          E.onclick = () => {
+            let res = nativeGift(t, f.id, +E.dataset.v, 10);
+            x(res), res.ok && res.note && (h = res.note), R();
           };
         });
       let sl = s.querySelector("#sell-send");
