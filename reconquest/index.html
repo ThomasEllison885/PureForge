@@ -39,8 +39,10 @@ button:hover { background: #fff8ea; }
 button:disabled { opacity: 0.45; cursor: default; }
 button.primary { background: #8c6a2f; color: #fff8ea; border-color: #6d5122; }
 button.ghost { background: transparent; color: var(--paper); border-color: #3d5160; }
-#next-unit.pending { background: #2f6b5a; color: #fff8ea; border-color: #7fd0b4; box-shadow: 0 0 0 0 rgba(127, 208, 180, 0.7); animation: nextPulse 1.8s ease-out infinite; }
-@keyframes nextPulse { 0% { box-shadow: 0 0 0 0 rgba(127, 208, 180, 0.6); } 70% { box-shadow: 0 0 0 7px rgba(127, 208, 180, 0); } 100% { box-shadow: 0 0 0 0 rgba(127, 208, 180, 0); } }
+#next-unit.pending { position: relative; background: #2f6b5a; color: #fff8ea; border-color: #7fd0b4; }
+/* The pulse is a ring scaled and faded on its own layer, so the page is not repainted each frame. */
+#next-unit.pending::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; border: 2px solid rgba(127, 208, 180, 0.7); pointer-events: none; will-change: transform, opacity; animation: nextPulse 1.8s ease-out infinite; }
+@keyframes nextPulse { 0% { transform: scale(1); opacity: 0.9; } 70% { transform: scale(1.12, 1.35); opacity: 0; } 100% { transform: scale(1.12, 1.35); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #next-unit.pending { animation: none; } }
 
 #battle {
@@ -7919,7 +7921,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }
       };
     if (settling && baseZoom != null && baseZoom !== rz) {
-      layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
+      // the overview underneath, so ground just uncovered is never black
+      blitTerrace(e, o.map, r, null), layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
       clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 130));
       return;
     }
@@ -7953,7 +7956,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           break;
         }
       }
-    if (!complete) baseZoom != null && baseZoom !== rz ? (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom)) : blitTerrace(e, o.map, r, null);
+    if (!complete) blitTerrace(e, o.map, r, null), baseZoom != null && baseZoom !== rz && (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom));
     current();
     complete && ((baseZoom = rz), (prevZoom = null));
     // Keep memory in check: forget the tiles least recently on screen,
@@ -11539,8 +11542,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function yt(e, n, o, r, i) {
     if (r.bounds && r.bounds.blocked.size) {
-      let s = [...r.bounds.edge];
-      Wn(e, o, s, "rgba(160, 48, 40, 0.22)", n.map),
+      Wn(e, o, r.bounds.edge, "rgba(160, 48, 40, 0.22)", n.map),
         Hn(
           e,
           o,
@@ -11759,14 +11761,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     e.beginPath();
     let steps = map ? terraceOf(map) : null,
       w = map ? map.width : 0,
-      h = map ? map.height : 0;
-    for (let i of o) {
-      let [s, a] = i.split(",").map(Number),
-        L =
-          steps && s >= 0 && a >= 0 && s < w && a < h
-            ? steps[a * w + s] * Tk * n.zoom
-            : 0,
-        t = YL(s - 0.5, a - 0.5, n, L),
+      h = map ? map.height : 0,
+      cw = (e.canvas && e.canvas.clientWidth) || 1e6,
+      ch = (e.canvas && e.canvas.clientHeight) || 1e6,
+      sq = o instanceof Set ? sqCache.get(o) : null;
+    if (!sq || sq.n !== o.size || sq.map !== map) {
+      let list = [];
+      for (let i of o) {
+        let [s, a] = i.split(",").map(Number);
+        list.push(s, a, steps && s >= 0 && a >= 0 && s < w && a < h ? steps[a * w + s] : 0);
+      }
+      (sq = { n: o.size, map, list }), o instanceof Set && sqCache.set(o, sq);
+    }
+    for (let q = 0; q < sq.list.length; q += 3) {
+      let s = sq.list[q],
+        a = sq.list[q + 1],
+        L = sq.list[q + 2] * Tk * n.zoom,
+        c0 = YL(s, a, n, L);
+      if (c0.x < -80 || c0.y < -80 || c0.x > cw + 80 || c0.y > ch + 80) continue;
+      let t = YL(s - 0.5, a - 0.5, n, L),
         l = YL(s + 0.5, a - 0.5, n, L),
         d = YL(s + 0.5, a + 0.5, n, L),
         u = YL(s - 0.5, a + 0.5, n, L);
@@ -11778,29 +11791,40 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     (e.fillStyle = r), e.fill();
   }
-  function Hn(e, n, o, r, i, s, map) {
-    e.save(), e.beginPath();
+  // Outlines of a set of squares, worked out once per set and kept: corner
+  // pairs in map units plus the terrace step under the square.
+  var segCache = new WeakMap(),
+    sqCache = new WeakMap();
+  function outlineSegs(o, map) {
+    let c = o instanceof Set ? segCache.get(o) : null;
+    if (c && c.n === o.size && c.map === map) return c.s;
     let steps = map ? terraceOf(map) : null,
       w = map ? map.width : 0,
-      hh = map ? map.height : 0;
+      hh = map ? map.height : 0,
+      s = [];
     for (let a of o) {
       let [t, l] = a.split(",").map(Number),
-        L =
-          steps && t >= 0 && l >= 0 && t < w && l < hh
-            ? steps[l * w + t] * Tk * n.zoom
-            : 0,
-        d = [
-          [t + 1, l, [t + 0.5, l - 0.5], [t + 0.5, l + 0.5]],
-          [t - 1, l, [t - 0.5, l - 0.5], [t - 0.5, l + 0.5]],
-          [t, l + 1, [t - 0.5, l + 0.5], [t + 0.5, l + 0.5]],
-          [t, l - 1, [t - 0.5, l - 0.5], [t + 0.5, l - 0.5]],
-        ];
-      for (let [u, c, h, p] of d) {
-        if (o.has(`${u},${c}`)) continue;
-        let m = YL(h[0], h[1], n, L),
-          y = YL(p[0], p[1], n, L);
-        e.moveTo(m.x, m.y), e.lineTo(y.x, y.y);
-      }
+        st = steps && t >= 0 && l >= 0 && t < w && l < hh ? steps[l * w + t] : 0;
+      o.has(`${t + 1},${l}`) || s.push(t + 0.5, l - 0.5, t + 0.5, l + 0.5, st);
+      o.has(`${t - 1},${l}`) || s.push(t - 0.5, l - 0.5, t - 0.5, l + 0.5, st);
+      o.has(`${t},${l + 1}`) || s.push(t - 0.5, l + 0.5, t + 0.5, l + 0.5, st);
+      o.has(`${t},${l - 1}`) || s.push(t - 0.5, l - 0.5, t + 0.5, l - 0.5, st);
+    }
+    o instanceof Set && segCache.set(o, { n: o.size, map, s });
+    return s;
+  }
+  function Hn(e, n, o, r, i, s, map) {
+    e.save(), e.beginPath();
+    let sg = outlineSegs(o, map),
+      cw = (e.canvas && e.canvas.clientWidth) || 1e6,
+      ch = (e.canvas && e.canvas.clientHeight) || 1e6;
+    // only what is on screen is drawn
+    for (let k = 0; k < sg.length; k += 5) {
+      let L = sg[k + 4] * Tk * n.zoom,
+        m = YL(sg[k], sg[k + 1], n, L),
+        y = YL(sg[k + 2], sg[k + 3], n, L);
+      if ((m.x < -40 && y.x < -40) || (m.x > cw + 40 && y.x > cw + 40) || (m.y < -40 && y.y < -40) || (m.y > ch + 40 && y.y > ch + 40)) continue;
+      e.moveTo(m.x, m.y), e.lineTo(y.x, y.y);
     }
     (e.strokeStyle = r),
       (e.lineWidth = i),
@@ -13146,10 +13170,47 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         L = t && t.map ? terracePx(t.map, f.x, f.y, d.zoom) : 0;
       (d.ox = k.w / 2 - v.x), (d.oy = k.h / 2 - v.y + L);
     }
+    // One camera move at a time: a glide or a zoom step. Starting a new one,
+    // or grabbing the map, stops the last where it is.
+    let camAnim = 0;
+    function camStop() {
+      camAnim++, (zoomAnim = null);
+    }
+    // Glide the view to a square (and zoom) instead of jumping there.
+    function glide(x, y, zoom) {
+      if (!t) return;
+      let my = ++camAnim,
+        k = J(),
+        z0 = d.zoom,
+        z1 = zoom || d.zoom,
+        v = Y(x, y, { ox: 0, oy: 0, zoom: z1 }),
+        L = t.map ? terracePx(t.map, x, y, z1) : 0,
+        ox1 = k.w / 2 - v.x,
+        oy1 = k.h / 2 - v.y + L,
+        wx0 = (k.w / 2 - d.ox) / z0,
+        wy0 = (k.h / 2 - d.oy) / z0,
+        wx1 = (k.w / 2 - ox1) / z1,
+        wy1 = (k.h / 2 - oy1) / z1;
+      zoomAnim = null;
+      if (Math.abs(wx1 - wx0) * z0 < 2 && Math.abs(wy1 - wy0) * z0 < 2 && z0 === z1) return;
+      let t0 = performance.now(),
+        tick = (now) => {
+          if (my !== camAnim || !t) return;
+          let p = Math.min(1, (now - t0) / 280),
+            e2 = 1 - Math.pow(1 - p, 3),
+            z = z0 * Math.pow(z1 / z0, e2),
+            wx = wx0 + (wx1 - wx0) * e2,
+            wy = wy0 + (wy1 - wy0) * e2;
+          p < 1 ? ((d.zoom = z), (d.ox = k.w / 2 - wx * z), (d.oy = k.h / 2 - wy * z), _e(), requestAnimationFrame(tick)) : ((d.zoom = z1), (d.ox = ox1), (d.oy = oy1), _e());
+        };
+      requestAnimationFrame(tick);
+    }
     // Drawing resolution adapts to keep frames quick: if a run of frames
     // comes slower than about 45 a second it steps down, and it creeps
     // back up when there is room. Press F to see the frame time.
-    let renderCap = 2,
+    // A big high-resolution screen starts a little below full sharpness:
+    // filling five million pixels a frame is too much for many laptops.
+    let renderCap = window.innerWidth * window.innerHeight * (window.devicePixelRatio || 1) ** 2 > 3.5e6 ? 1.5 : 2,
       frameLog = [],
       lastFrameAt = 0,
       meter = null;
@@ -13157,11 +13218,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let dt = ts - lastFrameAt;
       lastFrameAt = ts;
       if (dt > 0 && dt < 120) frameLog.push(dt), frameLog.length > 40 && frameLog.shift();
-      if (frameLog.length >= 30) {
+      if (frameLog.length >= 20) {
         let avg = frameLog.reduce((a, q) => a + q, 0) / frameLog.length,
           dpr = window.devicePixelRatio || 1;
-        if (avg > 22 && renderCap > 1) (renderCap = Math.max(1, renderCap - 0.25)), (frameLog = []);
-        else if (avg < 13 && renderCap < Math.min(2, dpr)) (renderCap = Math.min(2, renderCap + 0.25)), (frameLog = []);
+        if (avg > 21 && renderCap > 1) (renderCap = Math.max(1, renderCap - 0.25)), (frameLog = []);
+        else if (avg < 12 && frameLog.length >= 40 && renderCap < Math.min(2, dpr)) (renderCap = Math.min(2, renderCap + 0.25)), (frameLog = []);
         meter && (meter.textContent = `${avg.toFixed(1)} ms a frame \u00b7 drawing at ${Math.min(window.devicePixelRatio || 1, renderCap).toFixed(2)}x`);
       }
     }
@@ -13201,6 +13262,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       panLast = 0,
       panOn = !1;
     function panStart() {
+      camStop();
       if (panOn) return;
       (panOn = !0), (panLast = performance.now()), requestAnimationFrame(panStep);
     }
@@ -13238,15 +13300,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }, 120));
     };
     mapRepaint = () => pe();
-    // How long one square of a move takes on screen. Everyone walks or sails
-    // at a pace you can follow: an explorer's full run takes about twelve
-    // seconds, any other move about ten, never faster than 450 ms a square.
+    // How long one square of a move takes on screen: brisk enough that a
+    // move answers the drag at once, slow enough to follow. A long run takes
+    // about a second and a half.
     function paceOne(w) {
       let u = j(t, w.unitId),
         steps = Math.max(1, w.path.length - 1);
       return u && u.kind === "explorer"
-        ? Math.max(450, Math.min(1500, Math.round(12e3 / steps)))
-        : Math.max(450, Math.min(1300, Math.round(10e3 / steps)));
+        ? Math.max(90, Math.min(160, Math.round(1800 / steps)))
+        : Math.max(100, Math.min(170, Math.round(1500 / steps)));
     }
     // Milliseconds of animation played so far, not counting time spent paused
     // on a discovery.
@@ -13482,6 +13544,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ? { path: w, stops: gr(t, f, w), x: g, y: k }
         : { path: null, x: g, y: k };
     }
+    // The settler's spacing line and resource rings, kept until a colony
+    // or find changes.
+    let duKeep = null,
+      huKeep = null;
+    function duMemo(L) {
+      let w = t.map.width,
+        key = L.id + "#" + t.colonies.map((c) => `${c.id}:${c.x},${c.y}${c.owner === L.id || L.explored[c.y * w + c.x] === "1" ? "v" : ""}`).join("|");
+      return (duKeep && duKeep.key === key) || (duKeep = { key, v: du(t, L) }), duKeep.v;
+    }
+    function huMemo(L) {
+      let key = L.id + "#" + (t.map.specials || []).filter((s) => s.foundBy === L.id).length;
+      return (huKeep && huKeep.key === key) || (huKeep = { key, v: hu(t, L) }), huKeep.v;
+    }
     function _e() {
       if (!t || o.hidden) return;
       let f = J();
@@ -13494,7 +13569,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       let g = l ? j(t, l) : null,
-        v = g && g.kind === "ship" ? Xe(t, g.id) : [],
+        v = g && g.kind === "ship" ? PF("d.shore", () => Xe(t, g.id)) : [],
         b = y ? t.colonies.find((te) => te.id === y) : null,
         w = b ? Vn(b) : null,
         F =
@@ -13516,13 +13591,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             : D && D.foundBy != null && L.explored[u.y * t.map.width + u.x] === "1"
               ? D
               : null,
-        bound = g && g.kind === "settler" && !g.aboard && !y ? du(t, L) : null,
-        rings = bound ? hu(t, L) : null,
+        bound = g && g.kind === "settler" && !g.aboard && !y ? PF("d.bound", () => duMemo(L)) : null,
+        rings = bound ? PF("d.rings", () => huMemo(L)) : null,
         route =
           c && c.moved && P && g && g.id === P && u && !y
             ? Se(g, u.x, u.y)
             : null;
-      So(f.ctx, f, t, d, {
+      PF("d.So", () => So(f.ctx, f, t, d, {
         shore: v,
         hover: b ? u : null,
         selected: l,
@@ -13535,7 +13610,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         picked: b ? S : null,
         bounds: bound,
         rings,
-      });
+      }));
       updateTip();
     }
     // The hover label in the corner, written only when it changes.
@@ -13764,7 +13839,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             let X = t.map.specials.find(
               (Ae) => Ae.id === Number(I.dataset.find),
             );
-            X && (_(X.x, X.y), (u = { x: X.x, y: X.y }), _e());
+            X && (glide(X.x, X.y), (u = { x: X.x, y: X.y }), _e());
           };
         });
       let D = s.querySelector("#explore");
@@ -13808,7 +13883,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let pgo = s.querySelector("#pin-go");
       pgo && (pgo.onclick = () => {
         let P = pinned();
-        P && (_(P.x, P.y), R());
+        P && (glide(P.x, P.y), R());
       });
       let fin = s.querySelector("#fed-invite");
       fin &&
@@ -13904,7 +13979,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         </div>
       </div>`),
         (a.querySelector("#goto-find").onclick = () => {
-          Yn(t, f.id), (H = null), _(g.x, g.y), (u = { x: g.x, y: g.y }), R();
+          Yn(t, f.id), (H = null), glide(g.x, g.y), (u = { x: g.x, y: g.y }), R();
         }),
         (a.querySelector("#close-find").onclick = () => {
           Yn(t, f.id), (H = null), R();
@@ -14067,7 +14142,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let g = i.getBoundingClientRect();
       return { x: f.clientX - g.left, y: f.clientY - g.top };
     }
-    i.addEventListener("mousedown", (f) => {
+    i.style.touchAction = "none";
+    i.addEventListener("pointerdown", (f) => {
+      if (f.button > 0) return;
+      camStop();
       (c = { x: f.clientX, y: f.clientY, ox: d.ox, oy: d.oy, moved: !1 }),
         (P = null);
       // Units can be picked up while other moves play; only one still on
@@ -14089,7 +14167,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       P == null && i.classList.add("drag");
     }),
-      window.addEventListener("mouseup", (f) => {
+      window.addEventListener("pointerup", (f) => {
         if (!c) return;
         let g = c.moved,
           k = P;
@@ -14223,7 +14301,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           Rn(hu ? hu.x : b.x, hu ? hu.y : b.y);
         }
       }),
-      window.addEventListener("mousemove", (f) => {
+      window.addEventListener("pointermove", (f) => {
         if (c && P) {
           let v = Fe(f),
             b = tileAt(t.map, v.x, v.y, d);
@@ -14260,12 +14338,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (f) => {
           if (!t) return;
           f.preventDefault();
-          // A wheel notch, or a good swipe on a trackpad, is one level.
+          // A mouse wheel notch is one zoom level. On a laptop trackpad two
+          // fingers slide the map and a pinch zooms.
           let g = Fe(f),
-            px = f.deltaY * (f.deltaMode === 1 ? 16 : f.deltaMode === 2 ? 400 : 1);
+            mouse = f.deltaMode !== 0 || (!f.ctrlKey && !f.deltaX && f.wheelDeltaY && Math.abs(f.wheelDeltaY) >= 120 && f.wheelDeltaY % 120 === 0);
+          if (!f.ctrlKey && !mouse) {
+            camStop(), (d.ox -= f.deltaX), (d.oy -= f.deltaY), pe();
+            return;
+          }
+          let px = f.deltaY * (f.deltaMode === 1 ? 16 : f.deltaMode === 2 ? 400 : 1);
           wheelAcc = Date.now() - wheelAt > 300 ? px : wheelAcc + px;
           wheelAt = Date.now();
-          if (Math.abs(wheelAcc) >= 50) zoomStep(wheelAcc > 0 ? -1 : 1, g.x, g.y), (wheelAcc = 0);
+          if (Math.abs(wheelAcc) >= (f.ctrlKey ? 14 : 50)) zoomStep(wheelAcc > 0 ? -1 : 1, g.x, g.y), (wheelAcc = 0);
         },
         { passive: !1 },
       );
@@ -14289,14 +14373,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ky = (py - d.oy + L0) / d.zoom,
         from = d.zoom,
         t0 = performance.now();
+      let my = ++camAnim;
       zoomAnim = { to };
       let tick = () => {
+        // a newer zoom step or glide has taken over
+        if (my !== camAnim) return;
         let q = Math.min(1, (performance.now() - t0) / 140),
           ez = 1 - (1 - q) * (1 - q);
         d.zoom = from * Math.pow(to / from, ez);
         let L1 = terracePx(t.map, tp.x, tp.y, d.zoom);
         (d.ox = px - kx * d.zoom), (d.oy = py - ky * d.zoom + L1), _e();
-        q < 1 ? requestAnimationFrame(tick) : ((zoomAnim = null), R());
+        q < 1 ? requestAnimationFrame(tick) : ((zoomAnim = null), _e());
       };
       requestAnimationFrame(tick);
     }
@@ -14380,7 +14467,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     function Re(f) {
       (y = f), (T = null), (S = null), (m = !1), (a.hidden = !0);
       let g = t.colonies.find((k) => k.id === f);
-      g && q({ x: g.x, y: g.y }, Math.max(d.zoom, $.zoom.colony)), R();
+      g && glide(g.x, g.y, Math.max(zoomAnim ? zoomAnim.to : d.zoom, $.zoom.colony)), R();
     }
     function Kn() {
       (y = null), (T = null), (h = ""), R();
@@ -15104,7 +15191,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (el) =>
           (el.onclick = () => {
             let q = list[+el.dataset.k];
-            close(), _(q.x, q.y), (u = { x: q.x, y: q.y }), R();
+            close(), glide(q.x, q.y), (u = { x: q.x, y: q.y }), R();
           }),
       );
       a.querySelector("#sum-close").onclick = () => (close(), R());
@@ -15571,14 +15658,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         t.lastTraces,
         f,
         () => {
-          v && ((l = v.id), _(v.x, v.y)), R();
+          v && ((l = v.id), glide(v.x, v.y)), R();
         },
         !0,
         !0,
       ),
         O
           ? (h = "Click the map to watch this turn's moves.")
-          : v && ((l = v.id), _(v.x, v.y)),
+          : v && ((l = v.id), glide(v.x, v.y)),
         (m = !0),
         R();
     }
@@ -15613,7 +15700,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       y && ((y = null), (T = null), (S = null)),
         (l = u.id),
         (h = ""),
-        _(u.x, u.y),
+        glide(u.x, u.y),
         R();
     }
     (e.querySelector("#next-unit").onclick = () => nextUnit()),
