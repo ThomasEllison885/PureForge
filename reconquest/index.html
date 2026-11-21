@@ -502,7 +502,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.01";
+    "1.02";
   var on = [
       {
         id: "spain",
@@ -13338,114 +13338,146 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (d < 3.4 && Math.sin(e * 0.9 + n * 0.6) > -0.15) return "f";
       return "p";
     }
+    // The title screen's backdrop: a New World coast at dawn. The still
+    // parts are painted once per window size; clouds, sea glints, ships and
+    // birds move on top, gently, and only while the title screen is open.
+    let titleBg = null,
+      titleRaf = 0;
     function titleCoast() {
       if (!n || n.hidden) return;
-      let e = document.getElementById("title-coast");
-      if (!e) return;
-      let o = window.innerWidth,
-        r = window.innerHeight,
-        i = window.devicePixelRatio || 1,
-        s = Math.max(1, Math.floor(o * i)),
-        a = Math.max(1, Math.floor(r * i));
-      e.width !== s && (e.width = s), e.height !== a && (e.height = a);
-      let t = e.getContext("2d");
-      if (!t) return;
-      t.setTransform(i, 0, 0, i, 0, 0),
-        (t.fillStyle = "rgb(22,52,74)"),
-        t.fillRect(0, 0, o, r);
-      let l = o < 800 ? 0.95 : Math.max(0.95, Math.min(1.2, o / 1200)),
-        c = l * 32,
-        h = l * 16,
-        p = o * 0.2 - 96 * l,
-        m = r * 0.46 - 240 * l,
-        y = { ox: p, oy: m, zoom: l },
-        u = [];
-      for (let b = -6; b < 48; b++)
-        for (let w = -6; w < 36; w++) {
-          let F = (b - w) * c + p,
-            D = (b + w) * h + m;
-          if (F < -100 || F > o + 100 || D < -100 || D > r + 100) continue;
-          u.push([b, w, coastKind(b, w), F, D]);
+      let el = document.getElementById("title-coast");
+      if (!el) return;
+      let W = window.innerWidth,
+        H = window.innerHeight,
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+      (el.width !== Math.round(W * dpr) || el.height !== Math.round(H * dpr)) && ((el.width = Math.round(W * dpr)), (el.height = Math.round(H * dpr)));
+      let key = `${W}x${H}x${dpr}`;
+      (!titleBg || titleBg.key !== key) && (titleBg = { key, cv: titleStill(W, H, dpr), W, H, dpr });
+      titleFrame(performance.now());
+      titleRaf || (titleRaf = requestAnimationFrame(titleTick));
+    }
+    let titleLast = 0;
+    function titleTick(now) {
+      titleRaf = 0;
+      if (!n || n.hidden) return;
+      // about thirty frames a second is plenty for drifting clouds
+      now - titleLast > 32 && ((titleLast = now), titleFrame(now));
+      titleRaf = requestAnimationFrame(titleTick);
+    }
+    function titleStill(W, H, dpr) {
+      let cv = $o(Math.round(W * dpr), Math.round(H * dpr)),
+        g = cv.getContext("2d"),
+        rnd = bn(1500),
+        R = (a2, b2) => a2 + rnd() * (b2 - a2),
+        hz = H * 0.56;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // dawn sky
+      let sky = g.createLinearGradient(0, 0, 0, hz);
+      sky.addColorStop(0, "#1d2c4a"), sky.addColorStop(0.45, "#5a5a7a"), sky.addColorStop(0.8, "#d8946a"), sky.addColorStop(1, "#f2c48a");
+      (g.fillStyle = sky), g.fillRect(0, 0, W, hz + 2);
+      let sx = W * 0.8,
+        sy = hz - H * 0.02,
+        sun = g.createRadialGradient(sx, sy, 0, sx, sy, H * 0.45);
+      sun.addColorStop(0, "rgba(255,244,200,1)"), sun.addColorStop(0.06, "rgba(255,226,160,0.9)"), sun.addColorStop(0.3, "rgba(255,190,120,0.25)"), sun.addColorStop(1, "rgba(255,170,110,0)");
+      (g.fillStyle = sun), g.fillRect(0, 0, W, hz + 2);
+      // far ranges, bluest farthest
+      let range = (base, amp, col, n2, seed) => {
+        let r2 = bn(seed);
+        (g.fillStyle = col), g.beginPath(), g.moveTo(-20, hz);
+        for (let q = 0; q <= n2; q++) {
+          let x = -20 + ((W + 40) * q) / n2,
+            y = hz - base - r2() * amp;
+          g.lineTo(x, y);
         }
-      u.sort((b, w) => b[0] + b[1] - (w[0] + w[1]));
-      let L = {
-        o: W.deep,
-        s: W.shallow,
-        f: W.forest,
-        p: W.plains,
-        h: W.hills,
-        m: W.mountains,
+        g.lineTo(W + 20, hz), g.fill();
       };
-      for (let [b, w, F] of u) {
-        let base = L[F],
-          col =
-            F === "f" || F === "p"
-              ? tone(base, b, w, !1)
-              : `rgb(${base[0]},${base[1]},${base[2]})`;
-        Qe(t, y, b, w, 1, 1, 0),
-          (t.fillStyle = col),
-          (t.strokeStyle = col),
-          (t.lineWidth = 3),
-          t.fill(),
-          t.stroke();
+      range(H * 0.08, H * 0.08, "rgba(96,104,140,0.75)", 18, 11);
+      range(H * 0.03, H * 0.06, "rgba(70,80,106,0.85)", 12, 23);
+      // the sea
+      let sea = g.createLinearGradient(0, hz, 0, H);
+      sea.addColorStop(0, "#7a8aa0"), sea.addColorStop(0.15, "#4a6a86"), sea.addColorStop(1, "#16324a");
+      (g.fillStyle = sea), g.fillRect(0, hz, W, H - hz);
+      // sun path on the water
+      for (let q = 0; q < 40; q++) {
+        let y = hz + 3 + q * q * 0.35,
+          w2 = (6 + q * 2.4) * (0.6 + rnd() * 0.6);
+        if (y > H) break;
+        (g.fillStyle = `rgba(255,220,160,${0.5 - q * 0.011})`), g.fillRect(sx - w2 / 2 + R(-6, 6), y, w2, 1.4);
       }
+      // the forested coast down the left
+      let coast = (pts, col) => ((g.fillStyle = col), g.beginPath(), pts.forEach(([x, y], q) => (q ? g.lineTo(x, y) : g.moveTo(x, y))), g.fill());
+      coast([[-10, hz - H * 0.02], [W * 0.1, hz - H * 0.05], [W * 0.2, hz - H * 0.02], [W * 0.3, hz + H * 0.01], [W * 0.26, hz + H * 0.12], [W * 0.16, hz + H * 0.24], [W * 0.1, H * 0.94], [-10, H + 10]], "#2a3e28");
+      coast([[-10, hz + H * 0.02], [W * 0.18, hz + H * 0.03], [W * 0.24, hz + H * 0.1], [W * 0.14, hz + H * 0.24], [W * 0.06, H + 10], [-10, H + 10]], "#22341f");
+      // surf along that shore
+      (g.strokeStyle = "rgba(230,240,240,0.55)"), (g.lineWidth = 2), g.beginPath(), g.moveTo(W * 0.3, hz + H * 0.012), g.quadraticCurveTo(W * 0.285, hz + H * 0.08, W * 0.265, hz + H * 0.122), g.quadraticCurveTo(W * 0.2, hz + H * 0.19, W * 0.165, hz + H * 0.245), g.stroke();
+      // the headland on the right, cliffs and pines
+      coast([[W + 10, hz - H * 0.06], [W * 0.92, hz - H * 0.07], [W * 0.86, hz - H * 0.03], [W * 0.84, hz + H * 0.04], [W * 0.88, hz + H * 0.1], [W * 0.95, hz + H * 0.13], [W + 10, hz + H * 0.15]], "#3a4434");
+      coast([[W * 0.84, hz + H * 0.04], [W * 0.88, hz + H * 0.1], [W * 0.88, hz + H * 0.115], [W * 0.84, hz + H * 0.055]], "#6a6a5a");
+      let pine = (x, y, h2, col) => ((g.fillStyle = col), g.beginPath(), g.moveTo(x, y - h2), g.lineTo(x - h2 * 0.28, y), g.lineTo(x + h2 * 0.28, y), g.fill());
+      for (let q = 0; q < 26; q++) pine(R(W * 0.86, W + 10), hz - H * 0.06 + R(-4, 10), R(14, 30), q % 2 ? "#1f2e1c" : "#26381f");
+      // forest on the left coast: rows of trees, larger nearer
+      for (let row = 0; row < 7; row++) {
+        let y0 = hz - H * 0.03 + row * H * 0.05,
+          x1 = W * (0.28 - row * 0.02),
+          sz = 12 + row * 6;
+        for (let x = -10; x < x1; x += sz * 0.55) {
+          let y = y0 + R(-4, 4);
+          rnd() < 0.45
+            ? pine(x, y, sz * 1.5, row % 2 ? "#1c2c1a" : "#24361f")
+            : (disc(g, x, y - sz * 0.6, sz * 0.55, sz * 0.5, row % 2 ? "#26401f" : "#2e4a26"), disc(g, x - sz * 0.15, y - sz * 0.8, sz * 0.3, sz * 0.26, "rgba(120,160,80,0.35)"));
+        }
+      }
+      // warm light on the treetops facing the sun
+      let rim = g.createLinearGradient(0, 0, W * 0.3, 0);
+      rim.addColorStop(0, "rgba(255,200,140,0)"), rim.addColorStop(1, "rgba(255,200,140,0.12)"), (g.fillStyle = rim), g.fillRect(0, hz - H * 0.1, W * 0.3, H);
+      // a soft vignette
+      let vg = g.createRadialGradient(W / 2, H * 0.5, Math.min(W, H) * 0.4, W / 2, H * 0.5, Math.max(W, H) * 0.8);
+      vg.addColorStop(0, "rgba(0,0,0,0)"), vg.addColorStop(1, "rgba(0,0,0,0.35)"), (g.fillStyle = vg), g.fillRect(0, 0, W, H);
+      return cv;
+    }
+    function titleFrame(now) {
+      let el = document.getElementById("title-coast");
+      if (!el || !titleBg) return;
+      let { W, H, dpr, cv } = titleBg,
+        g = el.getContext("2d"),
+        hz = H * 0.56,
+        t2 = now / 1000;
+      g.setTransform(1, 0, 0, 1, 0, 0), g.drawImage(cv, 0, 0), g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // clouds drifting
+      for (let q = 0; q < 5; q++) {
+        let x = (((q * 0.27 + t2 * 0.006 * (1 + q * 0.2)) % 1.3) - 0.15) * W,
+          y = H * (0.1 + q * 0.07),
+          w2 = W * (0.12 + (q % 3) * 0.05);
+        g.save(), g.translate(x, y), g.scale(1, 0.25);
+        let cg = g.createRadialGradient(0, 0, 0, 0, 0, w2);
+        cg.addColorStop(0, `rgba(255,236,220,${0.32 - q * 0.03})`), cg.addColorStop(1, "rgba(255,236,220,0)");
+        (g.fillStyle = cg), g.beginPath(), g.arc(0, 0, w2, 0, Math.PI * 2), g.fill(), g.restore();
+      }
+      // glints on the sea
+      for (let q = 0; q < 26; q++) {
+        let a2 = (Math.sin(t2 * 1.6 + q * 7.3) + 1) / 2,
+          x = ((q * 0.137 + 0.31) % 1) * W,
+          y = hz + 10 + ((q * 0.071) % 1) * (H - hz - 20);
+        a2 > 0.75 && ((g.fillStyle = `rgba(255,240,210,${(a2 - 0.75) * 1.6})`), g.fillRect(x, y, 6 + (y - hz) * 0.04, 1.3));
+      }
+      // ships: a caravel coasting in, and one far out on the horizon
+      let ship = (x, y, sc, tilt) => (g.save(), g.translate(x, y), g.rotate(tilt), g.scale(sc, sc), Tt(g, "#c0392b"), g.restore());
+      // in the open water right of the setup panel, where they can be seen
       let sheet = document.getElementById("title-sheet"),
         box = sheet ? sheet.getBoundingClientRect() : null,
-        open = (b, w) =>
-          !box ||
-          b < box.left - 6 ||
-          b > box.right + 6 ||
-          w < box.top - 6 ||
-          w > box.bottom + 6;
-      for (let [b, w, F, D, X] of u)
-        if (F === "f" && open(D, X)) {
-          t.save(),
-            t.translate(D, X),
-            t.scale(l, l),
-            st(t, b, w, 11, !1),
-            t.restore();
-        }
-      let aim =
-          o < 800
-            ? { x: o * 0.5, y: 62 }
-            : { x: Math.min(200, o * 0.14), y: Math.min(r * 0.34, 280) },
-        best = null,
-        bd = 1e9,
-        sea = null,
-        sd = 1e9;
-      for (let q of u) {
-        if (!open(q[3], q[4])) continue;
-        let d = (q[3] - aim.x) ** 2 + (q[4] - aim.y) ** 2;
-        q[2] === "s" && d < bd && ((bd = d), (best = q)),
-          q[2] === "o" && d < sd && ((sd = d), (sea = q));
-      }
-      best = best || sea;
-      if (best) {
-        let sc = Math.max(l * 1.7, 1);
-        t.save(),
-          t.translate(best[3], best[4]),
-          t.scale(sc, sc),
-          Tt(t, "#e2c57a"),
-          t.restore();
-      }
-      if (o >= 800) {
-        let who = null,
-          wd = 1e9,
-          at = { x: o * 0.86, y: Math.min(r * 0.64, 560) };
-        for (let q of u) {
-          if (q[2] !== "p" && q[2] !== "h") continue;
-          if (!open(q[3], q[4])) continue;
-          let d = (q[3] - at.x) ** 2 + (q[4] - at.y) ** 2;
-          d < wd && ((wd = d), (who = q));
-        }
-        if (who) {
-          let sc = Math.max(l * 1.35, 0.85);
-          t.save(),
-            t.translate(who[3], who[4]),
-            t.scale(sc, sc),
-            $t(t, "#8c2f39", "explorer"),
-            t.restore();
-        }
+        x0 = box && box.right < W * 0.85 ? box.right + 30 : W * 0.55,
+        x1 = W * 0.83,
+        span = Math.max(40, x1 - x0),
+        sx2 = x0 + ((t2 * 6) % span),
+        sy2 = hz + H * 0.27 + Math.sin(t2 * 1.3) * 3;
+      ship(sx2, sy2, Math.max(1.6, H / 300), Math.sin(t2 * 1.1) * 0.04);
+      ship(x1 - ((t2 * 2) % span) * 0.6, hz + 6 + Math.sin(t2) * 0.6, Math.max(0.6, H / 900), 0);
+      // birds
+      for (let q = 0; q < 4; q++) {
+        let bx = ((0.12 + q * 0.05 + t2 * 0.01) % 1.2) * W,
+          by = H * (0.24 + (q % 2) * 0.03) + Math.sin(t2 * 2 + q) * 4,
+          f = Math.sin(t2 * 9 + q * 2) * 4;
+        (g.strokeStyle = "rgba(30,30,40,0.6)"), (g.lineWidth = 1.5), g.beginPath(), g.moveTo(bx - 8, by - f), g.quadraticCurveTo(bx - 3, by - 4, bx, by), g.quadraticCurveTo(bx + 3, by - 4, bx + 8, by - f), g.stroke();
       }
     }
     function A() {
