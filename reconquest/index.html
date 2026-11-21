@@ -245,6 +245,16 @@ ul.colony-list small { color: #5c5144; }
 #intro canvas.iscene { position: absolute; inset: 0; width: 100%; height: 100%; }
 #intro .iload { position: absolute; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 10px; color: #f4ead2; font: 600 16px Palatino, Georgia, serif; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #intro .iskip { position: absolute; left: 24px; bottom: 18px; margin: 0; color: rgba(244,234,210,0.6); font: 13px "Segoe UI", sans-serif; }
+.advice { margin: 10px 0 4px; padding: 8px 12px; border-radius: 6px; border-left: 5px solid #b9a67e; background: rgba(0,0,0,0.04); font: 14px "Segoe UI", sans-serif; }
+.advice b { font: 700 16px Palatino, Georgia, serif; }
+.advice ul { margin: 4px 0 0; padding-left: 18px; }
+.advice.good { border-left-color: #3a8a4a; background: rgba(58,138,74,0.1); }
+.advice.good b { color: #2a6a38; }
+.advice.poor { border-left-color: #b0442e; background: rgba(176,68,46,0.08); }
+.advice.poor b { color: #9a2a20; }
+.announce-card { display: flex; gap: 16px; align-items: flex-start; max-width: 560px; }
+.announce-card .ann-art { flex: none; width: 120px; height: 90px; border-radius: 6px; background: linear-gradient(#cfe0c0, #9ab878); border: 1px solid #b9a67e; }
+.announce-card.raid .ann-art { background: linear-gradient(#e8c8a0, #b88a5a); }
 .raidbox { position: relative; display: inline-flex; align-items: baseline; gap: 10px; margin: 2px 0 4px; padding: 3px 12px 7px; border-radius: 6px; border: 1px solid #b9a67e; background: rgba(250, 244, 230, 0.95); color: #3a2a18; overflow: hidden; font: 14px "Segoe UI", sans-serif; }
 .raidbox b { font: 700 24px Palatino, Georgia, serif; min-width: 3.2em; }
 .raidbox.theirs b { color: #9a2a20; }
@@ -4222,6 +4232,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     });
   }
   // A village's warriors, for a battle in or around it.
+  // A raiding party; the first lesson raid is only a couple of warriors.
+  function raidForce(e, rd, v) {
+    let f = villageForce(e, v, !0);
+    return rd && rd.small ? { ...f, units: f.units.slice(0, 2) } : f;
+  }
   function villageForce(e, v, raiding) {
     let nat = nationOf(e, v),
       n = raiding ? Math.max(2, Math.ceil(v.warriors * 0.7)) : v.warriors,
@@ -4267,6 +4282,36 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let v of N.villages) {
       v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < (v.fed != null ? 0.6 : 0.3) && (v.warriors += 1);
       v.gold < 10 + v.size * 20 && (v.gold += 1);
+    }
+    // A first, small war party: two turns after your first colony stands,
+    // a few warriors from the nearest village come to see what you are made
+    // of. It teaches what a raid is and how to meet one.
+    if (hum && !e.lessonRaid) {
+      let mine = e.colonies.filter((c) => c.owner === hum.id);
+      if (mine.length) {
+        e.lessonRaidAt == null && (e.lessonRaidAt = e.year + 2);
+        if (e.year >= e.lessonRaidAt) {
+          e.lessonRaid = 1;
+          let col = mine[0],
+            v = N.villages
+              .filter((q) => q.fed == null || q.fed !== hum.id)
+              .sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y))[0];
+          if (v && Math.hypot(v.x - col.x, v.y - col.y) <= 60) {
+            let dx = Math.sign(v.x - col.x) || 1,
+              dy = Math.sign(v.y - col.y);
+            N.raids.push({ id: N.nextRaid++, village: v.id, target: col.id, x: col.x + dx, y: col.y + dy, year: e.year, small: !0 });
+            e.log.push(`Scouts report a small war party from ${v.name} closing on ${col.name}.`);
+            (e.announce || (e.announce = [])).push({
+              kind: "raid",
+              year: e.year,
+              title: `Warriors are coming for ${col.name}`,
+              text: `Scouts have seen a small war party from ${v.name} a short way from ${col.name}. They will strike next year. A town defends itself with its militia, but soldiers inside, best of all with a leader, hold it far better. Move what men you have into ${col.name}. When they strike you can fight it out on the battlefield or let it resolve itself.`,
+              x: col.x,
+              y: col.y,
+            });
+          }
+        }
+      }
     }
     // Hostile villages may send a new party at a colony within reach.
     for (let v of N.villages) {
@@ -4317,7 +4362,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       v = natives(e).villages.find((q) => q.id === rd.village);
     if (!col || !v) return "";
     let def = colonyDefence(e, col, v.nation);
-    B || (B = bAutoFinish(battleNew({ kind: "raid", title: "", att: villageForce(e, v, !0), def }, rd.id * 31 + e.year)));
+    B || (B = bAutoFinish(battleNew({ kind: "raid", title: "", att: raidForce(e, rd, v), def }, rd.id * 31 + e.year)));
     applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner);
     let rounds = B.raidRounds + (B.over.winner === "att" ? 3 : 0),
       took = [];
@@ -5438,13 +5483,53 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let tot = {};
       for (let k of keys) tot[k] = theirs.reduce((a, c) => a + (c.stock[k] || 0), 0);
       let give = keys.slice().sort((a, b) => tot[b] - tot[a])[0],
-        want = keys.filter((k) => k !== give)[Math.floor(z(r.id + 3, e.year, (e.seed >>> 0) + 2217) * 3)],
         value = { food: 1, wood: 1.2, metal: 3, goods: 5 },
         n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
         fair = 0.8 + z(r.id + 9, e.year, (e.seed >>> 0) + 2219) * 0.5,
-        ask = Math.max(1, Math.round((n * value[give] * fair) / value[want]));
+        // only ask for what one of your colonies can actually pay
+        most = (k) => Math.max(0, ...e.colonies.filter((c) => c.owner === hum.id).map((c) => c.stock[k] || 0)),
+        opts = keys.filter((k) => k !== give),
+        start = Math.floor(z(r.id + 3, e.year, (e.seed >>> 0) + 2217) * 3),
+        want = null,
+        ask = 0;
+      for (let q = 0; q < opts.length && !want; q++) {
+        let k = opts[(start + q) % opts.length],
+          a2 = Math.max(1, Math.round((n * value[give] * fair) / value[k]));
+        most(k) >= a2 && ((want = k), (ask = a2));
+      }
+      if (!want) continue;
       P.offers.push({ kind: "trade", id: P.nextArmy++, from: r.id, give, n, want, ask });
     }
+  }
+  // Advice on a trade: is it a fair price, does the colony need what comes
+  // in, can it spare what goes out, and will the storehouse hold it?
+  function tradeAdvice(e, offer, pay, get) {
+    let VAL = { food: 1, wood: 1.2, metal: 3, goods: 5 },
+      gName = Ne[offer.give].toLowerCase(),
+      wName = Ne[offer.want].toLowerCase(),
+      why = [],
+      score = 0;
+    if (!pay || !get) return { verdict: "fair", head: "", why };
+    let inNet = yn(e, get).net[offer.give] || 0,
+      outNet = yn(e, pay).net[offer.want] || 0,
+      cap = storeCap(get, offer.give),
+      room = Math.max(0, cap - (get.stock[offer.give] || 0)),
+      kept = Math.min(offer.n, room),
+      worth = kept * (VAL[offer.give] || 1),
+      price = offer.ask * (VAL[offer.want] || 1),
+      ratio = worth / Math.max(1, price),
+      left = (pay.stock[offer.want] || 0) - offer.ask,
+      nextLv = pay.level < 4 ? ge("center", pay.level + 1) : null,
+      wantForLevel = nextLv && nextLv[offer.want] ? nextLv[offer.want] : 0;
+    ratio >= 1.2 ? (why.push(`A good price: what you get is worth about ${Math.round((ratio - 1) * 100)}% more than what you pay.`), (score += 2)) : ratio >= 0.9 ? (why.push("A fair price."), (score += 0.5)) : why.push(`A poor price: you pay about ${Math.round((1 / Math.max(0.01, ratio) - 1) * 100)}% more than it is worth.`), ratio < 0.9 && (score -= 2);
+    if (inNet < 0 || (get.stock[offer.give] || 0) < 20) why.push(`${get.name} is short of ${gName}${inNet < 0 ? `, losing ${-inNet} a year` : ""}.`), (score += 2);
+    if (kept < offer.n) why.push(`${get.name}'s storehouse can hold only ${kept} more ${gName}; the rest would go to waste.`), (score -= kept === 0 ? 4 : 1);
+    if (left < 0) why.push(`${pay.name} does not have ${offer.ask} ${wName}.`), (score -= 6);
+    else if (outNet < 0 && left < 30) why.push(`${pay.name} is already short of ${wName}.`), (score -= 2);
+    else if (wantForLevel && left < wantForLevel && (pay.stock[offer.want] || 0) >= wantForLevel) why.push(`${pay.name} needs its ${wName} to reach level ${pay.level + 1}.`), (score -= 1.5);
+    why.push("Trading also warms relations with them a little.");
+    let verdict = score >= 2 ? "good" : score >= 0 ? "fair" : "poor";
+    return { verdict, head: verdict === "good" ? "Worth taking" : verdict === "fair" ? "A fair trade, if you want it" : "Better to decline", why };
   }
   function acceptTrade(e, offer, payId, getId) {
     let hum = e.players.find((p) => p.isHuman),
@@ -6205,7 +6290,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     i.push(...gn.slice(0, 4));
     gn.length > 4 && i.push(`And ${gn.length - 4} more pieces of colony news; the log at the bottom of the screen has them all.`);
     if ((e.arrivedThisTurn || []).includes(n.id))
-      i.push("The storeship has arrived with two settlers, an explorer, and a second leader with his soldiers.");
+      i.push("The storeship has arrived with your settlers, an explorer, and a second leader with his soldiers.");
     else {
       let p = (e.arrivals || []).find((m) => m.owner === n.id);
       p && i.push(`The storeship with the settlers is due in ${p.year}.`);
@@ -7017,7 +7102,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let m = je(s, u.year);
     return s.native
       ? (u.log.push(`${u.year}. Runners bring word of strange ships off the eastern shore. ${m} rules from the high city.`),
-        u.log.push("Your leader, two scouts, two bands of settlers and a company of warriors stand ready on home ground. Found your first town where you like."),
+        u.log.push("Your leader, two scouts, a band of settlers and a company of warriors stand ready on home ground. Found your first town where you like."),
         u)
       : (u.log.push(`${s.name} sails west in ${u.year}. ${m} rules at home.`),
         u.log.push(`One ship, with your leader, a few soldiers to guard the landing, and two explorers. Find good ground for colonies first. The storeship with your settlers, another explorer and a second leader is due in ${vr()}.`),
@@ -7070,7 +7155,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       L2 = freshLeader(Le(e, o, "leader", s[0], s[1], nat.leaders[(o.nextLeader || 1) % nat.leaders.length]), 1, 2);
     (o.nextLeader = (o.nextLeader || 1) + 1), (L2.aboard = a.id);
     // Settlers, an explorer, and a second leader with a few soldiers.
-    for (let t of ["settler", "settler", "explorer", "infantry", "infantry", "infantry"]) {
+    for (let t of ["settler", "explorer", "infantry", "infantry", "infantry"]) {
       let l = Le(e, o, t, s[0], s[1], t === "settler" ? "Settlers" : t === "explorer" ? "Explorer" : "Guard");
       (l.aboard = a.id), t === "infantry" && ((l.strength = 3), (l.maxStr = 3), (l.leaderId = L2.id));
     }
@@ -7187,7 +7272,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     r.push(o), (n.anchor = [...o]);
     let a = freshLeader(Le(e, n, "leader", o[0], o[1], i.leaders[0]), 1, 2);
     for (let k = 0; k < 2; k++) Le(e, n, "explorer", o[0], o[1], "Scout");
-    for (let k = 0; k < 2; k++) Le(e, n, "settler", o[0], o[1], "Settlers");
+    Le(e, n, "settler", o[0], o[1], "Settlers");
     for (let k = 0; k < 3; k++) {
       let d = Le(e, n, "infantry", o[0], o[1], "Warriors");
       (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
@@ -7580,11 +7665,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         e.arrivedThisTurn.push(r.owner),
         ze(e, r.owner);
       let s = e.players.find((a) => a.isHuman);
-      s &&
-        r.owner === s.id &&
-        e.log.push(
-          "The storeship has arrived with two settlers, an explorer, and a second leader with his soldiers.",
-        );
+      if (s && r.owner === s.id) {
+        e.log.push("The storeship has arrived with your settlers, an explorer, and a second leader with his soldiers.");
+        let st = e.units.find((u) => u.owner === s.id && u.kind === "settler");
+        (e.announce || (e.announce = [])).push({
+          kind: "settlers",
+          year: e.year,
+          title: "Your settlers have arrived",
+          text: "The storeship is in with a band of settlers, an explorer, and a second leader with his soldiers. Sail her to good ground near a river or the coast, put the settlers ashore, select them, and press Found colony. Your first colony is where everything else begins.",
+          x: st ? st.x : r.spot && r.spot[0],
+          y: st ? st.y : r.spot && r.spot[1],
+          unitId: st ? st.id : null,
+        });
+      }
     }
     e.arrivedThisTurn.length && Dn(e), (e.governorNews = []);
     let o = Do(e);
@@ -13429,8 +13522,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // A new game opens with a short scene while the map is made ready.
       let fresh = t.year === $.startYear && !t.welcomed,
         qs = new URLSearchParams(location.search),
-        intro = fresh && (!qs.has("test") || qs.has("intro"));
-      intro ? introPlay(V(t).nationId, () => !skip && setTimeout(welcomeCard, 150)) : fresh && !skip && setTimeout(welcomeCard, 350);
+        intro = !qs.has("test") || qs.has("intro");
+      intro ? introPlay(V(t).nationId, () => fresh && !skip && setTimeout(welcomeCard, 150)) : fresh && !skip && setTimeout(welcomeCard, 350);
     }
     // The opening scene: dawn over the mountains, an explorer climbs onto a
     // ledge and plants the flag at the sight of a great peak. About three
@@ -13559,7 +13652,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (ta > 0) {
           (g.globalAlpha = ta), (g.textAlign = "center"), (g.fillStyle = "#fff6e4"), (g.shadowColor = "rgba(0,0,0,0.5)"), (g.shadowBlur = 8);
           (g.font = `600 ${Math.round(Math.min(64, W / 14))}px Palatino, Georgia, serif`), g.fillText("The New World", W * 0.5, H * 0.16);
-          (g.font = `${Math.round(Math.min(24, W / 40))}px Palatino, Georgia, serif`), g.fillText(`${$.startYear} \u00b7 ${(ee[natId] && ee[natId].name) || ""}`, W * 0.5, H * 0.16 + Math.min(40, W / 24));
+          (g.font = `${Math.round(Math.min(24, W / 40))}px Palatino, Georgia, serif`), g.fillText(`${(t && t.year) || $.startYear} \u00b7 ${(ee[natId] && ee[natId].name) || ""}`, W * 0.5, H * 0.16 + Math.min(40, W / 24));
           (g.globalAlpha = 1), (g.shadowBlur = 0);
         }
         // the hourglass, sand running and the glass turning over
@@ -13733,14 +13826,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     };
     mapRepaint = () => pe();
     // How long one square of a move takes on screen: brisk enough that a
-    // move answers the drag at once, slow enough to follow: about a third of
-    // a second a square, and a long run takes three to four seconds.
+    // move answers the drag at once, slow enough to follow: about half a
+    // second a square, and a long run takes five or six seconds.
     function paceOne(w) {
       let u = j(t, w.unitId),
         steps = Math.max(1, w.path.length - 1);
       return u && u.kind === "explorer"
-        ? Math.max(220, Math.min(360, Math.round(4000 / steps)))
-        : Math.max(240, Math.min(380, Math.round(3200 / steps)));
+        ? Math.max(380, Math.min(600, Math.round(6500 / steps)))
+        : Math.max(400, Math.min(640, Math.round(5500 / steps)));
     }
     // Milliseconds of animation played so far, not counting time spent paused
     // on a discovery.
@@ -14119,6 +14212,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         H !== rdNow.key && ((H = rdNow.key), rdNow.run());
       } else if (!p && t.politics && t.politics.over && !t.politics.over.seen) {
         H !== "end" && ((H = "end"), endScreen(t.politics.over));
+      } else if (!p && t.announce && t.announce.length && ((t.announce = t.announce.filter((q) => q.kind !== "raid" || q.year == null || q.year >= t.year)), t.announce.length)) {
+        let an = t.announce[0],
+          w = `announce:${an.kind}:${t.year}`;
+        H !== w && ((H = w), announceCard(an));
       } else if (!p && t.politics && t.politics.offers.length && (staleOffers(t), t.politics.offers.length)) {
         let of = t.politics.offers[0],
           w = `offer:${of.id}`;
@@ -15391,7 +15488,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       _(col.x, col.y);
-      let spec = { kind: "raid", title: `Warriors from ${v.name} attack ${col.name}`, att: villageForce(t, v, !0), def: colonyDefence(t, col, v.nation) };
+      let spec = { kind: "raid", title: `Warriors from ${v.name} attack ${col.name}`, att: raidForce(t, rd, v), def: colonyDefence(t, col, v.nation) };
       preBattle(spec, "def", (B) => {
         let msg = resolveRaid(t, rd, B, !0);
         (t.pendingRaids = (t.pendingRaids || []).filter((q) => q !== rd)), t.log.push(msg), (h = msg), R();
@@ -15617,17 +15714,59 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <div class="card">
         <p class="find-kicker">Trade offer · ${G(diploLevel(relOf(t, me.id, r.id)).name)}</p>
         <h2>${G(nationName(r))} offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()}</h2>
-        <p class="muted">A fair trade warms relations. The goods change hands at once.</p>
         <label class="pick">Paid from <select id="of-pay">${opts(payDef)}</select></label>
         <label class="pick">Delivered to <select id="of-get">${opts(mine.slice().sort((x1, x2) => (x1.stock[of.give] || 0) - (x2.stock[of.give] || 0))[0])}</select></label>
+        <div id="of-advice" class="advice"></div>
         <p id="of-err" class="down"></p>
         <div class="row"><button type="button" id="of-yes" class="primary">Accept</button><button type="button" id="of-no">Decline</button></div>
       </div>`;
+      // The advice follows whichever colonies are picked.
+      let advise = () => {
+        let pc = mine.find((c) => c.id === +a.querySelector("#of-pay").value),
+          gc = mine.find((c) => c.id === +a.querySelector("#of-get").value),
+          ad = tradeAdvice(t, of, pc, gc),
+          box = a.querySelector("#of-advice");
+        box.className = `advice ${ad.verdict}`;
+        box.innerHTML = `<b>${G(ad.head)}</b><ul>${ad.why.map((q) => `<li>${G(q)}</li>`).join("")}</ul>`;
+        a.querySelector("#of-yes").classList.toggle("primary", ad.verdict !== "poor");
+        a.querySelector("#of-no").classList.toggle("primary", ad.verdict === "poor");
+      };
+      a.querySelector("#of-pay").onchange = advise;
+      a.querySelector("#of-get").onchange = advise;
+      advise();
       a.querySelector("#of-yes").onclick = () => {
         let res = acceptTrade(t, of, +a.querySelector("#of-pay").value, +a.querySelector("#of-get").value);
         res.ok ? done(res.note) : (a.querySelector("#of-err").textContent = res.error);
       };
       a.querySelector("#of-no").onclick = () => done(`You declined ${nationName(r)}'s offer.`);
+    }
+    // A short announcement: the settlers are here, or warriors are coming.
+    function announceCard(an) {
+      let close = (go) => {
+        (t.announce = (t.announce || []).filter((q) => q !== an)), (p = !1), (a.hidden = !0), (H = null);
+        go && an.x != null && (an.unitId && (l = an.unitId), glide(an.x, an.y));
+        R();
+      };
+      p = !0;
+      a.hidden = !1;
+      a.innerHTML = `
+      <div class="card announce-card ${an.kind}">
+        <canvas class="ann-art" width="120" height="90"></canvas>
+        <div>
+          <p class="find-kicker">${an.kind === "raid" ? "Warning" : "Arrival"} \u00b7 ${t.year}</p>
+          <h2>${G(an.title)}</h2>
+          <p>${G(an.text)}</p>
+          <div class="row"><button type="button" id="an-go" class="primary">Show me</button><button type="button" id="an-ok">Carry on</button></div>
+        </div>
+      </div>`;
+      let cv = a.querySelector(".ann-art"),
+        g = cv.getContext("2d"),
+        L = lookOf(V(t).nationId);
+      g.save(), g.translate(60, an.kind === "raid" ? 80 : 70), g.scale(an.kind === "raid" ? 2.1 : 2.6, an.kind === "raid" ? 2.1 : 2.6);
+      an.kind === "raid" ? (figure(g, -8, 0, LOOKS.tribe, null, { hand: (q) => (spear(q), shield(q)) }), figure(g, 8, 2, LOOKS.tribe, null, { hand: (q) => (spear(q), shield(q)) })) : settlerArt(g, L, null, ee[V(t).nationId].color);
+      g.restore();
+      a.querySelector("#an-go").onclick = () => close(!0);
+      a.querySelector("#an-ok").onclick = () => close(!1);
     }
     // Everything that happened this year in one box. Show me takes you there.
     function summaryBox(list, again) {
