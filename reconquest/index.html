@@ -13853,7 +13853,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       );
     }
     let H = null,
-      Pe = !1;
+      Pe = !1,
+      heldCards = !1;
     function pe() {
       Pe ||
         ((Pe = !0),
@@ -14261,7 +14262,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nu_ && (nu_.classList.toggle("pending", idle_ > 0), (nu_.textContent = idle_ ? `Next unit (${idle_})` : "Next unit"));
       let k = l ? j(t, l) : null;
       let rdNow = !p && nextFight();
-      if ((De(k, f), _e(), O)) {
+      De(k, f), _e();
+      // Never pop a card up under a hand that is still dragging a unit or
+      // the map: it waits until the button is let go.
+      if (c && !p) {
+        heldCards = !0;
+        return;
+      }
+      if (O) {
         if (O.hold) {
           let it = O.hold.item;
           if (holdOpen(it)) {
@@ -14799,6 +14807,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let g = c.moved,
           k = P;
         if (((c = null), (P = null), i.classList.remove("drag"), !t)) return;
+        // a card held back during the drag shows once this move is made
+        heldCards && ((heldCards = !1), setTimeout(() => t && R(), 0));
         let v = Fe(f),
           b = tileAt(t.map, v.x, v.y, d);
         if (k && g) {
