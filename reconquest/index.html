@@ -13301,14 +13301,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     };
     mapRepaint = () => pe();
     // How long one square of a move takes on screen: brisk enough that a
-    // move answers the drag at once, slow enough to follow. A long run takes
-    // about a second and a half.
+    // move answers the drag at once, slow enough to follow: about a third of
+    // a second a square, and a long run takes three to four seconds.
     function paceOne(w) {
       let u = j(t, w.unitId),
         steps = Math.max(1, w.path.length - 1);
       return u && u.kind === "explorer"
-        ? Math.max(90, Math.min(160, Math.round(1800 / steps)))
-        : Math.max(100, Math.min(170, Math.round(1500 / steps)));
+        ? Math.max(220, Math.min(360, Math.round(4000 / steps)))
+        : Math.max(240, Math.min(380, Math.round(3200 / steps)));
     }
     // Milliseconds of animation played so far, not counting time spent paused
     // on a discovery.
