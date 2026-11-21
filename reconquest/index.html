@@ -7045,6 +7045,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function tileId(zoom, ti, tj) {
     return `${zoom}|${ti},${tj}`;
   }
+  // Mark stale every cached tile overlapping one square-chunk of ground.
+  function staleChunk(k) {
+    let [cx, cy] = k.split(",").map(Number),
+      x0 = cx * TCH,
+      y0 = cy * TCH,
+      x1 = x0 + TCH,
+      y1 = y0 + TCH;
+    for (let [id, t] of mapTiles) {
+      let z = t.zoom,
+        TS = TILE / (t.dpr || 1),
+        c = id.slice(id.indexOf("|") + 1).split(","),
+        tx = +c[0] * TS,
+        ty = +c[1] * TS,
+        // the chunk's diamond on screen, with room for trees and hills
+        minx = (x0 - y1) * 32 * z - 100 * z,
+        maxx = (x1 - y0) * 32 * z + 100 * z,
+        miny = (x0 + y0) * 16 * z - 120 * z,
+        maxy = (x1 + y1) * 16 * z + 60 * z;
+      tx + TS > minx && tx < maxx && ty + TS > miny && ty < maxy && (t.key = null);
+    }
+  }
   function staleAround(o, explored, a) {
     let prev = tileExplored;
     tileExplored = explored;
@@ -8671,7 +8692,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               let old = [...st.chunks.entries()].sort((a, b) => a[1].used - b[1].used);
               for (let i = 0; i < st.chunks.size - TMAXCH; i++) st.chunks.delete(old[i][0]);
             }
-            (job = null), onTerrainReady && onTerrainReady();
+            onTerrainReady && onTerrainReady(job.k), (job = null);
           }
           if (performance.now() - t0 > 7) break;
         }
@@ -12416,11 +12437,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       tearArm = null;
     // Repaint when a detailed piece of ground finishes painting.
     let readyTimer = 0;
-    onTerrainReady = () => {
+    // Only the map tiles over the newly painted piece of ground are redrawn.
+    let readyChunks = [];
+    onTerrainReady = (k) => {
+      k && readyChunks.push(k);
       readyTimer ||
         (readyTimer = setTimeout(() => {
-          (readyTimer = 0), tileEpoch++, pe();
-        }, 200));
+          readyTimer = 0;
+          let list = readyChunks;
+          readyChunks = [];
+          for (let ck of list) staleChunk(ck);
+          pe();
+        }, 120));
     };
     mapRepaint = () => pe();
     // How long one square of a move takes on screen. Everyone walks or sails
