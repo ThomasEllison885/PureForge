@@ -173,6 +173,7 @@ footer.bar { border-bottom: 0; border-top: 1px solid #1e3342; height: 92px; alig
 #mini canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; cursor: pointer; }
 #maptip { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 260px); z-index: 4; padding: 5px 10px; border-radius: 5px; background: rgba(12, 22, 30, 0.82); color: #e8eef2; font: 13px "Segoe UI", sans-serif; pointer-events: none; }
 #maptip:empty { display: none; }
+.frame-meter { position: absolute; left: 10px; top: 10px; z-index: 8; padding: 4px 8px; border-radius: 4px; background: rgba(0,0,0,0.7); color: #9fe8b0; font: 12px ui-monospace, Menlo, monospace; }
 #toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: min(560px, calc(100% - 400px)); z-index: 7; padding: 8px 14px; border-radius: 6px; background: rgba(250, 244, 230, 0.96); color: #4a2a14; border: 1px solid #b9a67e; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); font: 14px "Segoe UI", sans-serif; }
 #map { width: 100%; height: 100%; display: block; cursor: grab; }
 #map.drag { cursor: grabbing; }
@@ -231,6 +232,19 @@ ul.colony-list small { color: #5c5144; }
 .bwrap { display: grid; grid-template-columns: minmax(300px, 500px) 1fr; gap: 24px; align-items: start; }
 .bboard { padding: 10px; border-radius: 10px; margin: 8px 0; background: radial-gradient(ellipse at 30% 20%, rgba(150,170,90,0.35), transparent 60%), radial-gradient(ellipse at 80% 85%, rgba(60,80,30,0.5), transparent 55%), repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0 3px, transparent 3px 9px), linear-gradient(#5d7a3a, #48632c); box-shadow: inset 0 0 30px rgba(0,0,0,0.45), 0 3px 10px rgba(0,0,0,0.4); border: 3px solid #6b5432; }
 .bgrid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 96px; gap: 5px; }
+.bboard.scene { position: relative; padding: 46px 14px 14px; background: #4a6030; }
+.bboard.scene.behind-me { padding: 14px 14px 56px; }
+.bboard.scene canvas.bscene { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; }
+.bboard.scene .bgrid { position: relative; z-index: 1; grid-auto-rows: 118px; }
+.bboard.scene .bcell { background: rgba(0,0,0,0.03); border-color: rgba(255,250,220,0.16); align-items: flex-end; align-content: flex-end; padding-bottom: 3px; }
+.bboard.scene .bcell.home-mine { background: rgba(40,70,120,0.12); }
+.bboard.scene .bcell.home-theirs { background: rgba(120,40,30,0.12); }
+.bboard.scene .bcell.can-move { background: rgba(90,200,90,0.26); }
+.bboard.scene .bcell.can-hit { background: rgba(220,60,40,0.3); }
+.bboard.scene .bu { width: auto; height: 22px; flex-direction: row; gap: 2px; padding: 0 4px; opacity: 0.92; }
+.bboard.scene .bu svg { width: 14px; height: 14px; }
+.bboard.scene .bu span { font-size: 12px; }
+.bboard.scene .bu.sel { outline: 2px solid #ffe9a0; opacity: 1; }
 .bcell { background: rgba(30,45,18,0.25); border: 1px solid rgba(240,235,200,0.22); border-radius: 4px; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 3px; cursor: pointer; position: relative; }
 .bcell.home-mine { background: rgba(40,70,120,0.22); }
 .bcell.home-theirs { background: rgba(120,40,30,0.22); }
@@ -3360,6 +3374,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       stolen: { food: 0, wood: 0, goods: 0, gold: 0 },
       killed: 0,
       raidRounds: 0,
+      // What happened, in order, for the battle screen to play out.
+      fx: [],
     };
     for (let s of ["att", "def"]) B.sides[s].start = B.sides[s].units.reduce((a, u) => a + u.str, 0);
     bStartTurn(B);
@@ -3511,6 +3527,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       total = 0,
       fell = [];
     S.attacksLeft -= 1;
+    let fxShot = { t: "shot", side: group[0].side, to: [tc, tr], from: group.map((u) => ({ key: u.key, pos: u.pos.slice(), cls: bCls(u), charge: bHorse(u) && u.moved })), fell: [], hits: 0 };
     for (let u of group) {
       u.acted = !0;
       let t = bPickTarget(B, u, stack);
@@ -3538,6 +3555,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       dealt && hurt.set(t, (hurt.get(t) || 0) + dealt);
       t.str <= 0 && (bRemove(B, t), fell.push(t));
     }
+    (fxShot.hits = total), (fxShot.fell = fell.map((u) => ({ key: u.key }))), B.fx.push(fxShot);
     let one = (list) => list.length === 1 && !/s$|militia|artillery|infantry/i.test(list[0].name),
       cap = (w) => w.charAt(0).toUpperCase() + w.slice(1),
       msg = `${S.name || "They"}: ${bLabel(group)} attack${one(group) ? "s" : ""}${parts.length ? ` (${parts.join(", ")})` : ""}, ${total} hit${total === 1 ? "" : "s"}.`;
@@ -3549,9 +3567,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         theirs = S.leader,
         p = (1 - t.str / t.max) * 0.75 + 0.1 + d * 0.05 * ((theirs ? theirs.rep || 0 : 0) - (mine ? mine.charisma : 0));
       if (B.rng() >= Math.max(0, Math.min(0.85, p))) continue;
-      let back = t.pos[1] - bFwd(t.side);
-      if (back < 0 || back >= BROWS) bRemove(B, t), (msg += ` ${t.name} fall back into reserve.`);
-      else if (bRoom(B, t, t.pos[0], back)) bPlace(B, t, t.pos[0], back), (msg += ` ${t.name} fall back.`);
+      let back = t.pos[1] - bFwd(t.side),
+        was = t.pos.slice();
+      if (back < 0 || back >= BROWS) bRemove(B, t), (msg += ` ${t.name} fall back into reserve.`), B.fx.push({ t: "move", key: t.key, from: was, to: null });
+      else if (bRoom(B, t, t.pos[0], back)) bPlace(B, t, t.pos[0], back), (msg += ` ${t.name} fall back.`), B.fx.push({ t: "move", key: t.key, from: was, to: t.pos.slice() });
       else
         (t.str -= 1),
           (t.taken = (t.taken || 0) + 1),
@@ -3566,8 +3585,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function bMove(B, u, c, r) {
     if (!bMoves(B, u).some(([a, b]) => a === c && b === r)) return !1;
-    let wasIn = !!u.pos;
+    let wasIn = !!u.pos,
+      from = u.pos ? u.pos.slice() : null;
     bPlace(B, u, c, r), (u.moved = !0);
+    B.fx && B.fx.push({ t: "move", key: u.key, from, to: [c, r] });
     // Infantry and guns spend their turn moving; cavalry may still charge,
     // except when just coming on from reserve.
     (!bHorse(u) || !wasIn) && (u.acted = !0);
@@ -3791,11 +3812,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     // Friendly villages close by send warriors to help, never against
     // their own nation. Up to four come.
-    let allies = 0;
+    let allies = 0,
+      maxAllies = isNatNation(e.players.find((q) => q.id === col.owner)) ? 6 : 4;
     for (let v of nativeAllies(e, col, exceptNation)) {
-      let n = Math.min(2, Math.max(1, Math.floor(v.warriors / 3)));
-      for (let k = 0; k < n && allies < 4; k++, allies++)
-        units.push({ id: `a${v.id}-${k}`, kind: k % 2 ? "rider" : "brave", str: 3, ally: !0, village: v.id, name: k % 2 ? "Allied riders" : "Allied warriors" });
+      let n = Math.min(v.fed != null ? 3 : 2, Math.max(1, Math.floor(v.warriors / 3)));
+      for (let k = 0; k < n && allies < maxAllies; k++, allies++)
+        units.push({ id: `a${v.id}-${k}`, kind: k % 2 ? "rider" : "brave", str: v.fed != null ? 4 : 3, ally: !0, village: v.id, name: v.fed != null ? (k % 2 ? "Federated riders" : "Federated warriors") : k % 2 ? "Allied riders" : "Allied warriors" });
     }
     // Defenders fight from behind the town's walls and houses. A leader
     // with soldiers organises a real defence: raiders find it hard going
@@ -3803,16 +3825,67 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let real = here.find((u) => u.kind === "leader"),
       armed = here.some((u) => arm(u.kind)),
       cover = real && armed ? { att: 8, def: 5, rout: 0.8 } : real ? { att: 6, def: 3, rout: 0.65 } : armed ? { att: 4, def: 2, rout: 0.5 } : { att: 3, def: 1, rout: 0.5 };
-    return { name: col.name, nat: (e.players.find((q) => q.id === col.owner) || {}).nationId, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
+    return { name: col.name, nat: (e.players.find((q) => q.id === col.owner) || {}).nationId, scene: { kind: "town", level: col.level || 1, big: !!col.big }, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
   }
   function nativeAllies(e, col, exceptNation) {
     if (!e.natives) return [];
     return e.natives.villages
       .filter((v) => {
-        let nat = nationOf(e, v);
-        return nat && nat.id !== exceptNation && (nat.att[col.owner] || 0) >= 30 && v.warriors >= 2 && Math.max(Math.abs(v.x - col.x), Math.abs(v.y - col.y)) <= 10;
+        let nat = nationOf(e, v),
+          d = Math.max(Math.abs(v.x - col.x), Math.abs(v.y - col.y));
+        // Federated villages answer the empire's call from farther away.
+        if (v.fed != null) return v.fed === col.owner && v.warriors >= 2 && d <= 20;
+        return nat && nat.id !== exceptNation && (nat.att[col.owner] || 0) >= 30 && v.warriors >= 2 && d <= 10;
       })
-      .sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y));
+      .sort((a, b) => (b.fed != null) - (a.fed != null) || Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y));
+  }
+  // ---- Federation (the Ixtal Empire) ------------------------------------------
+  // The native power can bring villages into its federation: peacefully
+  // when their nation is friendly to it, or by force of arms. A federated
+  // village doubles in strength, sends warriors to defend the empire's
+  // towns from farther away, trades with any of its towns, never raids the
+  // empire, and raids the towns of anyone at war with it. The other
+  // nations grow uneasy at each one.
+  var FED_SCORE = 150;
+  function federate(e, pid, v, forced) {
+    let p = ce(e, pid),
+      nat = nationOf(e, v);
+    if (!p || v.fed != null) return "";
+    (v.fed = pid), (v.size = Math.min(8, (v.size || 1) * 2)), (v.warriors = Math.max(v.warriors, v.size + 2)), (v.raidCool = 2);
+    p.score = (p.score || 0) + FED_SCORE;
+    for (let n2 of natives(e).nations) n2 !== nat && shiftAttitude(n2, pid, -4);
+    nat && shiftAttitude(nat, pid, forced ? -25 : 5);
+    let msg = `${v.name} of the ${nat ? nat.name : "native"} people ${forced ? "is brought into" : "joins"} the ${nationName(p)}'s federation.`;
+    pushEvent(e, msg, v.x, v.y);
+    return msg;
+  }
+  function fedCount(e, pid) {
+    return natives(e).villages.filter((v) => v.fed === pid).length;
+  }
+  // A friendly village asked by a leader standing close by.
+  function inviteFederate(e, pid, vId) {
+    return be(e, () => {
+      let v = natives(e).villages.find((q) => q.id === vId),
+        p = ce(e, pid);
+      if (!v || !isNatNation(p)) return B("Only the native power can federate villages.");
+      if (v.fed != null) return B(`${v.name} is already federated.`);
+      let nat = nationOf(e, v);
+      if ((nat.att[pid] || 0) < 30) return B(`The ${nat.name} are not friendly enough to join you. Win them over, or bring ${v.name} in by force.`);
+      if (!e.units.some((u) => u.owner === pid && u.kind === "leader" && !u.aboard && Math.max(Math.abs(u.x - v.x), Math.abs(u.y - v.y)) <= 2))
+        return B(`Send a leader to ${v.name} to ask them.`);
+      return { ok: !0, discoveries: [], note: federate(e, pid, v, !1) };
+    });
+  }
+  // The computer's empire wins over friendly villages near its towns.
+  function rivalFederate(e, r) {
+    if (!isNatNation(r)) return;
+    let cols = e.colonies.filter((c) => c.owner === r.id);
+    for (let v of natives(e).villages) {
+      if (v.fed != null) continue;
+      let nat = nationOf(e, v);
+      if ((nat.att[r.id] || 0) < 0 || !cols.some((c) => Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 25)) continue;
+      z(v.id, e.year, (e.seed >>> 0) + 3301) < 0.12 && federate(e, r.id, v, !1);
+    }
   }
   // Allied warriors who fell are lost to their village; when the colony
   // held, their nation thinks the better of it.
@@ -3987,7 +4060,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       units = [];
     for (let k = 0; k < n; k++)
       units.push({ id: `w${v.id}-${k}`, kind: k % 3 === 2 ? "rider" : "brave", str: 3, name: k % 3 === 2 ? "Mounted warriors" : "Warriors" });
-    return { name: `${v.name} (${nat.name})`, leader: { name: `War chief of ${v.name}`, attacks: 4, charisma: 2, rep: 0 }, units };
+    return { name: `${v.name} (${nat.name})`, scene: { kind: "village", style: nat.style || 0, size: v.size || 1 }, leader: { name: `War chief of ${v.name}`, attacks: 4, charisma: 2, rep: 0 }, units };
   }
   // Once a year: colonies near a nation's villages anger it, distance lets
   // it cool, and hostile villages may send a raiding party.
@@ -4024,7 +4097,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     N.raids = still;
     // Villages slowly make good their losses.
     for (let v of N.villages) {
-      v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < 0.3 && (v.warriors += 1);
+      v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < (v.fed != null ? 0.6 : 0.3) && (v.warriors += 1);
       v.gold < 10 + v.size * 20 && (v.gold += 1);
     }
     // Hostile villages may send a new party at a colony within reach.
@@ -4035,7 +4108,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       let nat = nationOf(e, v),
         near = e.colonies
-          .filter((c) => (nat.att[c.owner] || 0) <= -30 && Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 16)
+          .filter((c) =>
+            v.fed != null
+              ? c.owner !== v.fed && atWar(e, v.fed, c.owner) && Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 20
+              : !natives(e).villages.some((q) => q.fed === c.owner && q.nation === v.nation) && (nat.att[c.owner] || 0) <= -30 && Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 16,
+          )
           .sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
       if (!near) continue;
       let chance = nat.temper === "warlike" ? 0.12 : 0.07;
@@ -4104,8 +4181,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Your soldiers attack a village. Win, and it is burned and its stores
   // taken; either way its whole nation turns hostile.
-  function resolveVillageAttack(e, pid, stackIds, v, B, leaderId) {
+  function resolveVillageAttack(e, pid, stackIds, v, B, leaderId, fedForce) {
     let nat = nationOf(e, v);
+    // Striking a federated village is striking the empire.
+    if (v.fed != null && v.fed !== pid) {
+      let me = ce(e, pid),
+        emp = ce(e, v.fed);
+      me && emp && startWar(e, me, emp);
+    }
+    if (fedForce) {
+      applyLosses(e, pid, B, "att");
+      let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+        won = B.over.winner === "att",
+        up = leaderWon(e, L, won, B, "att"),
+        tl = battleTally(B);
+      v.warriors = Math.max(1, v.warriors - B.sides.def.units.filter((u) => u.str <= 0).length);
+      battleNews(e, `${v.name} ${won ? "brought into the federation" : "holds out"}`, `Our warriors${L ? ` under ${L.name}` : ""} fought ${v.name} of the ${nat.name} for ${tl.rounds} round${tl.rounds === 1 ? "" : "s"}. ${won ? `${v.name} now stands with the empire.` : "The village held out."} We lost ${tl.attLost}; they lost ${tl.defLost}.`, !1);
+      if (!won) return shiftAttitude(nat, pid, -30), `${v.name} held out against you. The ${nat.name} are angered.${up ? " " + up : ""}`;
+      return `${federate(e, pid, v, !0)}${up ? " " + up : ""}`;
+    }
     (nat.att[pid] = -100), applyLosses(e, pid, B, "att");
     let L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
       won = B.over.winner === "att",
@@ -6705,7 +6799,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           })());
       // What rivals do at home is not news to you; the dispatch covers them.
       let quiet = e.log.length;
-      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), (e.log.length = quiet);
+      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), rivalFederate(e, r), (e.log.length = quiet);
     }
     meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
     crownTurn(e);
@@ -6903,7 +6997,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         .map((s) => s.id)
         .join(",");
     // Newly charted squares are handled tile by tile (staleAround), not here.
-    return `${r}#${i}`;
+    let fed = e.natives ? e.natives.villages.filter((v) => v.fed != null).map((v) => `${v.id}:${v.fed}`).join(",") : "";
+    return `${r}#${i}#${fed}`;
   }
   // The map is cached as a grid of 256-pixel tiles fixed to the map, so
   // panning only ever draws the few tiles coming into view, a few
@@ -7040,7 +7135,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         colonyTiles = null,
         drew = 0;
       for (let [ti, tj] of todo) {
-        if (performance.now() - t0 > 6 && drew) break;
+        if ((performance.now() - t0 > 3 || drew >= 3) && drew) break;
         colonyTiles || (colonyTiles = Ct(o));
         let k = tileId(r.zoom, ti, tj),
           tile = mapTiles.get(k);
@@ -9112,7 +9207,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         vg = vmap.get(c * 4096 + h);
       if (vg) {
         let nt = nationOf(n, vg);
-        Ye(e, p.x, p.y, Math.max(d * 1.35, 0.6), (M) => villageSprite(M, nt.style, vg.size, vg.id, d >= 0.75));
+        Ye(e, p.x, p.y, Math.max(d * 1.35, 0.6), (M) => {
+          villageSprite(M, nt.style, vg.size, vg.id, d >= 0.75);
+          // A federated village flies the empire's banner.
+          let fp = vg.fed != null && n.players.find((q) => q.id === vg.fed);
+          fp && (ln_(M, 14, 2, 14, -20, "#3a2a18", 1), natFlag(M, fp.nationId, 14, -20, 10, 6.5, null));
+        });
         continue;
       }
       if (y) {
@@ -11445,6 +11545,115 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     wagon(g, -2, 5, ph, col);
     figure(g, 18, 9, L, ph == null ? null : ph + 0.6, { hat: "brim", coat: "#7a6a4a", hand: (q) => ln_(q, 3.4, -9, 8, -16, "#3a2414", 0.6) });
   }
+  // ---- Battle scenes ---------------------------------------------------------
+  // The board is drawn as a place: open ground of the terrain where the
+  // fight is, a town of its level (European or Ixtal), or a native
+  // village. Each side's men are drawn in their nation's dress, and every
+  // move, volley, cannon shot and charge plays out before the board settles.
+  LOOKS.tribe = { coat: "#c8a070", trim: "#a83a2a", hat: "feather", legs: "#a06a44", native: !0 };
+  LOOKS.colonist = { coat: "#7a6a4a", trim: "#d8c8a0", hat: "brim", legs: "#4a3a2a" };
+  function sceneAt(e, x, y) {
+    let col = e.colonies.find((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) <= 1);
+    if (col) return { kind: "town", level: col.level || 1, big: !!col.big };
+    let v = villageAt(e, x, y);
+    if (v) return { kind: "village", style: (nationOf(e, v) || {}).style || 0, size: v.size || 1 };
+    let t = se(e, x, y);
+    return { kind: (t && t.terrain) || "plains" };
+  }
+  var SCENE_GROUND = {
+    plains: ["#7d9a4e", "#5f7c38"],
+    woods: ["#6e8c46", "#4f6c30"],
+    forest: ["#5a7a3c", "#3e5a28"],
+    hills: ["#8a9a58", "#66763c"],
+    mountains: ["#8a8a6e", "#5e5e48"],
+    swamp: ["#5e7a4e", "#3e5a3a"],
+    desert: ["#d8c28a", "#b89a62"],
+    coast: ["#cdb98a", "#a89668"],
+    town: ["#9a8a62", "#7a6c4a"],
+    village: ["#8a9a5a", "#68783e"],
+  };
+  // The still picture behind the board, drawn once per battle.
+  // sc.bottom: the town or village stands behind the bottom line instead.
+  function sceneBackdrop(w, h, sc, rnd) {
+    let cv = $o(w, h),
+      g = cv.getContext("2d"),
+      k = sc.kind,
+      [c0, c1] = SCENE_GROUND[k] || SCENE_GROUND.plains,
+      gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, c1), gr.addColorStop(1, c0), (g.fillStyle = gr), g.fillRect(0, 0, w, h);
+    // speckled ground
+    for (let n = 0; n < (w * h) / 900; n++) (g.fillStyle = `rgba(${rnd() < 0.5 ? "255,255,230" : "20,30,10"},${0.05 + rnd() * 0.06})`), g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 1 + rnd() * 2);
+    let s = Math.max(1.2, h / 260),
+      at = (x, y, sc2, fn) => (g.save(), g.translate(x, y), g.scale(sc2, sc2), fn(g), g.restore()),
+      edgeTrees = (n, pine) => {
+        for (let q = 0; q < n; q++) {
+          let side = q % 3,
+            x = side === 0 ? rnd() * w : side === 1 ? rnd() * w * 0.07 : w - rnd() * w * 0.07,
+            y = side === 0 ? rnd() * h * 0.1 + 8 : rnd() * h;
+          at(x, y, s * (0.8 + rnd() * 0.5), (q2) => (rnd() < pine ? ((q2.fillStyle = "#26401f"), q2.beginPath(), q2.moveTo(0, -18), q2.lineTo(-7, 0), q2.lineTo(7, 0), q2.fill()) : (ln_(q2, 0, 0, 0, -6, "#3b2a18", 1.6), disc(q2, 0, -11, 7, 6.5, "#3f6a2c"), disc(q2, 2, -13, 4, 3.5, "#5a8a3a"))));
+        }
+      };
+    if (k === "forest" || k === "woods") edgeTrees(k === "forest" ? 46 : 26, k === "forest" ? 0.6 : 0.25);
+    else if (k === "hills" || k === "mountains") {
+      for (let q = 0; q < 3; q++) {
+        (g.fillStyle = `rgba(${k === "mountains" ? "120,112,96" : "110,130,70"},${0.35 + q * 0.12})`), g.beginPath(), g.moveTo(0, h * (0.06 + q * 0.04));
+        for (let x = 0; x <= w; x += w / 8) g.quadraticCurveTo(x + w / 16, h * (k === "mountains" ? -0.02 : 0.0) + q * 10 * s - rnd() * 12 * s, x + w / 8, h * (0.07 + q * 0.04));
+        g.lineTo(w, 0), g.lineTo(0, 0), g.fill();
+      }
+      if (k === "mountains") for (let q = 0; q < 6; q++) at(rnd() * w, h * 0.1, s * 1.6, (q2) => ((q2.fillStyle = "#8a8070"), q2.beginPath(), q2.moveTo(-14, 0), q2.lineTo(0, -22), q2.lineTo(14, 0), q2.fill(), (q2.fillStyle = "#f0f0ea"), q2.beginPath(), q2.moveTo(-4, -16), q2.lineTo(0, -22), q2.lineTo(4, -16), q2.fill()));
+      for (let q = 0; q < 14; q++) disc(g, rnd() * w, h * 0.15 + rnd() * h * 0.8, 6 * s, 3 * s, "rgba(90,84,70,0.35)");
+    } else if (k === "swamp") {
+      for (let q = 0; q < 12; q++) disc(g, rnd() * w, rnd() * h, (14 + rnd() * 20) * s, (5 + rnd() * 6) * s, "rgba(50,80,90,0.35)");
+      for (let q = 0; q < 50; q++) {
+        let x = rnd() * w,
+          y = rnd() * h;
+        for (let r2 = -2; r2 <= 2; r2++) ln_(g, x + r2 * 2, y, x + r2 * 3, y - (8 + rnd() * 6) * s, "rgba(70,90,40,0.7)", 1);
+      }
+    } else if (k === "desert" || k === "coast") {
+      for (let q = 0; q < 10; q++) at(rnd() * w, rnd() * h, s, (q2) => (ln_(q2, 0, 0, 0, -16, "#5a8a3a", 3.5), ln_(q2, 0, -8, 5, -12, "#5a8a3a", 2.5), ln_(q2, 0, -6, -5, -10, "#5a8a3a", 2.5)));
+    } else if (k === "town") {
+      // The town stands behind the defenders' line, bigger with its level.
+      let L = Math.max(1, Math.min(4, sc.level || 1)),
+        n = sc.big ? 4 + L * 2 : 3 + L * 2;
+      for (let q = 0; q < n; q++) {
+        let x = ((q + 0.5) / n) * w + (rnd() - 0.5) * 18,
+          y = sc.bottom ? h - 8 - rnd() * 6 : h * 0.09 + rnd() * 6;
+        sc.big
+          ? at(x, y, s * 1.3, (q2) => (q === Math.floor(n / 2) ? ixStepped(q2, 0, 0, 14, 3, 4, IX.stone, IX.red) : rnd() < 0.5 ? ixHouse(q2, 0, 0, 12, 9, 7, !0) : ixHut(q2, 0, 0, 5, 5)))
+          : at(x, y, s * 1.2, (q2) => (q === Math.floor(n / 2) && L >= 2 ? (gableHouse(q2, 0, 0, 14, 10, 10, "#c9a878", "#6b4a30", { detail: !0, door: !0 }), steeple(q2, -3, -4, 2.2, 16, "#e6dccb", "#4a5560", !0, !0)) : gableHouse(q2, 0, 0, 11, 9, 8, jr("#d8c49a", Math.round((rnd() - 0.5) * 30)), ["#7a3b2a", "#6b4a30", "#5a4a3c"][q % 3], { detail: !0, door: !0, chimney: rnd() > 0.5 })));
+      }
+      // walls: stakes for a young colony, stone for an old one, adobe for the empire
+      let wy = sc.bottom ? h - 24 * s : h * 0.17;
+      if (sc.big) (g.fillStyle = "#c8b08a"), g.fillRect(0, wy, w, 6 * s), (g.fillStyle = IX.red), g.fillRect(0, wy, w, 1.6 * s);
+      else if (L >= 3) {
+        (g.fillStyle = "#8a8070"), g.fillRect(0, wy, w, 8 * s);
+        for (let x = 0; x < w; x += 14 * s) (g.fillStyle = "#9a907e"), g.fillRect(x, wy - 4 * s, 8 * s, 4 * s);
+      } else for (let x = 0; x < w; x += 4 * s) (g.fillStyle = x % (8 * s) < 4 * s ? "#7a5634" : "#6a4628"), g.fillRect(x, wy - 6 * s + ((x / (4 * s)) % 2) * 2, 3.2 * s, 10 * s);
+      for (let q = 0; q < 20; q++) disc(g, rnd() * w, h * 0.1 + rnd() * h * 0.75, 8 * s, 3 * s, "rgba(120,100,70,0.25)");
+    } else if (k === "village") {
+      let n = 3 + (sc.size || 1);
+      for (let q = 0; q < n; q++) at(((q + 0.5) / n) * w, sc.bottom ? h - 10 : h * 0.1, s * 1.5, (q2) => villageSprite(q2, sc.style || 0, 1, q + 3, !0));
+    } else {
+      // plains: a fence line, haystacks, a few bushes
+      for (let x = 0; x < w; x += 18 * s) ln_(g, x, h * 0.12, x, h * 0.12 - 8 * s, "#6a4a2a", 1.4), ln_(g, x, h * 0.12 - 5 * s, x + 18 * s, h * 0.12 - 5 * s, "#7a5a34", 1.2);
+      for (let q = 0; q < 4; q++) at(rnd() * w, h * 0.09, s, (q2) => haystack(q2, 0, 0, 5));
+      for (let q = 0; q < 10; q++) disc(g, rnd() * w, rnd() * h, 6 * s, 4 * s, "rgba(60,90,30,0.45)");
+    }
+    // a soft vignette
+    let vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
+    vg.addColorStop(0, "rgba(0,0,0,0)"), vg.addColorStop(1, "rgba(0,0,0,0.35)"), (g.fillStyle = vg), g.fillRect(0, 0, w, h);
+    return cv;
+  }
+  // One unit as a figure: a man, a horseman, or a gun and its gunner.
+  function sceneUnit(g, u, look, face, ph, lean) {
+    let cls = bCls(u),
+      L = u.militia ? LOOKS.colonist : u.ally || u.kind === "brave" || u.kind === "rider" ? LOOKS.tribe : look;
+    g.save(), g.scale(face, 1), lean && g.translate(lean, 0);
+    if (cls === "horse") horse(g, 0, 0, ph, L.native ? "#8a5a36" : "#4a2e18", L.native ? "#d8c8b0" : "#3a2414"), rider(g, 1, -2, L, ph, L.native ? (q) => ln_(q, 3, -12, 9, -27, "#6a4a2a", 0.9) : (q) => ln_(q, 2.4, -13, 7, -21, "#d8dce0", 1));
+    else if (cls === "gun") gunArt(g, L, ph);
+    else figure(g, 0, 0, L, ph, { hand: L.native ? (q) => (spear(q), shield(q)) : u.militia ? (q) => ln_(q, 3.4, -7, 5, -20, "#5a3e22", 1) : musket });
+    g.restore();
+  }
   // Kept for the title screen and anything else that draws one figure.
   function $t(e, n, o, nat, ph) {
     let L = lookOf(nat || "england");
@@ -12129,9 +12338,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         L = t && t.map ? terracePx(t.map, f.x, f.y, d.zoom) : 0;
       (d.ox = k.w / 2 - v.x), (d.oy = k.h / 2 - v.y + L);
     }
+    // Drawing resolution adapts to keep frames quick: if a run of frames
+    // comes slower than about 45 a second it steps down, and it creeps
+    // back up when there is room. Press F to see the frame time.
+    let renderCap = 2,
+      frameLog = [],
+      lastFrameAt = 0,
+      meter = null;
+    function noteFrame(ts) {
+      let dt = ts - lastFrameAt;
+      lastFrameAt = ts;
+      if (dt > 0 && dt < 120) frameLog.push(dt), frameLog.length > 40 && frameLog.shift();
+      if (frameLog.length >= 30) {
+        let avg = frameLog.reduce((a, q) => a + q, 0) / frameLog.length,
+          dpr = window.devicePixelRatio || 1;
+        if (avg > 22 && renderCap > 1) (renderCap = Math.max(1, renderCap - 0.25)), (frameLog = []);
+        else if (avg < 13 && renderCap < Math.min(2, dpr)) (renderCap = Math.min(2, renderCap + 0.25)), (frameLog = []);
+        meter && (meter.textContent = `${avg.toFixed(1)} ms a frame \u00b7 drawing at ${Math.min(window.devicePixelRatio || 1, renderCap).toFixed(2)}x`);
+      }
+    }
     function J() {
       let f = i.getBoundingClientRect(),
-        g = window.devicePixelRatio || 1,
+        g = Math.min(window.devicePixelRatio || 1, renderCap),
         k = Math.max(1, Math.floor(f.width * g)),
         v = Math.max(1, Math.floor(f.height * g));
       i.width !== k && (i.width = k), i.height !== v && (i.height = v);
@@ -12145,8 +12373,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     function pe() {
       Pe ||
         ((Pe = !0),
-        requestAnimationFrame(() => {
-          (Pe = !1), _e();
+        requestAnimationFrame((ts) => {
+          (Pe = !1), noteFrame(ts), _e();
         }));
     }
     // Keyboard scrolling: held keys move the camera smoothly each frame.
@@ -12493,8 +12721,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         bounds: bound,
         rings,
       });
-      tipBox &&
-        (tipBox.textContent = u ? (b && T ? Jn(b, u.x, u.y) : io(t, u.x, u.y, V(t))) + (g && g.kind === "settler" && !g.aboard && !b ? ` \u00b7 ${pu(u.x, u.y)}` : "") : "");
+      updateTip();
+    }
+    // The hover label in the corner, written only when it changes.
+    function updateTip() {
+      if (!tipBox || !t) return;
+      let b = y ? t.colonies.find((te) => te.id === y) : null,
+        g = l ? j(t, l) : null,
+        txt = u ? (b && T ? Jn(b, u.x, u.y) : io(t, u.x, u.y, V(t))) + (g && g.kind === "settler" && !g.aboard && !b ? ` \u00b7 ${pu(u.x, u.y)}` : "") : "";
+      tipBox.textContent !== txt && (tipBox.textContent = txt);
     }
     function R() {
       if (!t || o.hidden) return;
@@ -12751,6 +12986,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let P = pinned();
         P && (_(P.x, P.y), R());
       });
+      let fin = s.querySelector("#fed-invite");
+      fin &&
+        (fin.onclick = () => {
+          let res = inviteFederate(t, V(t).id, pin.id);
+          x(res), res.ok && res.note && ((h = res.note), t.log.push(res.note)), R();
+        });
       let pcl = s.querySelector("#pin-close");
       pcl && (pcl.onclick = () => ((pin = null), R()));
       let rnu = s.querySelector("#rename-unit");
@@ -13129,7 +13370,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let g = Fe(f),
           hit = unitAt(g.x, g.y),
           k = hit || tileAt(t.map, g.x, g.y, d);
-        (u && u.x === k.x && u.y === k.y) || ((u = k), T && y ? R() : pe());
+        if (!(u && u.x === k.x && u.y === k.y)) {
+          let was = u;
+          u = k;
+          // Only redraw the map when the hover changes what it shows: in a
+          // colony, while placing, or moving on or off a landmark.
+          let sp = (q) => q && ro(t, q.x, q.y) && ro(t, q.x, q.y).foundBy != null;
+          T && y ? R() : y || sp(was) || sp(k) ? pe() : updateTip();
+        }
         placeTip(f);
       }),
       i.addEventListener(
@@ -13288,7 +13536,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           of = villageOffer(t, P),
           per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`,
           near = t.colonies.filter((c) => c.owner === me_.id && Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= 10);
+        let fedP = P.fed != null && t.players.find((q) => q.id === P.fed),
+          canInvite = isNatNation(me_) && P.fed == null && att >= 30 && t.units.some((u) => u.owner === me_.id && u.kind === "leader" && !u.aboard && Math.max(Math.abs(u.x - P.x), Math.abs(u.y - P.y)) <= 2);
         return `<h2>${G(P.name)}</h2>
+        ${fedP ? `<p class="find-stat">Federated with ${fedP === me_ ? "your empire" : G(nationName(fedP))}.</p>` : ""}
+        ${isNatNation(me_) && P.fed == null ? `<p class="muted">${canInvite ? "Your leader is here: you can ask them to join your federation." : att >= 30 ? "Friendly: send a leader here to ask them to join your federation." : "Not friendly enough to join you freely. Win them over with gifts and trade, or bring them in by force with an army."}</p>${canInvite ? '<div class="row"><button type="button" id="fed-invite" class="primary">Invite into the federation</button></div>' : ""}` : ""}
         <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
         <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
         <p class="muted">The ring shows how far its warriors will come: ${word === "friendly" ? "while friendly, its warriors come to help defend your colonies inside it" : "friendly villages send warriors to help defend colonies inside it"}.${near.length ? ` ${near.map((c) => G(c.name)).join(", ")} ${near.length === 1 ? "is" : "are"} inside.` : ""} Drag soldiers onto the village to raid or destroy it.</p>
@@ -13406,6 +13658,168 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           `<button type="button" class="bu ${u.side === mine ? "mine" : "theirs"}${native(u.side) ? " native" : ""}${sel.has(u) ? " sel" : ""}${extra || ""}" data-k="${u.key}" title="${G(u.name)}: strength ${u.str} of ${u.max}">
             ${B_ICON[bCls(u)]}<span class="${u.militia || (u.kind === "artillery" && typeof u.id === "string") ? "red" : u.ally ? "yellow" : ""}">${u.str}</span></button>`,
         unitByKey = (k) => B.sides[k.startsWith("att") ? "att" : "def"].units.find((q) => q.key === k),
+        // ---- the scene behind the board ----
+        sceneSpec = { ...(spec.def.scene || spec.scene || { kind: "plains" }), bottom: mine === "def" },
+        backdrop = null,
+        bdKey = "",
+        fxSeen = 0,
+        queue = [],
+        playing = null,
+        raf = 0,
+        lookFor = (side) => lookOf(B.sides[side].nat || (native(side) ? "tribe" : "england")),
+        fxDur = (ev) => (ev.t === "move" ? 420 : ev.from.some((q) => q.cls === "gun") ? 850 : ev.from.some((q) => q.charge) ? 720 : 620),
+        render = (now) => {
+          let cv = r.querySelector("canvas.bscene");
+          if (!cv) return;
+          let board = cv.parentElement,
+            W = board.clientWidth,
+            H = board.clientHeight,
+            dpr = Math.min(2, window.devicePixelRatio || 1);
+          if (!W || !H) return;
+          (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) && ((cv.width = Math.round(W * dpr)), (cv.height = Math.round(H * dpr)));
+          let g = cv.getContext("2d");
+          g.setTransform(dpr, 0, 0, dpr, 0, 0);
+          let key = `${W}x${H}`;
+          if (bdKey !== key) {
+            let seed = (spec.title || "").length * 97 + 13,
+              rnd = bn(seed);
+            (backdrop = sceneBackdrop(W, H, sceneSpec, rnd)), (bdKey = key);
+          }
+          g.clearRect(0, 0, W, H), g.drawImage(backdrop, 0, 0, W, H);
+          // where each square is on screen
+          let bb = board.getBoundingClientRect(),
+            cells = new Map();
+          r.querySelectorAll(".bcell").forEach((el) => {
+            let q = el.getBoundingClientRect();
+            cells.set(`${el.dataset.c},${el.dataset.r}`, { x: q.left - bb.left, y: q.top - bb.top, w: q.width, h: q.height });
+          });
+          let edge = (side) => (side === mine ? H + 30 : -30);
+          // play the next event when the last is done
+          for (;;) {
+            if (playing && now - playing.t0 >= fxDur(playing.ev)) playing = null;
+            if (playing || !queue.length) break;
+            playing = { ev: queue.shift(), t0: playing ? playing.t0 + fxDur(playing.ev) : now };
+          }
+          let ev = playing && playing.ev,
+            p = ev ? Math.min(1, (now - playing.t0) / fxDur(ev)) : 1,
+            // units not yet where the board shows them
+            held = new Map(),
+            ghosts = [];
+          for (let q of queue)
+            if (q.t === "move") held.has(q.key) || held.set(q.key, q.from);
+            else for (let f of q.fell) ghosts.push({ key: f.key, at: q.to, fall: 0 });
+          ev && ev.t === "shot" && ev.fell.forEach((f) => ghosts.push({ key: f.key, at: ev.to, fall: p > 0.6 ? (p - 0.6) / 0.4 : 0 }));
+          let spots = new Map(),
+            put = (u, at, extra) => {
+              let k = at ? at.join() : null;
+              k && (spots.get(k) || spots.set(k, []).get(k)).push({ u, ...extra });
+            };
+          for (let side of ["att", "def"])
+            for (let u of B.sides[side].units) {
+              if (u.str <= 0 || !u.pos) {
+                // a unit about to come on or go off still shows where it was
+                if (u.str > 0 && held.has(u.key) && held.get(u.key)) put(u, held.get(u.key), {});
+                continue;
+              }
+              if (ev && ev.t === "move" && ev.key === u.key) continue;
+              held.has(u.key) ? held.get(u.key) && put(u, held.get(u.key), {}) : put(u, u.pos, {});
+            }
+          for (let gh of ghosts) {
+            let u = unitByKey(gh.key);
+            u && put(u, gh.at, { fall: gh.fall });
+          }
+          let posOf = (k, i, n) => {
+            let c = cells.get(k);
+            return c ? { x: c.x + c.w * (0.5 + (i - (n - 1) / 2) * 0.3), y: c.y + c.h * 0.6, s: Math.max(1.1, c.h / 44) } : null;
+          };
+          let where = new Map();
+          for (let [k, list] of spots) list.forEach((it, i) => where.set(it.u.key, posOf(k, i, list.length)));
+          // a unit on the move, walking between squares
+          if (ev && ev.t === "move") {
+            let u = unitByKey(ev.key),
+              a = ev.from ? posOf(ev.from.join(), 0, 1) : null,
+              b = ev.to ? posOf(ev.to.join(), 0, 1) : null,
+              ref = a || b;
+            if (u && ref) {
+              let ax = a ? a.x : ref.x,
+                ay = a ? a.y : edge(u.side),
+                bx = b ? b.x : ref.x,
+                by = b ? b.y : edge(u.side),
+                e2 = p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p);
+              (spots.get("__walk") || spots.set("__walk", []).get("__walk")).push({ u, walk: { x: ax + (bx - ax) * e2, y: ay + (by - ay) * e2, s: ref.s } });
+            }
+          }
+          // draw back to front
+          let drawList = [];
+          for (let [k, list] of spots) list.forEach((it, i) => drawList.push({ ...it, at: it.walk || posOf(k, i, list.length) }));
+          drawList.sort((a, b) => (a.at ? a.at.y : 0) - (b.at ? b.at.y : 0));
+          for (let it of drawList) {
+            if (!it.at) continue;
+            let u = it.u,
+              face = u.side === mine ? 1 : -1,
+              lean = 0,
+              ldx = 0,
+              ldy = 0;
+            // a charging horseman lunges at his target and comes back
+            if (ev && ev.t === "shot" && ev.from.some((q) => q.key === u.key && q.charge)) {
+              let tc = posOf(ev.to.join(), 0, 1);
+              if (tc) {
+                let f = Math.sin(Math.PI * Math.min(1, p * 1.2));
+                (ldx = (tc.x - it.at.x) * 0.45 * f), (ldy = (tc.y - it.at.y) * 0.45 * f);
+              }
+            }
+            g.save(), g.translate(it.at.x + ldx, it.at.y + ldy), g.scale(it.at.s, it.at.s);
+            if (it.fall) (g.globalAlpha = Math.max(0, 1 - it.fall)), g.rotate(face * Math.min(1, it.fall * 2) * 1.4);
+            (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(0, 1, 10, 3, 0, 0, Math.PI * 2), g.fill();
+            sceneUnit(g, u, lookFor(u.side), face, it.walk ? now / 90 : null, lean);
+            u.str > 0 && !it.fall && it.at && (g.globalAlpha = 1);
+            g.restore();
+          }
+          // the volley, cannon shot or charge
+          if (ev && ev.t === "shot") {
+            let tgt = posOf(ev.to.join(), 0, 1);
+            for (let f of ev.from) {
+              let at = where.get(f.key);
+              if (!at || !tgt) continue;
+              let face = f.key.startsWith(mine) ? 1 : -1,
+                mx = at.x + face * 9 * at.s,
+                my = at.y - 17 * at.s;
+              if (f.cls === "gun") {
+                (mx = at.x + face * 14 * at.s), (my = at.y - 8 * at.s);
+                p < 0.2 && disc(g, mx, my, 9 * at.s * (1 - p * 3), 6 * at.s, "rgba(255,210,90,0.95)");
+                if (p > 0.12 && p < 0.68) {
+                  let q = (p - 0.12) / 0.56,
+                    bx = mx + (tgt.x - mx) * q,
+                    by = my + (tgt.y - 20 - my) * q - Math.sin(Math.PI * q) * 60;
+                  disc(g, bx, by, 2.6 * at.s, 2.6 * at.s, "#1a1a1a");
+                }
+              } else if (!f.charge) {
+                p < 0.22 && disc(g, mx, my, 4 * at.s, 3 * at.s, "rgba(255,220,110,0.95)");
+                p > 0.08 && p < 0.4 && ln_(g, mx, my, mx + (tgt.x - mx) * (p - 0.08) * 3, my + (tgt.y - 16 - my) * (p - 0.08) * 3, "rgba(255,240,200,0.5)", 0.8);
+              }
+              // powder smoke drifting up
+              if (!f.charge)
+                for (let k2 = 0; k2 < (f.cls === "gun" ? 5 : 3); k2++) disc(g, mx + face * k2 * 4 * at.s, my - p * 14 * at.s - k2 * 3, (3 + p * 9 + k2 * 2) * at.s * (f.cls === "gun" ? 1.4 : 1), (2.5 + p * 6) * at.s, `rgba(235,232,225,${0.55 * (1 - p)})`);
+            }
+            if (tgt && p > 0.55) {
+              let q = (p - 0.55) / 0.45;
+              for (let k2 = 0; k2 < 5; k2++) disc(g, tgt.x + (k2 - 2) * 9 * tgt.s, tgt.y - 6 * tgt.s - q * 10 * k2, (4 + q * 7) * tgt.s, (3 + q * 4) * tgt.s, `rgba(170,150,110,${0.5 * (1 - q)})`);
+              ev.from.some((q2) => q2.charge) && p < 0.75 && [0, 1, 2].forEach((k2) => disc(g, tgt.x + (k2 - 1) * 7, tgt.y - 22 * tgt.s, 2.2, 2.2, "rgba(255,240,180,0.9)"));
+              (g.font = `700 ${Math.round(15 * Math.min(1.6, tgt.s))}px Palatino, Georgia, serif`), (g.textAlign = "center");
+              (g.lineWidth = 3), (g.strokeStyle = "rgba(20,10,4,0.7)"), (g.fillStyle = ev.hits ? "#ffd0b8" : "#e8e8e0");
+              let tx = ev.hits ? `-${ev.hits}` : "miss";
+              g.strokeText(tx, tgt.x, tgt.y - 26 * tgt.s - q * 12), g.fillText(tx, tgt.x, tgt.y - 26 * tgt.s - q * 12);
+            }
+          }
+        },
+        frame = (now) => {
+          (raf = 0), render(now);
+          (playing || queue.length) && (raf = requestAnimationFrame(frame));
+        },
+        sceneKick = () => {
+          queue.push(...B.fx.slice(fxSeen)), (fxSeen = B.fx.length);
+          render(performance.now()), raf || (raf = requestAnimationFrame(frame));
+        },
         live = () => [...sel].filter((u) => u.str > 0 && (bMoves(B, u).length || bTargets(B, u).length)),
         draw = () => {
           for (let u of [...sel]) (u.str <= 0 || (!bMoves(B, u).length && !bTargets(B, u).length)) && sel.delete(u);
@@ -13442,7 +13856,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             <h1>${G(spec.title)}</h1>
             <p class="sub">Round ${Math.min(B.round, BMAXROUND)} of ${BMAXROUND}. ${B.over ? "" : myTurn ? `Your turn: ${S.attacksLeft} attack${S.attacksLeft === 1 ? "" : "s"} left${S.leader ? ` under ${G(S.leader.name)}` : ""}.` : "Their turn."}</p>
             <div class="bres theirs"><span>${G(B.sides[foe].name)}: reserves</span>${res(foe)}</div>
-            <div class="bboard"><div class="bgrid">${rows.join("")}</div></div>
+            <div class="bboard scene${(sceneSpec.kind === "town" || sceneSpec.kind === "village") && sceneSpec.bottom ? " behind-me" : ""}"><canvas class="bscene"></canvas><div class="bgrid">${rows.join("")}</div></div>
             <div class="bres mine"><span>Your reserves${myTurn ? " (click one, then a square on your home row)" : ""}</span>${res(mine)}</div>
             <div class="row">
               ${B.over ? '<button type="button" id="b-done" class="primary">Back to the map</button>' : `<button type="button" id="b-end" class="primary" ${myTurn ? "" : "disabled"}>End turn</button><button type="button" id="b-auto">Auto-finish</button><button type="button" id="b-flee" ${myTurn ? "" : "disabled"}>Retreat</button>`}
@@ -13485,11 +13899,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let be_ = r.querySelector("#b-end");
           be_ && (be_.onclick = () => (sel.clear(), bEndTurn(B), B.over || (bAiTurn(B), bEndTurn(B)), draw()));
           let ba = r.querySelector("#b-auto");
-          ba && (ba.onclick = () => (sel.clear(), bAutoFinish(B), draw()));
+          // Auto-finish skips the show and goes straight to the end.
+          ba && (ba.onclick = () => (sel.clear(), bAutoFinish(B), (fxSeen = B.fx.length), (queue.length = 0), (playing = null), draw()));
           let bf = r.querySelector("#b-flee");
           bf && (bf.onclick = () => (sel.clear(), bRetreat(B, mine), draw()));
           let bd = r.querySelector("#b-done");
-          bd && (bd.onclick = () => ((r.hidden = !0), (o.hidden = !1), done(B)));
+          bd && (bd.onclick = () => (cancelAnimationFrame(raf), (raf = 0), (r.hidden = !0), (o.hidden = !1), done(B)));
+          sceneKick();
         },
         act = (c, rr) => {
           let picks = live();
@@ -13543,7 +13959,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!F.troops.length) return noTroops("an army");
       let ow = t.players.find((q) => q.id === A.owner),
         def = armyForce(t, A, !0);
-      preBattle({ kind: "attack", title: `Attack on the ${nationAdj(ow)} army under ${A.leader.name}`, att: F.att, def, warn: warWarn(A.owner) }, "att", (B) =>
+      preBattle({ kind: "attack", title: `Attack on the ${nationAdj(ow)} army under ${A.leader.name}`, att: F.att, def, scene: sceneAt(t, A.x, A.y), warn: warWarn(A.owner) }, "att", (B) =>
         afterAttack(F, resolveArmyBattle(t, F.me_, A, B, F.lead && F.lead.id)),
       );
     }
@@ -13611,7 +14027,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${rows}
         <section class="drow">
           <h3>${isNatNation(me) ? "The Great Speaker" : "The crown"}</h3>
-          ${isNatNation(me) ? `<p class="muted">${G(je(ee[me.nationId], t.year))} asks no tax and no tribute. No crown across the ocean tells you whom to fight.</p>` : `<p class="muted">Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}. ${m.taxRate != null ? `Last year's tax was ${Math.round(m.taxRate * 100)}% of your colonies' gold.` : "Tax is taken each year from your colonies' gold."} The angrier the court, the higher the tax.</p>`}
+          ${isNatNation(me) ? `<p class="muted">${G(je(ee[me.nationId], t.year))} asks no tax and no tribute. No crown across the ocean tells you whom to fight. Your federation counts ${fedCount(t, me.id)} village${fedCount(t, me.id) === 1 ? "" : "s"}: send a leader to a friendly village to invite it, or win one by force.</p>` : `<p class="muted">Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}. ${m.taxRate != null ? `Last year's tax was ${Math.round(m.taxRate * 100)}% of your colonies' gold.` : "Tax is taken each year from your colonies' gold."} The angrier the court, the higher the tax.</p>`}
         </section>
         <div class="row"><button type="button" id="diplo-close" class="primary">Close</button></div>
       </div>`);
@@ -13761,12 +14177,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         [
           { id: "raid", label: "Raid", hint: "Break in and carry off gold. You need not win: the longer you hold part of the village, the more you take. The village survives." },
           { id: "destroy", label: "Destroy", hint: "Win the battle and the village is burned and all its gold taken. The nation goes to war with you." },
+          ...(isNatNation(V(t)) && v.fed == null ? [{ id: "federate", label: "Federate by force", hint: "Win the battle and the village joins your federation, doubled in strength, instead of burning. Its nation will resent it." }] : []),
         ],
         (opt) => {
           let raid = opt.id === "raid",
             spec = { kind: raid ? "raid" : "attack", title: `${raid ? "Raid" : "Attack"} on ${v.name} of the ${nat.name}`, att: F.att, def: villageForce(t, v, !1) };
           preBattle(spec, "att", (B) =>
-            afterAttack(F, raid ? resolveVillageRaid(t, F.me_, v, B, F.lead && F.lead.id) : resolveVillageAttack(t, F.me_, F.troops.map((q) => q.id), v, B, F.lead && F.lead.id)),
+            afterAttack(F, raid ? resolveVillageRaid(t, F.me_, v, B, F.lead && F.lead.id) : resolveVillageAttack(t, F.me_, F.troops.map((q) => q.id), v, B, F.lead && F.lead.id, opt.id === "federate")),
           );
         },
       );
@@ -13795,7 +14212,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let F = myForce(u);
       if (!F.troops.length) return noTroops("other men");
       let def = fieldForce(t, x, y, F.me_);
-      preBattle({ kind: "attack", title: `Attack on the ${def.name}`, att: F.att, def }, "att", (B) => afterAttack(F, resolveUnitAttack(t, F.me_, x, y, B, F.lead && F.lead.id)));
+      preBattle({ kind: "attack", title: `Attack on the ${def.name}`, att: F.att, def, scene: sceneAt(t, x, y) }, "att", (B) => afterAttack(F, resolveUnitAttack(t, F.me_, x, y, B, F.lead && F.lead.id)));
     }
     // Every square in the colony's land where the building would fit, with
     // the productivity it would get there, and the best of them.
@@ -13888,7 +14305,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         gd = colonyDefence(t, f),
         garrison = `
       <h3 class="side-sub">Garrison</h3>
-      <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && !q.ally && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && !q.ally && q.name !== "Fort guns").length} soldiers` : ""}.${gd.units.some((q) => q.ally) ? ` ${gd.units.filter((q) => q.ally).length} warriors from friendly villages nearby come to help.` : ""} ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 1 attack a turn. Bring a leader into the colony to command it."}</p>
+      <p class="muted">${gd.units.filter((q) => q.militia).length} militia turn out to defend (strength 2 each, below trained troops)${gd.units.some((q) => q.name === "Fort guns") ? `, ${gd.units.filter((q) => q.name === "Fort guns").length} fort gun${gd.units.filter((q) => q.name === "Fort guns").length === 1 ? "" : "s"}` : ""}${gd.units.some((q) => !q.militia && !q.ally && q.name !== "Fort guns") ? `, and ${gd.units.filter((q) => !q.militia && !q.ally && q.name !== "Fort guns").length} soldiers` : ""}.${gd.units.some((q) => q.ally) ? ` ${gd.units.filter((q) => q.ally).length} warriors from friendly villages nearby come to help.` : ""} ${gd.leader ? `${G(gd.leader.name)} commands the defence: ${gd.leader.attacks} attacks a turn, charisma ${gd.leader.charisma}.` : "No leader is here, so the defence makes only 3 attacks a turn and gets little of the town's cover. Bring a leader and soldiers into the colony to command it."}</p>
       ${(() => {
         let me_ = V(t),
           inTown = t.units.filter((q) => q.owner === me_.id && inColony(f, q) && (q.kind === "leader" || arm(q.kind))),
@@ -13903,7 +14320,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       })()}
       <button type="button" class="recruit" id="recruit-leader" ${f.stock.gold >= LEADER_COST[Math.min(4, f.level || 1)] ? "" : "disabled"}>Commission a leader, level ${Math.min(4, f.level || 1)}<small>${LEADER_COST[Math.min(4, f.level || 1)]} gold. Bigger colonies train better leaders: more attacks a turn, more charisma, more men under command.</small></button>`,
         nearV = natives(t)
-          .villages.filter((q) => Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (f.big ? 24 : 12) && k.explored[q.y * t.map.width + q.x] === "1")
+          .villages.filter((q) => q.fed === f.owner || (Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (f.big ? 24 : 12) && k.explored[q.y * t.map.width + q.x] === "1"))
           .sort((q1, q2) => Math.hypot(q1.x - f.x, q1.y - f.y) - Math.hypot(q2.x - f.x, q2.y - f.y)),
         natHtml = nearV.length
           ? `
@@ -14178,6 +14595,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           return;
         }
         if (O && O.hold) return;
+        if ((f.key === "f" || f.key === "F") && !m) {
+          meter ? (meter.remove(), (meter = null)) : ((meter = document.createElement("div")), (meter.className = "frame-meter"), (meter.textContent = "Move the map to measure"), e.querySelector(".layout").appendChild(meter));
+          return;
+        }
         if ((f.key === "n" || f.key === "N") && !m) {
           f.preventDefault(), nextUnit();
           return;
