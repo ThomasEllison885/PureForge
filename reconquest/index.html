@@ -255,6 +255,18 @@ ul.colony-list small { color: #5c5144; }
 .announce-card { display: flex; gap: 16px; align-items: flex-start; max-width: 560px; }
 .announce-card .ann-art { flex: none; width: 120px; height: 90px; border-radius: 6px; background: linear-gradient(#cfe0c0, #9ab878); border: 1px solid #b9a67e; }
 .announce-card.raid .ann-art { background: linear-gradient(#e8c8a0, #b88a5a); }
+.outcome { position: fixed; inset: 0; z-index: 1100; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(8, 6, 4, 0.28); cursor: pointer; animation: obFade 0.3s ease; transition: opacity 0.5s ease; }
+.outcome.out { opacity: 0; pointer-events: none; }
+.outcome .ob-band { position: absolute; left: -10%; width: 120%; top: 50%; height: 190px; margin-top: -105px; transform: rotate(-3deg); transform-origin: left center; clip-path: polygon(0 12%, 6% 4%, 14% 10%, 25% 2%, 38% 9%, 52% 0, 63% 8%, 77% 3%, 88% 10%, 100% 5%, 100% 92%, 90% 98%, 78% 90%, 64% 99%, 50% 91%, 37% 100%, 24% 92%, 12% 99%, 0 90%); animation: obWipe 0.45s cubic-bezier(.2,.7,.2,1) both; }
+.outcome.win .ob-band { background: linear-gradient(180deg, rgba(40, 26, 10, 0.94), rgba(20, 12, 4, 0.94)); box-shadow: 0 0 60px rgba(230, 180, 80, 0.25); }
+.outcome.lose .ob-band { background: linear-gradient(180deg, rgba(110, 18, 12, 0.94), rgba(50, 6, 4, 0.94)); }
+.outcome .ob-text { position: relative; font: 700 clamp(64px, 12vw, 150px)/1 Palatino, Georgia, serif; letter-spacing: 0.08em; text-transform: uppercase; transform: rotate(-3deg); animation: obSlam 0.55s cubic-bezier(.2,.8,.2,1) 0.12s both; }
+.outcome.win .ob-text { background: linear-gradient(180deg, #fff3c4 0%, #f0c04a 45%, #a8741e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(60, 36, 8, 0.7); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
+.outcome.lose .ob-text { color: #e8ddd0; -webkit-text-stroke: 2px rgba(60, 8, 4, 0.8); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7)); }
+.outcome .ob-line { position: relative; margin-top: 22px; max-width: min(80vw, 720px); text-align: center; color: #f4ead2; font: italic 20px Palatino, Georgia, serif; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); transform: rotate(-3deg); animation: obFade 0.5s ease 0.55s both; }
+@keyframes obWipe { from { transform: rotate(-3deg) scaleX(0); } to { transform: rotate(-3deg) scaleX(1); } }
+@keyframes obSlam { from { opacity: 0; transform: rotate(-3deg) scale(1.7); filter: blur(10px); } to { opacity: 1; transform: rotate(-3deg) scale(1); } }
+@keyframes obFade { from { opacity: 0; } to { opacity: 1; } }
 .raidbox { position: relative; display: inline-flex; align-items: baseline; gap: 10px; margin: 2px 0 4px; padding: 3px 12px 7px; border-radius: 6px; border: 1px solid #b9a67e; background: rgba(250, 244, 230, 0.95); color: #3a2a18; overflow: hidden; font: 14px "Segoe UI", sans-serif; }
 .raidbox b { font: 700 24px Palatino, Georgia, serif; min-width: 3.2em; }
 .raidbox.theirs b { color: #9a2a20; }
@@ -7118,7 +7130,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         u.log.push("Your leader, two scouts, a band of settlers and a company of warriors stand ready on home ground. Found your first town where you like."),
         u)
       : (u.log.push(`${s.name} sails west in ${u.year}. ${m} rules at home.`),
-        u.log.push(`One ship, with your leader, a few soldiers to guard the landing, and two explorers. Find good ground for colonies first. The storeship with your settlers, another explorer and a second leader is due in ${vr()}.`),
+        u.log.push(`One ship, with your leader, a few soldiers to guard the landing, and three explorers. Find good ground for colonies first. The storeship with your settlers, another explorer and a second leader is due in ${vr()}.`),
         u);
   }
   function yr(e, n, o, r) {
@@ -7145,9 +7157,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let s = Le(e, n, "ship", o[0], o[1], "Lead ship"),
       a = freshLeader(Le(e, n, "leader", o[0], o[1], i.leaders[0]), 1, 2);
     a.aboard = s.id;
-    let t = Le(e, n, "explorer", o[0], o[1], "Explorer"),
-      l = Le(e, n, "explorer", o[0], o[1], "Explorer");
-    (t.aboard = s.id), (l.aboard = s.id);
+    // three explorers aboard the lead ship
+    for (let k = 0; k < 3; k++) Le(e, n, "explorer", o[0], o[1], "Explorer").aboard = s.id;
     // A few soldiers to guard the landing, not enough to go conquering.
     for (let k = 0; k < 3; k++) {
       let d = Le(e, n, "infantry", o[0], o[1], "Guard");
@@ -15240,6 +15251,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         tens = Math.round(p * 10);
       return `Rough odds: ${word}, about ${tens} in 10.${mine === "def" && spec.kind === "raid" ? ` Expect to lose about ${Math.round(o.killed * 0.75)} colonists.` : ""}`;
     }
+    // VICTORY or DEFEAT painted across the screen as a battle ends. A click
+    // clears it; it fades by itself in a few seconds.
+    function showOutcome(win, line) {
+      let el = document.createElement("div");
+      el.className = `outcome ${win ? "win" : "lose"}`;
+      el.innerHTML = `<div class="ob-band"></div><div class="ob-text">${win ? "Victory" : "Defeat"}</div>${line ? `<div class="ob-line">${G(line)}</div>` : ""}`;
+      document.body.appendChild(el);
+      let gone = () => (el.classList.contains("out") || (el.classList.add("out"), setTimeout(() => el.remove(), 500)));
+      (el.onclick = gone), setTimeout(gone, 2800);
+    }
     function preBattle(spec, mine, done) {
       p = !0;
       (a.hidden = !1),
@@ -15259,7 +15280,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (a.querySelector("#b-auto").onclick = () => {
           (p = !1), (a.hidden = !0);
           let B = bAutoFinish(battleNew(spec, (Date.now() >>> 0) ^ 0x9e37));
-          done(B);
+          showOutcome(B.over.winner === mine, overText(B, mine)), done(B);
         }),
         (a.querySelector("#b-grid").onclick = () => {
           (p = !1), (a.hidden = !0), gridBattle(spec, mine, done);
@@ -15471,7 +15492,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           render(performance.now()), raf || (raf = requestAnimationFrame(frame));
         },
         live = () => [...sel].filter((u) => u.str > 0 && (bMoves(B, u).length || bTargets(B, u).length)),
+        told = !1,
         draw = () => {
+          B.over && !told && ((told = !0), setTimeout(() => showOutcome(B.over.winner === mine, overText(B, mine)), 250));
           for (let u of [...sel]) (u.str <= 0 || (!bMoves(B, u).length && !bTargets(B, u).length)) && sel.delete(u);
           let S = B.sides[mine],
             myTurn = B.turn === mine && !B.over,
@@ -15989,8 +16012,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           { id: "board", label: "Board her", hint: "Soldiers aboard help. Win and the ship is yours, empty; those aboard her are lost. Fail and your ship is damaged." },
         ],
         (opt) => {
-          let msg = resolveSea(t, s, foe, opt.id, bn((Date.now() >>> 0) ^ 0x5ea));
+          let foeOwner = foe.owner,
+            msg = resolveSea(t, s, foe, opt.id, bn((Date.now() >>> 0) ^ 0x5ea)),
+            theirsGone = !t.units.includes(foe) || foe.owner !== foeOwner,
+            mineGone = !t.units.includes(s);
           t.log.push(msg), (h = msg), R();
+          theirsGone ? showOutcome(!0, foe.owner !== foeOwner ? "She is taken." : "She went down.") : mineGone && showOutcome(!1, "Your ship went down.");
         },
       );
     }
