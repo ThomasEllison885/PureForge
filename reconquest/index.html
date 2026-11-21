@@ -2989,10 +2989,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         );
     return o;
   }
+  // What a nation's units and towns can see is charted. Only squares newly
+  // seen are written, and only squares charted since the last look are
+  // checked for first claims, so a step costs little on a big map.
+  var claimMemo = new WeakMap();
   function ze(e, n) {
     let o = ce(e, n),
-      r = o.explored.split(""),
-      { width: i, height: s } = e.map;
+      ex = o.explored,
+      { width: i, height: s } = e.map,
+      fresh = [];
     for (let a of e.units) {
       if (a.owner !== n || a.aboard) continue;
       let t = $.vision[a.kind] || 1,
@@ -3001,33 +3006,36 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         for (let u = a.x - t; u <= a.x + t; u++) {
           if (!Ge(u, d, i, s)) continue;
           let c = u - a.x,
-            h = d - a.y;
-          c * c + h * h > l || (r[C(u, d, i)] = "1");
+            h = d - a.y,
+            k = C(u, d, i);
+          c * c + h * h > l || ex.charCodeAt(k) === 49 || fresh.push(k);
         }
     }
     for (let c of e.colonies)
       c.owner === n &&
         paintSight(e.map, c.x, c.y, townSight(c.level), (x, y) => {
-          r[C(x, y, i)] = "1";
+          let k = C(x, y, i);
+          ex.charCodeAt(k) === 49 || fresh.push(k);
         });
-    (o.explored = r.join("")), Hs(e), chartRivers(e, n, o.explored, null, null, null);
+    if (fresh.length) {
+      let r = ex.split("");
+      for (let k of fresh) r[k] = "1";
+      (o.explored = r.join("")), Hs(e), chartRivers(e, n, o.explored, null, null, null);
+    } else Hs(e);
     let Ni = e.map.firstClaim,
+      prev = claimMemo.get(o),
+      cur = o.explored,
       gained = 0,
       chars = null;
-    for (let y2 = 0; y2 < s; y2++)
-      for (let x2 = 0; x2 < i; x2++) {
-        let idx = C(x2, y2, i);
-        if (o.explored[idx] !== "1" || Ni[idx] !== ".") continue;
+    if (prev !== cur)
+      for (let idx = 0; idx < cur.length; idx++) {
+        if (cur.charCodeAt(idx) !== 49 || (prev && prev.length === cur.length && prev.charCodeAt(idx) === 49) || Ni[idx] !== ".") continue;
         let terr = e.map.tiles[idx].terrain;
         if (terr === "ocean" || terr === "coast") continue;
-        chars || (chars = Ni.split("")),
-          (chars[idx] = String.fromCharCode(65 + n)),
-          (gained += 20);
+        chars || (chars = Ni.split("")), (chars[idx] = String.fromCharCode(65 + n)), (gained += 20);
       }
-    gained &&
-      ((e.map.firstClaim = chars.join("")),
-      (o.score = (o.score || 0) + gained)),
-      li(e, n);
+    claimMemo.set(o, cur);
+    gained && ((e.map.firstClaim = chars.join("")), (o.score = (o.score || 0) + gained)), li(e, n);
   }
   function li(e, n) {
     let o = e.map.specials || [];
@@ -5851,13 +5859,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }
         return (w = seen >= 6 ? 5 : seen >= 4 ? 2.5 : 1), gaps.set(key, w), w;
       };
+    // What each reachable square would let it see, by offsets rather
+    // than building names for every square.
+    let vr2 = $.vision[n.kind] || 1,
+      offs = [];
+    for (let dy = -vr2; dy <= vr2; dy++) for (let dx = -vr2; dx <= vr2; dx++) dx * dx + dy * dy <= vr2 * vr2 && offs.push([dx, dy]);
     for (let [d, u] of i) {
       let [c, h] = d.split(",").map(Number),
         p = 0;
-      for (let A of xn(e, n.kind, c, h)) {
-        if (o.has(A)) continue;
-        let [N, _] = A.split(",").map(Number);
-        r.explored[C(N, _, s)] !== "1" && (p += worth(N, _));
+      for (let [dx, dy] of offs) {
+        let N = c + dx,
+          _ = h + dy;
+        if (N < 0 || _ < 0 || N >= s || _ >= hh || r.explored.charCodeAt(_ * s + N) === 49 || (o.size && o.has(`${N},${_}`))) continue;
+        p += worth(N, _);
       }
       if (!p) continue;
       let m = e.map.tiles[C(c, h, s)],
@@ -5883,6 +5897,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function early(e, p) {
     return p && p.anchor ? Math.max(0, Math.min(1, 1 - (e.year - $.startYear) / 10)) : 0;
   }
+  // When nothing new is within reach this turn: search outward from the
+  // squares the unit can reach for the nearest edge of the charted land,
+  // stopping at the first one, and head for whichever reachable square
+  // leads there.
   function Di(e, n, o, r) {
     let { width: i, height: s, tiles: a } = e.map,
       t = n.kind === "ship",
@@ -5892,32 +5910,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return t ? M : !M;
       },
       d = (m, y) => o.explored[C(m, y, i)] === "1",
-      u = new Int32Array(i * s).fill(-1),
-      c = [];
-    for (let m = 0; m < s; m++)
-      for (let y = 0; y < i; y++) {
-        if (!d(y, m) || !l(y, m)) continue;
-        Z(y, m, i, s).some(([M, P]) => !d(M, P)) &&
-          ((u[C(y, m, i)] = 0), c.push([y, m]));
+      seen = new Int32Array(i * s).fill(-1),
+      q = [];
+    for (let k of r.keys()) {
+      let [x, y] = k.split(",").map(Number),
+        id = C(x, y, i);
+      seen[id] < 0 && ((seen[id] = id), q.push(id));
+    }
+    for (let h = 0; h < q.length; h++) {
+      let id = q[h],
+        x = id % i,
+        y = (id / i) | 0;
+      if (d(x, y) && l(x, y) && Z(x, y, i, s).some(([M, P]) => !d(M, P))) {
+        let src = seen[id];
+        return { x: src % i, y: (src / i) | 0 };
       }
-    for (let m = 0; m < c.length; m++) {
-      let [y, S] = c[m],
-        M = u[C(y, S, i)];
-      for (let [P, T] of Z(y, S, i, s)) {
-        if (!Ge(P, T, i, s)) continue;
-        let A = C(P, T, i);
-        u[A] >= 0 || !d(P, T) || !l(P, T) || ((u[A] = M + 1), c.push([P, T]));
+      for (let [M, P] of Z(x, y, i, s)) {
+        let n2 = C(M, P, i);
+        seen[n2] >= 0 || !d(M, P) || !l(M, P) || ((seen[n2] = seen[id]), q.push(n2));
       }
     }
-    let h = null,
-      p = u[C(n.x, n.y, i)];
-    p < 0 && (p = 1 / 0);
-    for (let m of r.keys()) {
-      let [y, S] = m.split(",").map(Number),
-        M = u[C(y, S, i)];
-      M >= 0 && M < p && ((p = M), (h = { x: y, y: S }));
-    }
-    return h;
+    return null;
   }
   function xn(e, n, o, r) {
     let { width: i, height: s } = e.map,
@@ -5938,7 +5951,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let o = mn[n.terrain].pass;
     return e.kind === "ship" ? o === "sea" : o === "land";
   }
-  function Pn(e, n) {
+  // Distances from a unit across the map. Given a goal it stops as soon as
+  // the goal (or, for a ship, water beside it) is reached, which is far
+  // quicker than charting the whole map.
+  function Pn(e, n, goal) {
     let o = j(e, n),
       { width: r, height: i } = e.map,
       s = r * i,
@@ -5980,12 +5996,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return m;
       },
       p = new Uint8Array(s);
+    let gi = goal ? C(goal.x, goal.y, r) : -1,
+      ship = o.kind === "ship";
     for (; u.length; ) {
       let m = h();
       if (p[m]) continue;
       p[m] = 1;
       let y = m % r,
         S = Math.floor(m / r);
+      if (gi >= 0 && (m === gi || (ship && Math.max(Math.abs(y - goal.x), Math.abs(S - goal.y)) <= 1))) break;
       for (let [M, P] of Z(y, S, r, i)) {
         let T = C(M, P, r);
         if (p[T]) continue;
@@ -6031,7 +6050,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     if (!Xu(i.kind)) return { ok: !1, error: "That unit cannot move." };
     let s = ce(e, i.owner),
-      a = Pn(e, n),
+      a = Pn(e, n, { x: o, y: r }),
       t = { x: o, y: r };
     if (s.explored[C(o, r, e.map.width)] === "1" && !ao(i, se(e, o, r))) {
       if (i.kind !== "ship")
@@ -6055,7 +6074,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ? { ok: !0, discoveries: [], note: `${i.name} will set off next turn.` }
       : d;
   }
-  function pr(e, n, o = Pn(e, n.id)) {
+  function pr(e, n, o = Pn(e, n.id, n.dest)) {
     let r = n.dest;
     if (!r) return { ok: !1, error: "No destination." };
     if (n.x === r.x && n.y === r.y)
@@ -6064,7 +6083,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s = [],
       a = [n.id];
     for (let t = 0; t < 4 && n.mp > 0; t++) {
-      let l = t === 0 ? o : Pn(e, n.id);
+      let l = t === 0 ? o : Pn(e, n.id, r);
       if (
         ce(e, n.owner).explored[C(r.x, r.y, e.map.width)] === "1" &&
         !ao(n, se(e, r.x, r.y))
@@ -6847,6 +6866,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
     return b;
   }
+  // The map's squares never change after it is made, so they are packed
+  // once and reused by every save.
+  var packedMemo = new WeakMap();
+  function packedOf(tiles) {
+    let p = packedMemo.get(tiles);
+    return p || (packedMemo.set(tiles, (p = packTiles(tiles))), p);
+  }
   function packTiles(tiles) {
     let keys = new Set();
     for (let tl of tiles) for (let k in tl) keys.add(k);
@@ -6909,7 +6935,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         year: e.year,
         season: e.season,
         nextId: e.nextId,
-        map: { ...e.map, tiles: void 0, packedTiles: packTiles(e.map.tiles) },
+        map: { ...e.map, tiles: void 0, packedTiles: packedOf(e.map.tiles) },
         players: e.players,
         units: e.units,
         colonies: e.colonies,
