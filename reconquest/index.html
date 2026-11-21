@@ -7940,6 +7940,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       t = s ? { id: a.id, explored: s.explored } : a,
       l = s ? s.visible : Sn(o, t.id);
     Zi(e, n, o, r, t, l),
+      // the fog over the whole view in one piece, so its edge moves smoothly
+      blitFog(e, o.map, { ox: r.ox, oy: r.oy, zoom: r.zoom }, t.explored),
       yt(e, o, r, i, t),
       kt(e, o, r, n, t),
       vt(e, o, r, n, l, i);
@@ -7983,7 +7985,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       blitTerrace(g, S, cam, frame),
       rt(g, o, cam, frame, i),
       it(g, o, cam, frame, i, colonyTiles),
-      blitFog(g, S, cam, i.explored, s),
       Qe(g, cam, 0, 0, S.width, S.height, 0),
       (g.strokeStyle = "#000000"),
       (g.lineWidth = 3),
@@ -10198,11 +10199,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       vmap = new Map(natives(n).villages.map((v) => [v.x * 4096 + v.y, v]));
     for (let [c, h] of tilesInView(n.map, o, r)) {
       let p = YL(c, h, o, terracePx(n.map, c, h, o.zoom));
-      if (!Nn(p, r) || i.explored[C(c, h, a)] !== "1") continue;
+      if (!Nn(p, r)) continue;
+      // Ground and trees are drawn everywhere (the fog hides them); villages,
+      // towns and finds only once the square is charted.
+      let seen = i.explored[C(c, h, a)] === "1";
       let m = t[C(c, h, a)],
         y = s.get(`${c},${h}`),
         lm = l.get(`${c},${h}`),
         vg = vmap.get(c * 4096 + h);
+      if ((vg || y) && !seen) continue;
       if (vg) {
         let nt = nationOf(n, vg);
         Ye(e, p.x, p.y, Math.max(d * 1.35, 0.6), (M) => {
@@ -10231,13 +10236,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       m.terrain === "woods" && d >= Vi && Ye(e, p.x, p.y, d, (M) => woodsTile(M, c, h, u, wetSides(n.map, c, h), !!m.riverId));
       m.terrain === "swamp" && d >= Vi && Ye(e, p.x, p.y, d, (M) => swampTile(M, c, h, u));
       m.terrain === "desert" && d >= Ji && Ye(e, p.x, p.y, d, (M) => desertTile(M, c, h, u));
+      // peaks stand tall enough to show above the fog, so they wait too
       m.terrain === "mountains" &&
         !m.riverId &&
+        seen &&
         Ye(e, p.x, p.y, d, (M) => mtnTile(M, n.map, c, h, u, m));
       m.terrain === "hills" &&
         d >= Ji &&
         Ye(e, p.x, p.y, d, (M) => hillTile(M, c, h, u));
-      lm && finds.push([p, lm, !1]);
+      lm && seen && finds.push([p, lm, !1]);
     }
     // Discoveries go on last so a mountain peak in front can never hide one.
     // On a built square the marker sits smaller at the square's front corner,
@@ -15955,6 +15962,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a.querySelector("#an-go").onclick = () => close(!0);
       a.querySelector("#an-ok").onclick = () => close(!1);
     }
+    // Show me only goes where you have charted, at least at the edge:
+    // it must not give away country you have not seen.
+    function chartedNear(x, y) {
+      let me = V(t),
+        w = t.map.width,
+        h2 = t.map.height;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          let xx = x + dx,
+            yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < w && yy < h2 && me.explored[yy * w + xx] === "1") return !0;
+        }
+      return !1;
+    }
     // Everything that happened this year in one box. Show me takes you there.
     function summaryBox(list, again) {
       let P = pol(t),
@@ -15968,7 +15989,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <div class="card summary-card">
         <p class="find-kicker">${t.year}</p>
         <h2>This year</h2>
-        ${list.length ? `<ul class="summary">${list.map((q, k) => `<li><span>${G(q.text)}</span>${q.x != null ? `<button type="button" data-k="${k}">Show me</button>` : ""}</li>`).join("")}</ul>` : '<p class="muted">Nothing of note.</p>'}
+        ${list.length ? `<ul class="summary">${list.map((q, k) => `<li><span>${G(q.text)}</span>${q.x != null && chartedNear(q.x, q.y) ? `<button type="button" data-k="${k}">Show me</button>` : ""}</li>`).join("")}</ul>` : '<p class="muted">Nothing of note.</p>'}
         <div class="row"><button type="button" id="sum-close" class="primary">Carry on</button></div>
       </div>`);
       a.querySelectorAll(".summary button").forEach(
