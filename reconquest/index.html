@@ -173,6 +173,8 @@ footer.bar { border-bottom: 0; border-top: 1px solid #1e3342; height: 92px; alig
 #mini canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; cursor: pointer; }
 #maptip { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 260px); z-index: 4; padding: 5px 10px; border-radius: 5px; background: rgba(12, 22, 30, 0.82); color: #e8eef2; font: 13px "Segoe UI", sans-serif; pointer-events: none; }
 #maptip:empty { display: none; }
+#zoombar { position: absolute; right: 10px; bottom: 182px; z-index: 5; display: flex; flex-direction: column; gap: 4px; }
+#zoombar button { width: 34px; height: 34px; padding: 0; font: 700 20px/1 "Segoe UI", sans-serif; border-radius: 6px; background: rgba(250,244,230,0.95); color: #3a2a18; border: 1px solid #b9a67e; box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
 .frame-meter { position: absolute; left: 10px; top: 10px; z-index: 8; padding: 4px 8px; border-radius: 4px; background: rgba(0,0,0,0.7); color: #9fe8b0; font: 12px ui-monospace, Menlo, monospace; }
 #toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: min(560px, calc(100% - 400px)); z-index: 7; padding: 8px 14px; border-radius: 6px; background: rgba(250, 244, 230, 0.96); color: #4a2a14; border: 1px solid #b9a67e; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); font: 14px "Segoe UI", sans-serif; }
 #map { width: 100%; height: 100%; display: block; cursor: grab; }
@@ -1480,7 +1482,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       startYear: 1500,
       yearsPerTurn: 1,
       storeshipTurn: 6,
-      zoom: { start: 1.35, min: 0.05, max: 2, colony: 1.4 },
+      zoom: { start: 1.25, min: 0.3, max: 2, colony: 1.55 },
       skillPoints: 6,
       invasionScale: { easy: 0.4, normal: 0.6, hard: 0.8, ruthless: 1 },
       move: {
@@ -6530,7 +6532,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       },
       p = new Uint8Array(s);
     let gi = goal ? C(goal.x, goal.y, r) : -1,
-      ship = o.kind === "ship";
+      // a ship bound for land stops at the water beside it; bound for
+      // water, it goes all the way
+      gt = goal && e.map.tiles[gi],
+      ship = o.kind === "ship" && gt && !ao(o, gt);
     for (; u.length; ) {
       let m = h();
       if (p[m]) continue;
@@ -7089,6 +7094,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!n || n.kind !== "ship" || (o === n.x && r === n.y)) return null;
     let i = se(e, o, r);
     if (!i || ao(n, i)) return null;
+    // Land farther off: the ship sails there first (see the drag handler).
+    if (Math.max(Math.abs(o - n.x), Math.abs(r - n.y)) > 1) return null;
     let s = Xe(e, n.id);
     if (!s.length) return { error: "No open shore next to the ship." };
     let a = s.find(([t, l]) => t === o && l === r);
@@ -7665,95 +7672,104 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
   }
+  // The map is painted at a few fixed sizes, four to each doubling, and
+  // stretched smoothly to the exact zoom. Zooming within a step paints
+  // nothing new; crossing one paints the next size, the old one standing
+  // in until it is ready.
+  // Eight zoom levels, as in the original's + and - buttons. The map is
+  // only ever painted at these sizes, so each is painted once and kept.
+  var ZLEVELS = [0.3, 0.45, 0.6, 0.8, 1, 1.25, 1.55, 2];
+  function quantZ(z) {
+    let best = ZLEVELS[0];
+    for (let q of ZLEVELS) Math.abs(Math.log(q / z)) < Math.abs(Math.log(best / z)) && (best = q);
+    return best;
+  }
   function Zi(e, n, o, r, i, s) {
     let a = e.getTransform().a || 1,
       TS = TILE / a,
       now = performance.now(),
-      key = `${o.map.seed}|${a}|${r.zoom}|${tileEpoch}|${Xi(o, i, s)}`,
-      i0 = Math.floor(-r.ox / TS),
-      j0 = Math.floor(-r.oy / TS),
-      i1 = Math.floor((n.w - r.ox) / TS),
-      j1 = Math.floor((n.h - r.oy) / TS),
+      rz = quantZ(r.zoom),
+      S = TS * (r.zoom / rz),
+      rr = { ox: r.ox, oy: r.oy, zoom: rz, lift: r.lift },
+      key = `${o.map.seed}|${a}|${rz}|${tileEpoch}|${Xi(o, i, s)}`,
+      i0 = Math.floor(-r.ox / S),
+      j0 = Math.floor(-r.oy / S),
+      i1 = Math.floor((n.w - r.ox) / S),
+      j1 = Math.floor((n.h - r.oy) / S),
       ci = (i0 + i1) / 2,
       cj = (j0 + j1) / 2,
       todo = [];
     staleAround(o, i.explored, a);
-    r.zoom !== zoomSeen && (zoomSeen != null && zoomSeen !== baseZoom && (prevZoom = zoomSeen), (zoomSeen = r.zoom), (zoomSeenAt = now));
-    let settling = now - zoomSeenAt < 160,
-      // Stretch another zoom's tiles to the current scale.
+    rz !== zoomSeen && (zoomSeen != null && zoomSeen !== baseZoom && (prevZoom = zoomSeen), (zoomSeen = rz), (zoomSeenAt = now));
+    let settling = now - zoomSeenAt < 120,
+      // a tile placed on whole device pixels, edges shared with its neighbours
+      place = (tile, ti, tj, SS) => {
+        let x0 = Math.round((ti * SS + r.ox) * a) / a,
+          y0 = Math.round((tj * SS + r.oy) * a) / a,
+          x1 = Math.round(((ti + 1) * SS + r.ox) * a) / a,
+          y1 = Math.round(((tj + 1) * SS + r.oy) * a) / a;
+        x0 > n.w || y0 > n.h || x1 < 0 || y1 < 0 || e.drawImage(tile.canvas, x0, y0, x1 - x0, y1 - y0);
+      },
+      // another size's tiles, stretched to the current zoom
       layer = (z0) => {
-        if (z0 == null || z0 === r.zoom) return;
-        let k = r.zoom / z0,
-          S = TS * k;
+        if (z0 == null || z0 === rz) return;
+        let SS = TS * (r.zoom / z0);
         for (let [id, t] of mapTiles) {
           if (t.zoom !== z0 || t.dpr !== a) continue;
-          let c = id.slice(id.indexOf("|") + 1).split(","),
-            x = +c[0] * S + r.ox,
-            y = +c[1] * S + r.oy;
-          x > n.w || y > n.h || x + S < 0 || y + S < 0 || e.drawImage(t.canvas, x, y, S, S);
+          let c = id.slice(id.indexOf("|") + 1).split(",");
+          place(t, +c[0], +c[1], SS);
         }
-      };
-    // Every frame draws the same layers in the same order, so nothing
-    // flickers: the last complete zoom, then any half-finished one, then
-    // whatever sharp tiles are ready at this zoom.
-    let current = () => {
-      let missing = !1;
-      for (let tj = j0; tj <= j1; tj++)
-        for (let ti = i0; ti <= i1; ti++) {
-          let tile = mapTiles.get(tileId(r.zoom, ti, tj));
-          if (!(tile && tile.dpr === a && tile.canvas && tile.zoom === r.zoom)) {
-            missing = !0;
-            continue;
+      },
+      current = () => {
+        for (let tj = j0; tj <= j1; tj++)
+          for (let ti = i0; ti <= i1; ti++) {
+            let tile = mapTiles.get(tileId(rz, ti, tj));
+            if (!(tile && tile.dpr === a && tile.canvas && tile.zoom === rz)) continue;
+            (tile.used = ++tileTick), place(tile, ti, tj, S);
           }
-          tile.used = ++tileTick;
-          let x = Math.round((ti * TS + r.ox) * a) / a,
-            y = Math.round((tj * TS + r.oy) * a) / a;
-          e.drawImage(tile.canvas, x, y, TS, TS);
-        }
-      return missing;
-    };
-    if (settling && baseZoom != null && baseZoom !== r.zoom) {
+      };
+    if (settling && baseZoom != null && baseZoom !== rz) {
       layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
-      clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 170));
+      clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 130));
       return;
     }
     for (let tj = j0; tj <= j1; tj++)
       for (let ti = i0; ti <= i1; ti++) {
-        let tile = mapTiles.get(tileId(r.zoom, ti, tj));
+        let tile = mapTiles.get(tileId(rz, ti, tj));
         (!tile || tile.dpr !== a || tile.key !== key) && todo.push([ti, tj, Math.hypot(ti - ci, tj - cj)]);
       }
-    // Draw what is due, nearest the middle first, within a small budget.
+    // Paint what is due, nearest the middle first, a few a frame.
     if (todo.length) {
       todo.sort((p, q) => p[2] - q[2]);
       let t0 = performance.now(),
         colonyTiles = null,
         drew = 0;
       for (let [ti, tj] of todo) {
-        if ((performance.now() - t0 > 3 || drew >= 3) && drew) break;
+        if ((performance.now() - t0 > 4 || drew >= 4) && drew) break;
         colonyTiles || (colonyTiles = Ct(o));
-        let k = tileId(r.zoom, ti, tj),
+        let k = tileId(rz, ti, tj),
           tile = mapTiles.get(k);
         tile || ((tile = { canvas: $o(TILE, TILE) }), mapTiles.set(k, tile));
-        drawTile(o, r, i, s, colonyTiles, tile, ti, tj, a, key), drew++;
+        drawTile(o, rr, i, s, colonyTiles, tile, ti, tj, a, key), drew++;
       }
       drew < todo.length && mapRepaint && mapRepaint();
     }
     let complete = !0;
     for (let tj = j0; tj <= j1 && complete; tj++)
       for (let ti = i0; ti <= i1; ti++) {
-        let tile = mapTiles.get(tileId(r.zoom, ti, tj));
-        if (!(tile && tile.dpr === a && tile.zoom === r.zoom)) {
+        let tile = mapTiles.get(tileId(rz, ti, tj));
+        if (!(tile && tile.dpr === a && tile.zoom === rz)) {
           complete = !1;
           break;
         }
       }
-    if (!complete) baseZoom != null && baseZoom !== r.zoom ? (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom)) : blitTerrace(e, o.map, r, null);
+    if (!complete) baseZoom != null && baseZoom !== rz ? (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom)) : blitTerrace(e, o.map, r, null);
     current();
-    complete && ((baseZoom = r.zoom), (prevZoom = null));
+    complete && ((baseZoom = rz), (prevZoom = null));
     // Keep memory in check: forget the tiles least recently on screen,
-    // never the ones of the zoom being stretched.
+    // never those of a size standing in.
     if (mapTiles.size > TILE_MAX) {
-      let old = [...mapTiles.entries()].filter(([, t]) => t.zoom === r.zoom || (t.zoom !== baseZoom && t.zoom !== prevZoom)).sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
+      let old = [...mapTiles.entries()].filter(([, t]) => t.zoom === rz || (t.zoom !== baseZoom && t.zoom !== prevZoom)).sort((p, q) => (p[1].used || 0) - (q[1].used || 0));
       for (let k = 0; k < Math.min(old.length, mapTiles.size - TILE_MAX); k++) mapTiles.delete(old[k][0]);
     }
   }
@@ -12454,6 +12470,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <div id="toast" hidden></div>
         <div id="maptip"></div>
         <div id="mini"><canvas id="minimap" width="288" height="216"></canvas></div>
+        <div id="zoombar"><button type="button" id="zoom-in" title="Zoom in (+)">+</button><button type="button" id="zoom-out" title="Zoom out (-)">\u2212</button></div>
       </div>
       <footer class="bar"><pre id="log"></pre></footer>
     </section>
@@ -13012,7 +13029,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         pe(),
         requestAnimationFrame(panStep);
     }
-    let Ln = 170,
+    let Ln = 120,
       O = null,
       tearArm = null;
     // Repaint when a detailed piece of ground finishes painting.
@@ -13352,10 +13369,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 `));
       // Messages for the player show briefly over the map.
       if (toastEl)
-        if (!h) toastEl.hidden = !0;
+        if (!h) (toastEl.hidden = !0), (toastEl.dataset.msg = "");
         else if (toastEl.dataset.msg !== h) {
           (toastEl.dataset.msg = h), (toastEl.innerHTML = h), (toastEl.hidden = !1);
-          clearTimeout(toastEl._t), (toastEl._t = setTimeout(() => (toastEl.hidden = !0), 5000));
+          // once it fades the message is done, so the same one can show again
+          clearTimeout(toastEl._t), (toastEl._t = setTimeout(() => ((toastEl.hidden = !0), h === toastEl.dataset.msg && (h = ""), (toastEl.dataset.msg = "")), 5000));
         }
       // The Next unit button lights up while someone still has a move to make.
       let nu_ = e.querySelector("#next-unit"),
@@ -13916,6 +13934,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             rc = land && !vg && !am && t.colonies.find((c) => c.x === b.x && c.y === b.y && (c.owner !== w.owner || c.occupied)),
             rp = land && !vg && !am && !rc && t.units.some((q) => q.owner !== w.owner && !q.aboard && q.kind !== "ship" && q.x === b.x && q.y === b.y),
             near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= 1;
+          // A unit dragged onto one of your ships goes aboard, walking up to
+          // the shore beside her first if it can this turn.
+          let myShip = land && t.units.find((q) => q.kind === "ship" && q.owner === w.owner && q.x === b.x && q.y === b.y);
+          if (myShip) {
+            let board = () => {
+              let res = wr(t, w.id, myShip.id);
+              x(res), res.ok && (l = myShip.id), R();
+            };
+            if (Math.max(Math.abs(w.x - b.x), Math.abs(w.y - b.y)) <= 1) return board();
+            let reach = kn(t, w.id),
+              best = null;
+            for (let [key, cost] of reach) {
+              let [sx, sy] = key.split(",").map(Number);
+              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) === 1 && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
+            }
+            if (!best) return (h = "The ship is beyond this turn's march; bring her closer or walk nearer first."), R();
+            return neThen(w.id, () => mo(t, w.id, best.x, best.y), () => {
+              let u2 = j(t, w.id);
+              u2 && Math.max(Math.abs(u2.x - b.x), Math.abs(u2.y - b.y)) <= 1 ? board() : ((h = "They could not reach the ship this turn."), R());
+            });
+          }
           if (vg || am || rc || rp) {
             let strike = () => (vg ? attackVillage(w, vg) : am ? attackArmy(w, am) : rc ? attackColony(w, rc) : attackParty(w, b.x, b.y));
             if (near) return strike();
@@ -13951,6 +13990,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             if (!(w.x === b.x && w.y === b.y)) {
               let F = Se(w, b.x, b.y);
               if (F && F.path) {
+                // A loaded ship sent onto land sails to the water beside it
+                // and, if it gets there this turn, everyone steps off.
+                let landing = ship && t.units.some((q) => q.aboard === ship.id) && !ao(ship, se(t, b.x, b.y));
+                if (landing)
+                  return neThen(w.id, () => mo(t, w.id, b.x, b.y), () => {
+                    if (Math.max(Math.abs(ship.x - b.x), Math.abs(ship.y - b.y)) <= 1) {
+                      let res = kr(t, ship.id, b.x, b.y);
+                      x(res), res.ok && res.note && (h = res.note);
+                    } else h = `${ship.name || "The ship"} is on her way; drag her onto the shore when she arrives to land everyone.`;
+                    R();
+                  });
                 ne(w.id, () => mo(t, w.id, b.x, b.y));
                 return;
               }
@@ -14020,21 +14070,46 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (f) => {
           if (!t) return;
           f.preventDefault();
+          // A wheel notch, or a good swipe on a trackpad, is one level.
           let g = Fe(f),
-            tp = tileAt(t.map, g.x, g.y, d),
-            L0 = terracePx(t.map, tp.x, tp.y, d.zoom),
-            k = (g.x - d.ox) / d.zoom,
-            v = (g.y - d.oy + L0) / d.zoom,
-            b = Math.max(
-              $.zoom.min,
-              Math.min($.zoom.max, d.zoom * (f.deltaY > 0 ? 0.9 : 1.1)),
-            );
-          d.zoom = b;
-          let L1 = terracePx(t.map, tp.x, tp.y, d.zoom);
-          (d.ox = g.x - k * d.zoom), (d.oy = g.y - v * d.zoom + L1), pe();
+            px = f.deltaY * (f.deltaMode === 1 ? 16 : f.deltaMode === 2 ? 400 : 1);
+          wheelAcc = Date.now() - wheelAt > 300 ? px : wheelAcc + px;
+          wheelAt = Date.now();
+          if (Math.abs(wheelAcc) >= 50) zoomStep(wheelAcc > 0 ? -1 : 1, g.x, g.y), (wheelAcc = 0);
         },
         { passive: !1 },
       );
+    // Step one zoom level in or out, gliding there and keeping the point
+    // under the pointer (or the middle of the view) where it is.
+    let wheelAcc = 0,
+      wheelAt = 0,
+      zoomAnim = null;
+    function zoomStep(dir, sx, sy) {
+      if (!t) return;
+      let cur = zoomAnim ? zoomAnim.to : d.zoom,
+        idx = ZLEVELS.indexOf(quantZ(cur)),
+        to = ZLEVELS[Math.max(0, Math.min(ZLEVELS.length - 1, idx + dir))];
+      if (to === cur) return;
+      let J0 = J(),
+        px = sx == null ? J0.w / 2 : sx,
+        py = sy == null ? J0.h / 2 : sy,
+        tp = tileAt(t.map, px, py, d),
+        L0 = terracePx(t.map, tp.x, tp.y, d.zoom),
+        kx = (px - d.ox) / d.zoom,
+        ky = (py - d.oy + L0) / d.zoom,
+        from = d.zoom,
+        t0 = performance.now();
+      zoomAnim = { to };
+      let tick = () => {
+        let q = Math.min(1, (performance.now() - t0) / 140),
+          ez = 1 - (1 - q) * (1 - q);
+        d.zoom = from * Math.pow(to / from, ez);
+        let L1 = terracePx(t.map, tp.x, tp.y, d.zoom);
+        (d.ox = px - kx * d.zoom), (d.oy = py - ky * d.zoom + L1), _e();
+        q < 1 ? requestAnimationFrame(tick) : ((zoomAnim = null), R());
+      };
+      requestAnimationFrame(tick);
+    }
     function Rn(f, g) {
       if (O && O.paused) {
         He();
@@ -14303,7 +14378,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         playing = null,
         raf = 0,
         lookFor = (side) => lookOf(B.sides[side].nat || (native(side) ? "tribe" : "england")),
-        fxDur = (ev) => (ev.t === "move" ? 420 : ev.from.some((q) => q.cls === "gun") ? 850 : ev.from.some((q) => q.charge) ? 720 : 620),
+        // Quick, so the board keeps up with your clicks; and any click
+        // skips whatever is still waiting to play.
+        fxDur = (ev) => (ev.t === "move" ? 200 : ev.from.some((q) => q.cls === "gun") ? 480 : ev.from.some((q) => q.charge) ? 400 : 330),
+        skipFx = () => ((queue.length = 0), (playing = null)),
         render = (now) => {
           let cv = r.querySelector("canvas.bscene");
           if (!cv) return;
@@ -14507,7 +14585,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         </div>`;
           r.querySelectorAll(".bu").forEach((el) => {
             el.onclick = (ev) => {
-              ev.stopPropagation();
+              ev.stopPropagation(), skipFx();
               let u = unitByKey(el.dataset.k);
               if (!u) return;
               if (u.side === mine) {
@@ -14519,6 +14597,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           });
           r.querySelectorAll(".bcell").forEach((el) => {
             el.onclick = () => {
+              skipFx();
               if (!myTurn) return;
               let c = +el.dataset.c,
                 rr = +el.dataset.r;
@@ -14533,12 +14612,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             };
           });
           let be_ = r.querySelector("#b-end");
-          be_ && (be_.onclick = () => (sel.clear(), bEndTurn(B), B.over || (bAiTurn(B), bEndTurn(B)), draw()));
+          be_ && (be_.onclick = () => (skipFx(), sel.clear(), bEndTurn(B), B.over || (bAiTurn(B), bEndTurn(B)), draw()));
           let ba = r.querySelector("#b-auto");
           // Auto-finish skips the show and goes straight to the end.
           ba && (ba.onclick = () => (sel.clear(), bAutoFinish(B), (fxSeen = B.fx.length), (queue.length = 0), (playing = null), draw()));
           let bf = r.querySelector("#b-flee");
-          bf && (bf.onclick = () => (sel.clear(), bRetreat(B, mine), draw()));
+          bf && (bf.onclick = () => (skipFx(), sel.clear(), bRetreat(B, mine), draw()));
           let bd = r.querySelector("#b-done");
           bd && (bd.onclick = () => (cancelAnimationFrame(raf), (raf = 0), (r.hidden = !0), (o.hidden = !1), done(B)));
           sceneKick();
@@ -15346,6 +15425,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         R();
     }
     (e.querySelector("#next-unit").onclick = () => nextUnit()),
+    (e.querySelector("#zoom-in").onclick = () => zoomStep(1)),
+    (e.querySelector("#zoom-out").onclick = () => zoomStep(-1)),
     (e.querySelector("#score-btn").onclick = () => t && scoreCard()),
     // Research buttons in the War College card.
     s.addEventListener("click", (ev) => {
@@ -15386,6 +15467,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           return;
         }
         if (O && O.hold) return;
+        if ((f.key === "+" || f.key === "=" || f.key === "-" || f.key === "_") && !m) {
+          f.preventDefault(), zoomStep(f.key === "+" || f.key === "=" ? 1 : -1);
+          return;
+        }
         if ((f.key === "f" || f.key === "F") && !m) {
           meter ? (meter.remove(), (meter = null)) : ((meter = document.createElement("div")), (meter.className = "frame-meter"), (meter.textContent = "Move the map to measure"), e.querySelector(".layout").appendChild(meter));
           return;
