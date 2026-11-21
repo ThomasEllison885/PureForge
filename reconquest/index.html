@@ -502,7 +502,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.02";
+    "1.03";
   var on = [
       {
         id: "spain",
@@ -7788,6 +7788,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function Er(e) {
     GS = e;
     e.undo = [];
+    // a fresh list of news for the new year; last year's stays for the button
+    {
+      let P0 = pol(e);
+      P0.events.length && (P0.lastEvents = P0.events.slice()), (P0.events = []), (P0.showSummary = !1);
+    }
     let n = Xo(e);
     if (!n.ok) return n;
     pioneerTurn(e);
@@ -8413,7 +8418,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (rg += e * e * amp), (amp *= 0.45), (f *= 2.2);
     }
     let shape = m * m * (3 - 2 * m);
-    v = (shape * (3 + 8 * dp + 40 * Math.pow(rg, 1.4) * (0.45 + 0.55 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 22 * shape) * 2.4;
+    v = (shape * (3 + 8 * dp + 52 * Math.pow(rg, 1.7) * (0.4 + 0.6 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 30 * shape) * 3.2;
     return F.memo.set(key, v), v;
   }
   // Gentle rolling height for hill country.
@@ -8497,12 +8502,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // mountains climb
         let mm = (a.mm + b.mm + c.mm) / 3,
           gr = Math.max(0, Math.min(1, (ha - 8) / 40)) * mm,
-          sn = Math.max(0, Math.min(1, (ha - 84) / 16)) * (flat > 0.45 ? 1 : 0.6) * mm,
+          sn = Math.max(0, Math.min(1, (ha - 120) / 22)) * (flat > 0.45 ? 1 : 0.6) * mm,
           r = 124 + (140 - 124) * gr,
           gg = 122 + (124 - 122) * gr,
           bb = 68 + (102 - 68) * gr;
         (r += (238 - r) * sn), (gg += (240 - gg) * sn), (bb += (236 - bb) * sn);
-        let k = 0.64 + 0.52 * lit,
+        // strong sun and shade, and the low slopes a little darker, so the
+        // range stands up off the map
+        let k = (0.42 + 0.86 * Math.pow(lit, 1.2)) * (0.8 + 0.2 * Math.min(1, ha / 70)),
           al = Math.max(0, Math.min(1, (ha - 0.5) / 4));
         g.fillStyle = g.strokeStyle = `rgba(${Math.round(r * k)},${Math.round(gg * k)},${Math.round(bb * k)},${al.toFixed(3)})`;
         (g.lineWidth = 0.7), g.fill(), al > 0.95 && g.stroke();
@@ -10491,9 +10498,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       u = n.map.seed >>> 0,
       finds = [],
       vmap = new Map(natives(n).villages.map((v) => [v.x * 4096 + v.y, v]));
-    for (let [c, h] of tilesInView(n.map, o, r)) {
+    // Mountains stand tall, so squares well below the frame can still reach
+    // up into it: take those in too, for their high ground only.
+    let tall = 340 * d;
+    for (let [c, h] of tilesInView(n.map, o, { x0: r.x0, y0: r.y0, w: r.w, h: r.h + tall })) {
       let p = YL(c, h, o, terracePx(n.map, c, h, o.zoom));
-      if (!Nn(p, r)) continue;
+      if (!Nn(p, r)) {
+        let b0 = Y(c, h, o);
+        b0.y > r.h - (r.y0 || 0) && b0.y < r.h - (r.y0 || 0) + tall + 40 && Nn({ x: b0.x, y: r.h / 2 }, r) &&
+          i.explored[C(c, h, a)] === "1" && reliefNear(n.map, c, h, "mt") &&
+          Ye(e, b0.x, b0.y, d, (M) => reliefMesh(M, n.map, c, h, groundH, !0));
+        continue;
+      }
       // Ground and trees are drawn everywhere (the fog hides them); villages,
       // towns and finds only once the square is charted.
       let seen = i.explored[C(c, h, a)] === "1";
@@ -12389,15 +12405,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     for (let rd of natives(n).raids) {
       if (!i.has(`${rd.x},${rd.y}`)) continue;
-      let p = YL(rd.x, rd.y, o, 0);
-      Nn(p, r, 200) && Ye(e, p.x, p.y, a, (m) => warPartySprite(m, 4));
+      // a war party: warriors with spears and shields, a red ring and a
+      // label, so it can be seen and clicked
+      let p = YL(rd.x, rd.y, o, terracePx(n.map, rd.x, rd.y, o.zoom));
+      Nn(p, r, 200) &&
+        Ye(e, p.x, p.y, a, (m) => {
+          let pulse = 0.55 + 0.35 * Math.sin(performance.now() / 300);
+          (m.strokeStyle = `rgba(220,50,40,${pulse.toFixed(2)})`), (m.lineWidth = 2), m.beginPath(), m.ellipse(0, 4, 17, 6.5, 0, 0, Math.PI * 2), m.stroke();
+          for (let [dx, dy] of [[-7, 1], [7, 2], [0, 5]].slice(0, rd.small ? 2 : 3)) m.save(), m.translate(dx, dy), figure(m, 0, 0, LOOKS.tribe, null, { hand: (q) => (spear(q), shield(q)) }), m.restore();
+          (m.font = '700 8px "Segoe UI", sans-serif'), (m.textAlign = "center"), (m.lineWidth = 3), (m.strokeStyle = "rgba(20,10,6,0.85)"), m.strokeText("War party", 0, -26), (m.fillStyle = "#ffb8a8"), m.fillText("War party", 0, -26);
+        });
     }
     // Rival armies on the march, once you have caught sight of them.
     let me_ = n.players.find((q) => q.isHuman);
     for (let A of (n.politics && n.politics.armies) || []) {
       if (!A.seen && !i.has(`${A.x},${A.y}`) && !(me_ && A.owner === me_.id)) continue;
       let ow = n.players.find((q) => q.id === A.owner),
-        p = YL(A.x, A.y, o, 0);
+        p = YL(A.x, A.y, o, terracePx(n.map, A.x, A.y, o.zoom));
       Nn(p, r, 200) && Ye(e, p.x, p.y, a, (m) => armySprite(m, ee[ow.nationId].color, A.troops.length, ow.nationId));
     }
   }
@@ -15459,6 +15483,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // While moves play, a click still selects units, squares and colonies.
       // It never skips the moves ahead.
       let k = V(t);
+      // a war party wins over the town square it stands on, even with the town open
+      {
+        let wp0 = !T && t.natives && t.natives.raids.find((q) => q.x === f && q.y === g);
+        if (wp0 && k.explored[g * t.map.width + f] === "1" && !stackAt(f, g).length)
+          return (pin = { kind: "raid", id: wp0.id }), (l = null), (y = null), (S = null), (h = ""), R();
+      }
       if (y) {
         let w = t.colonies.find((D) => D.id === y),
           F = w && oo(w, f, g);
@@ -15500,6 +15530,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       if (!b.length) {
+        // a war party wins over the town square it stands on
         let w = ln(t, f, g);
         if (w && w.colony.owner === k.id) {
           pin = null;
@@ -15577,6 +15608,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (pin.kind === "village") return natives(t).villages.find((q) => q.id === pin.id) || null;
       if (pin.kind === "colony") return t.colonies.find((q) => q.id === pin.id) || null;
       if (pin.kind === "army") return ((t.politics && t.politics.armies) || []).find((q) => q.id === pin.id) || null;
+      if (pin.kind === "raid") return (t.natives ? t.natives.raids : []).find((q) => q.id === pin.id) || null;
       return null;
     }
     // The pinned thing's reach, drawn as a ring on the map.
@@ -15636,6 +15668,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return `<h2>${G(nationAdj(ow))} army</h2>
         <p>Under ${G(P.leader.name)}, about ${P.troops.length} men. What kind of men, and how good, you cannot tell from here.</p>
         <p class="muted">${tg ? `It is marching on ${G(tg.name)}.` : ""} Drag soldiers beside it onto it to attack.</p>
+        <div class="row">${go}</div>`;
+      }
+      if (pin.kind === "raid") {
+        let v = natives(t).villages.find((q) => q.id === P.village),
+          nt = v && nationOf(t, v),
+          tg = t.colonies.find((c) => c.id === P.target),
+          d2 = tg ? Math.max(Math.abs(tg.x - P.x), Math.abs(tg.y - P.y)) : 9;
+        return `<h2>War party</h2>
+        <p>Warriors from ${G(v ? v.name : "a village")}${nt ? ` of the ${G(nt.name)} people` : ""}, about ${P.small ? 2 : Math.max(2, Math.ceil(((v && v.warriors) || 4) * 0.7))} of them${tg ? `, heading for ${G(tg.name)}` : ""}.</p>
+        <p class="muted">${d2 <= 1 ? "They strike next year." : "They are still on the way."} Soldiers in the town, best of all with a leader, hold it far better than militia alone.</p>
         <div class="row">${go}</div>`;
       }
       return "";
@@ -16958,6 +17000,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }),
       (e.querySelector("#help").onclick = () => ue()),
       window.addEventListener("keydown", (f) => {
+        // Escape closes whatever card is open: a find, the paper, the year's
+        // news, an offer. A name card keeps the suggested name. Cards that
+        // wait on a real choice (a battle, peace) stay.
+        if (f.key === "Escape" && t && !a.hidden && a.innerHTML.trim()) {
+          let fm = a.querySelector("form"),
+            bt = [...a.querySelectorAll("button")].find((b) => !b.disabled && /^(close|close the paper|carry on|back to the map|done|cancel|decline|not now)$/i.test(b.textContent.trim()));
+          f.preventDefault();
+          if (fm && fm.title) fm.requestSubmit ? fm.requestSubmit() : fm.querySelector('button[type="submit"]').click();
+          else bt && bt.click();
+          return;
+        }
         if (!t || o.hidden || (f.target.matches && f.target.matches("input, textarea"))) return;
         // W A S D or the arrow keys scroll the map while held. They never
         // skip moves that are playing.
