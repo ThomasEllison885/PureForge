@@ -2580,12 +2580,86 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let o = mn[n.terrain].pass;
     return e.kind === "ship" ? o === "sea" : o === "land";
   }
+  // ---- Roads -------------------------------------------------------------
+  // Kept in the map as square indices; a road speeds movement like a river.
+  var roadCache = new WeakMap();
+  function roadSet(map) {
+    let R = map.roads || (map.roads = []),
+      c = roadCache.get(map);
+    return (!c || c.n !== R.length) && ((c = { n: R.length, s: new Set(R) }), roadCache.set(map, c)), c.s;
+  }
+  function onRoad(e, x, y) {
+    return x >= 0 && y >= 0 && x < e.map.width && y < e.map.height && roadSet(e.map).has(y * e.map.width + x);
+  }
+  function addRoad(e, x, y) {
+    onRoad(e, x, y) || e.map.roads.push(y * e.map.width + x);
+  }
+  // Work a pioneer puts into one square of road (he has 4 a year): open
+  // ground is quick, woods, hills and marsh slower.
+  function roadWork(e, x, y) {
+    let t = (se(e, x, y) || {}).terrain;
+    return onRoad(e, x, y) ? 0 : t === "plains" || t === "desert" ? 1 : 2;
+  }
+  // Each year: explorers and pioneers changing role, and pioneers at work.
+  function pioneerTurn(e) {
+    let hum = e.players.find((p) => p.isHuman);
+    for (let u of e.units) {
+      if (u.kind !== "explorer") continue;
+      if (u.converting) {
+        if (e.year >= u.converting.ready) {
+          (u.pioneer = u.converting.to === "pioneer"), (u.name = u.pioneer ? "Pioneer" : "Explorer"), delete u.converting;
+          hum && u.owner === hum.id && e.log.push(u.pioneer ? "A pioneer is ready to build roads." : "The pioneer is an explorer again.");
+        } else u.mp = 0;
+        continue;
+      }
+      if (!u.pioneer || !u.road) continue;
+      let job = u.road,
+        budget = 4;
+      (u.mp = 0), (u.dest = null), (u.autoExplore = !1);
+      while (budget > 0 && job.i < job.path.length) {
+        let [x, y] = job.path[job.i];
+        (u.x = x), (u.y = y);
+        let need = roadWork(e, x, y) - (job.work || 0);
+        if (budget >= need) (budget -= need), (job.work = 0), addRoad(e, x, y), job.i++;
+        else (job.work = (job.work || 0) + budget), (budget = 0);
+      }
+      if (job.i >= job.path.length) {
+        let to = e.colonies.find((c) => c.id === job.to);
+        hum && u.owner === hum.id && pushEvent(e, `The road to ${to ? to.name : "the town"} is finished.`, u.x, u.y);
+        delete u.road;
+      }
+    }
+  }
+  // Start a pioneer's road to one of your towns.
+  function startRoad(e, unitId, colId) {
+    return be(e, () => {
+      let u = j(e, unitId),
+        col = e.colonies.find((c) => c.id === colId);
+      if (!u || !u.pioneer || u.aboard) return B("Select a pioneer on land.");
+      if (!col || col.owner !== u.owner) return B("Pick one of your towns.");
+      let path = landPath(e, { x: u.x, y: u.y }, { x: col.x, y: col.y }, 60000);
+      if (!path) return B(`There is no way over land to ${col.name} that a road can take.`);
+      path.push([col.x, col.y]);
+      (u.road = { to: col.id, path, i: 0, work: 0 }), (u.mp = 0), (u.dest = null), (u.autoExplore = !1);
+      return { ok: !0, discoveries: [], note: `${u.name} sets to work on the road to ${col.name}.` };
+    });
+  }
+  function convertScout(e, unitId) {
+    return be(e, () => {
+      let u = j(e, unitId);
+      if (!u || u.kind !== "explorer" || u.aboard) return B("Select an explorer or pioneer on land.");
+      if (u.converting) return B("That change is already under way.");
+      if (!e.colonies.some((c) => c.owner === u.owner && Math.max(Math.abs(c.x - u.x), Math.abs(c.y - u.y)) <= (reachOf(c) || 1) + 1)) return B("That change is made at one of your towns.");
+      (u.converting = { to: u.pioneer ? "explorer" : "pioneer", ready: e.year + 2 }), (u.mp = 0), (u.autoExplore = !1), delete u.road;
+      return { ok: !0, discoveries: [], note: u.pioneer ? `${u.name} turns back to exploring. Ready in two years.` : `${u.name} trains as a pioneer. Ready in two years.` };
+    });
+  }
   function vn(e, n, o, r, i, s) {
     let a = se(e, i, s),
       t = $.terrainCost[a.terrain] || 1;
     if (n.kind === "ship") return t;
     let l = se(e, o, r);
-    return l && l.riverId && a.riverId ? Math.min(t, $.riverCost) : t;
+    return (l && l.riverId && a.riverId) || (onRoad(e, o, r) && onRoad(e, i, s)) ? Math.min(t, $.riverCost) : t;
   }
   function kn(e, n) {
     let o = j(e, n),
@@ -4067,8 +4141,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     addScore(p, "federation", FED_SCORE);
     for (let n2 of natives(e).nations) n2 !== nat && shiftAttitude(n2, pid, -4);
     nat && shiftAttitude(nat, pid, forced ? -25 : 5);
-    let msg = `${v.name} of the ${nat ? nat.name : "native"} people ${forced ? "is brought into" : "joins"} the ${nationName(p)}'s federation.`;
-    pushEvent(e, msg, v.x, v.y);
+    let msg = `${v.name} of the ${nat ? nat.name : "native"} people ${forced ? "is brought into" : "joins"} the ${nationName(p)}'s federation.`,
+      hum = e.players.find((q) => q.isHuman);
+    hum && (p === hum || hum.explored[v.y * e.map.width + v.x] === "1") && pushEvent(e, msg, v.x, v.y);
     return msg;
   }
   function fedCount(e, pid) {
@@ -4096,7 +4171,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (v.fed != null) continue;
       let nat = nationOf(e, v);
       if ((nat.att[r.id] || 0) < -10 || !cols.some((c) => Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 80)) continue;
-      z(v.id, e.year, (e.seed >>> 0) + 3301) < 0.25 && federate(e, r.id, v, !1);
+      z(v.id, e.year, (e.seed >>> 0) + 3301) < 0.08 && federate(e, r.id, v, !1);
     }
   }
   // Allied warriors who fell are lost to their village; when the colony
@@ -4677,9 +4752,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let w = europeAt(e, me, rival);
     return w === "none" ? "none" : w === "war" ? "war" : "peace";
   }
+  // Important news (a war on you, an army at your gates) opens the year's
+  // summary by itself; the rest waits under the This year button.
+  var EVENT_URGENT = /declares war on you|marching on|has reached|lands to retake|declare their independence|Independence is won|commonwealth is agreed|Peace with the crown|has taken|burned .* to the ground|Raiders/;
   function pushEvent(e, text, x, y) {
     let P = pol(e);
-    P.events.push({ text, x: x == null ? null : x, y: y == null ? null : y });
+    P.events.push({ text, x: x == null ? null : x, y: y == null ? null : y, urgent: EVENT_URGENT.test(text) });
     P.events.length > 60 && P.events.shift();
   }
   function nationName(p) {
@@ -4707,7 +4785,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (a.id >= b.id || isNatNation(a) || isNatNation(b)) continue;
         let k = eKey(a.nationId, b.nationId),
           was = P.europe[k] || "peace";
-        if (z(a.id * 7 + b.id, e.year, (e.seed >>> 0) + 2203) >= (was === "war" ? 0.12 : 0.08)) continue;
+        // The first years go to settling; after that the crowns fall out
+        // now and then, and a war, once begun, runs for a good while.
+        if (e.year - $.startYear < 25 && was !== "war") continue;
+        if (z(a.id * 7 + b.id, e.year, (e.seed >>> 0) + 2203) >= (was === "war" ? 0.065 : 0.02)) continue;
         let now = was === "war" ? "peace" : "war";
         P.europe[k] = now;
         if (hum && (a === hum || b === hum)) {
@@ -5140,13 +5221,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (a.id >= b.id) continue;
         let near = e.colonies.some((c) => c.owner === a.id && e.colonies.some((d) => d.owner === b.id && Math.max(Math.abs(c.x - d.x), Math.abs(c.y - d.y)) <= 30)),
           r = z(a.id * 31 + b.id, e.year, (e.seed >>> 0) + 4501);
-        near && shiftRel(e, a.id, b.id, -2);
-        if (!atWar(e, a.id, b.id)) relOf(e, a.id, b.id) < DIPLO[2].min && near && r < 0.12 && setRel(e, a.id, b.id, -100);
+        near && shiftRel(e, a.id, b.id, -1);
+        if (!atWar(e, a.id, b.id)) e.year - $.startYear >= 25 && relOf(e, a.id, b.id) < DIPLO[2].min && near && r < 0.03 && setRel(e, a.id, b.id, -100);
         else {
           // A side down to its last colony sues for peace.
           let ca = e.colonies.filter((c) => c.owner === a.id).length,
             cb = e.colonies.filter((c) => c.owner === b.id).length;
-          (Math.min(ca, cb) <= 1 ? r < 0.45 : europeAt(e, a, b) !== "war" && r < 0.12) && setRel(e, a.id, b.id, -30);
+          (Math.min(ca, cb) <= 1 ? r < 0.45 : europeAt(e, a, b) !== "war" && r < 0.07) && setRel(e, a.id, b.id, -30);
         }
       }
     for (let p of ais) {
@@ -5181,15 +5262,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let crowd = 0;
       for (let c of e.colonies)
         c.owner === hum.id && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 20) && crowd++;
-      shiftRel(e, hum.id, r.id, -1 - crowd * 2);
+      shiftRel(e, hum.id, r.id, -0.5 - crowd * 1.5);
       // A rival follows its crown: at war in Europe, at war here once met.
       if (!atWar(e, hum.id, r.id) && pol(e).met[r.id] && europeAt(e, hum, r) === "war") {
         ((pol(e).blame || (pol(e).blame = {}))[r.id] = "them"), setRel(e, hum.id, r.id, -100), pushEvent(e, `${nationName(r)}, at war with your king in Europe, declares war on you here.`);
         continue;
       }
       // Already sour and with men to spare: they declare war.
-      let v = relOf(e, hum.id, r.id);
-      if (!atWar(e, hum.id, r.id) && v < DIPLO[2].min && (pol(e).pool[r.id] || 0) >= 3 && z(r.id, e.year, (e.seed >>> 0) + 2207) < 0.35)
+      // Only a neighbour picks a fight of its own accord, and not in the
+      // first years, when nobody has the men for it.
+      let v = relOf(e, hum.id, r.id),
+        neighbour = e.colonies.some((c) => c.owner === hum.id && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 30));
+      if (e.year - $.startYear >= 25 && neighbour && !atWar(e, hum.id, r.id) && v < DIPLO[2].min && (pol(e).pool[r.id] || 0) >= 3 && z(r.id, e.year, (e.seed >>> 0) + 2207) < 0.15)
         ((pol(e).blame || (pol(e).blame = {}))[r.id] = "them"), setRel(e, hum.id, r.id, -100), pushEvent(e, `${nationName(r)} declares war on you!`);
     }
   }
@@ -7706,6 +7790,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     e.undo = [];
     let n = Xo(e);
     if (!n.ok) return n;
+    pioneerTurn(e);
     e.arrivals || (e.arrivals = []), (e.arrivedThisTurn = []);
     for (let r of [...e.arrivals]) {
       if (r.year > e.year || !Ui(e, r)) continue;
@@ -7774,7 +7859,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let { report: i, traces: s } = cr(e, r.id);
         e.log.push(...i), e.lastTraces.push(...s);
       }
-    return tr(e), gameEndCheck(e), (pol(e).showSummary = !0), n;
+    return tr(e), gameEndCheck(e), (pol(e).showSummary = pol(e).events.some((q) => q.urgent)), n;
   }
   function yo(e) {
     let n = e.undo.pop();
@@ -7885,6 +7970,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         glimpsed: e.glimpsed || [],
         arrivals: e.arrivals || [],
         arrivedThisTurn: e.arrivedThisTurn || [],
+        lessonRaid: e.lessonRaid || 0,
+        lessonRaidAt: e.lessonRaidAt == null ? null : e.lessonRaidAt,
+        announce: e.announce || [],
         paper: e.paper || null,
         dispatch: e.dispatch || null,
       },
@@ -7960,7 +8048,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         .join(",");
     // Newly charted squares are handled tile by tile (staleAround), not here.
     let fed = e.natives ? e.natives.villages.filter((v) => v.fed != null).map((v) => `${v.id}:${v.fed}`).join(",") : "";
-    return `${r}#${i}#${fed}`;
+    return `${r}#${i}#${fed}#${(e.map.roads || []).length}`;
   }
   // The map is cached as a grid of 256-pixel tiles fixed to the map, so
   // panning only ever draws the few tiles coming into view, a few
@@ -8325,7 +8413,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (rg += e * e * amp), (amp *= 0.45), (f *= 2.2);
     }
     let shape = m * m * (3 - 2 * m);
-    v = shape * (3 + 8 * dp + 40 * Math.pow(rg, 1.4) * (0.45 + 0.55 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 22 * shape;
+    v = (shape * (3 + 8 * dp + 40 * Math.pow(rg, 1.4) * (0.45 + 0.55 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 22 * shape) * 2.4;
     return F.memo.set(key, v), v;
   }
   // Gentle rolling height for hill country.
@@ -8335,7 +8423,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       v = F.hmemo.get(key);
     if (v != null) return v;
     let m = wo(F.ht, F.w, F.h, px, py);
-    v = m <= 0.002 ? 0 : m * m * (3 - 2 * m) * (5 + 12 * Ee(px * 0.75, py * 0.75, F.seed + 741) + 5 * Ee(px * 1.9, py * 1.9, F.seed + 743));
+    v = m <= 0.002 ? 0 : m * m * (3 - 2 * m) * (6 + 14 * Ee(px * 0.75, py * 0.75, F.seed + 741) + 6 * Ee(px * 1.9, py * 1.9, F.seed + 743));
     return F.hmemo.set(key, v), v;
   }
   // Does a square need relief drawn: high ground on it or right beside it.
@@ -8351,6 +8439,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (xx >= 0 && yy >= 0 && xx < F.w && yy < F.h && A[yy * F.w + xx]) return !0;
       }
     return !1;
+  }
+  // Height of the ground in pixels at zoom 1: mountains and hills, flat
+  // inside any colony's land so towns stay level.
+  function groundH(map, x, y) {
+    let v = reliefH(map, x, y) + hillH(map, x, y);
+    if (v <= 0) return 0;
+    if (GS && GS.map === map)
+      for (let c of GS.colonies) {
+        let r = (reachOf(c) || 1) + 0.5;
+        if (Math.abs(x - c.x) <= r && Math.abs(y - c.y) <= r) return 0;
+      }
+    return v;
   }
   var RLIGHT = (() => {
     let v = [-0.62, -0.28, 0.73],
@@ -8370,7 +8470,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           py = y - 0.5 + j / n,
           H = hf(map, px, py);
         top = Math.max(top, H);
-        P.push({ sx: (px - x - (py - y)) * 32, sy: (px - x + py - y) * 16 - (raised ? H : 0), H, px, py });
+        P.push({ sx: (px - x - (py - y)) * 32, sy: (px - x + py - y) * 16 - (raised ? H : 0), H, px, py, mm: Math.min(1, wo(reliefField(map).mtb, map.width, map.height, px, py) * 1.25) });
       }
     if (top < 0.6) return;
     let tri = (a, b, c) => {
@@ -8393,14 +8493,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       g.beginPath(), g.moveTo(a.sx, a.sy), g.lineTo(b.sx, b.sy), g.lineTo(c.sx, c.sy), g.closePath();
       if (raised) {
         // green low down, bare rock higher, snow on the tops
-        let gr = Math.max(0, Math.min(1, (ha - 4) / 18)),
-          sn = Math.max(0, Math.min(1, (ha - 34) / 7)) * (flat > 0.5 ? 1 : 0.6),
-          r = 116 + (138 - 116) * gr,
-          gg = 110 + (124 - 110) * gr,
-          bb = 70 + (102 - 70) * gr;
+        // grassy upland where it is hill country, rock and then snow as the
+        // mountains climb
+        let mm = (a.mm + b.mm + c.mm) / 3,
+          gr = Math.max(0, Math.min(1, (ha - 8) / 40)) * mm,
+          sn = Math.max(0, Math.min(1, (ha - 84) / 16)) * (flat > 0.45 ? 1 : 0.6) * mm,
+          r = 124 + (140 - 124) * gr,
+          gg = 122 + (124 - 122) * gr,
+          bb = 68 + (102 - 68) * gr;
         (r += (238 - r) * sn), (gg += (240 - gg) * sn), (bb += (236 - bb) * sn);
         let k = 0.64 + 0.52 * lit,
-          al = Math.max(0, Math.min(1, (ha - 1) / 5));
+          al = Math.max(0, Math.min(1, (ha - 0.5) / 4));
         g.fillStyle = g.strokeStyle = `rgba(${Math.round(r * k)},${Math.round(gg * k)},${Math.round(bb * k)},${al.toFixed(3)})`;
         (g.lineWidth = 0.7), g.fill(), al > 0.95 && g.stroke();
       } else {
@@ -10033,6 +10136,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function terracePx(map, x, y, zoom) {
     if (!map) return 0;
+    return groundH(map, x, y) * zoom;
     let steps = terraceOf(map),
       w = map.width,
       h = map.height,
@@ -10177,6 +10281,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   function tileAt(map, sx, sy, cam) {
     if (!map) return $n(sx, sy, cam);
+    // The square under the pointer is the front-most one whose raised
+    // diamond the pointer falls in.
+    {
+      let a = $n(sx, sy, cam),
+        reach = 13,
+        best = null,
+        key = -1;
+      for (let dy = -1; dy <= reach; dy++)
+        for (let dx = -1; dx <= reach; dx++) {
+          let x = a.x + dx,
+            y = a.y + dy;
+          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+          let q = $n(sx, sy + groundH(map, x, y) * cam.zoom, cam);
+          q.x === x && q.y === y && x + y > key && ((key = x + y), (best = { x, y }));
+        }
+      if (best) return best;
+      return a;
+    }
     let steps = terraceOf(map),
       w = map.width,
       h = map.height,
@@ -10403,8 +10525,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         continue;
       }
       // High ground first, so what grows or stands on it is drawn over it.
-      seen && reliefNear(n.map, c, h, "ht") && Ye(e, p.x, p.y, d, (M) => reliefMesh(M, n.map, c, h, hillH, !1));
-      seen && reliefNear(n.map, c, h, "mt") && Ye(e, p.x, p.y, d, (M) => reliefMesh(M, n.map, c, h, reliefH, !0));
+      seen && (reliefNear(n.map, c, h, "mt") || reliefNear(n.map, c, h, "ht")) && Ye(e, Y(c, h, o).x, Y(c, h, o).y, d, (M) => reliefMesh(M, n.map, c, h, groundH, !0));
+      // a road: a dirt track from this square toward each road beside it
+      if (seen && (n.map.roads || []).length && onRoad(n, c, h)) {
+        let pts = [];
+        for (let [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]])
+          onRoad(n, c + dx, h + dy) && pts.push(YL(c + dx * 0.5, h + dy * 0.5, o, terracePx(n.map, c + dx * 0.5, h + dy * 0.5, o.zoom)));
+        let me = p;
+        e.save(), (e.lineCap = "round"), (e.lineJoin = "round");
+        for (let [w2, col] of [[7, "rgba(70,50,28,0.55)"], [4.6, "#b8955e"], [1.2, "rgba(255,240,200,0.35)"]]) {
+          (e.lineWidth = w2 * d), (e.strokeStyle = col), e.beginPath();
+          for (let q of pts) e.moveTo(me.x, me.y), e.lineTo(q.x, q.y);
+          pts.length || (e.moveTo(me.x - 3 * d, me.y), e.lineTo(me.x + 3 * d, me.y));
+          e.stroke();
+        }
+        e.restore();
+      }
       m.terrain === "forest" &&
         d >= Vi &&
         Ye(e, p.x, p.y, d, (M) => st(M, c, h, u, !!m.riverId, wetSides(n.map, c, h)));
@@ -12144,14 +12280,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let list = [];
       for (let i of o) {
         let [s, a] = i.split(",").map(Number);
-        list.push(s, a, steps && s >= 0 && a >= 0 && s < w && a < h ? steps[a * w + s] : 0);
+        list.push(s, a, map && s >= 0 && a >= 0 && s < w && a < h ? groundH(map, s, a) : 0);
       }
       (sq = { n: o.size, map, list }), o instanceof Set && sqCache.set(o, sq);
     }
     for (let q = 0; q < sq.list.length; q += 3) {
       let s = sq.list[q],
         a = sq.list[q + 1],
-        L = sq.list[q + 2] * Tk * n.zoom,
+        L = sq.list[q + 2] * n.zoom,
         c0 = YL(s, a, n, L);
       if (c0.x < -80 || c0.y < -80 || c0.x > cw + 80 || c0.y > ch + 80) continue;
       let t = YL(s - 0.5, a - 0.5, n, L),
@@ -12179,7 +12315,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s = [];
     for (let a of o) {
       let [t, l] = a.split(",").map(Number),
-        st = steps && t >= 0 && l >= 0 && t < w && l < hh ? steps[l * w + t] : 0;
+        st = map && t >= 0 && l >= 0 && t < w && l < hh ? groundH(map, t, l) : 0;
       o.has(`${t + 1},${l}`) || s.push(t + 0.5, l - 0.5, t + 0.5, l + 0.5, st);
       o.has(`${t - 1},${l}`) || s.push(t - 0.5, l - 0.5, t - 0.5, l + 0.5, st);
       o.has(`${t},${l + 1}`) || s.push(t - 0.5, l + 0.5, t + 0.5, l + 0.5, st);
@@ -12195,7 +12331,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ch = (e.canvas && e.canvas.clientHeight) || 1e6;
     // only what is on screen is drawn
     for (let k = 0; k < sg.length; k += 5) {
-      let L = sg[k + 4] * Tk * n.zoom,
+      let L = sg[k + 4] * n.zoom,
         m = YL(sg[k], sg[k + 1], n, L),
         y = YL(sg[k + 2], sg[k + 3], n, L);
       if ((m.x < -40 && y.x < -40) || (m.x > cw + 40 && y.x > cw + 40) || (m.y < -40 && y.y < -40) || (m.y > ch + 40 && y.y > ch + 40)) continue;
@@ -12417,7 +12553,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             : s === "leader"
               ? leaderArt(e, L, ph, nat)
               : s === "explorer"
-                ? explorerArt(e, L, ph)
+                ? (explorerArt(e, L, ph), n.pioneer && (ln_(e, 4, -4, 9, -19, "#6a4a2a", 1.3), (e.fillStyle = "#9aa0a6"), e.beginPath(), e.moveTo(7.6, -20), e.lineTo(11.2, -18.4), e.lineTo(10.4, -15.4), e.lineTo(7.2, -17), e.fill()))
                 : s === "infantry"
                   ? footArt(e, L, ph)
                   : figure(e, 0, 0, L, ph);
@@ -14472,6 +14608,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         txt = u ? (b && T ? Jn(b, u.x, u.y) : io(t, u.x, u.y, V(t))) + (g && g.kind === "settler" && !g.aboard && !b ? ` \u00b7 ${pu(u.x, u.y)}` : "") : "";
       tipBox.textContent !== txt && (tipBox.textContent = txt);
     }
+    // The first time you come upon a village that has joined a federation,
+    // say what that means; later ones get a line in the log.
+    function fedNotice() {
+      let me = V(t);
+      if (!me || !t.natives || isNatNation(me)) return;
+      let w = t.map.width,
+        seen = me.fedSeen || (me.fedSeen = []);
+      for (let v of t.natives.villages) {
+        if (v.fed == null || v.fed === me.id || seen.includes(v.id) || me.explored[v.y * w + v.x] !== "1") continue;
+        seen.push(v.id);
+        let emp = t.players.find((q) => q.id === v.fed),
+          en = emp ? nationName(emp) : "the empire";
+        if (!me.fedExplained) {
+          me.fedExplained = 1;
+          h = `${v.name} belongs to ${en}'s federation. Its warriors fight for the empire and come to defend its towns, so attacking it means war with ${en}.`;
+        }
+        t.log.push(`${v.name} is part of ${en}'s federation.`);
+      }
+    }
     function R() {
       if (!t || o.hidden) return;
       (!T || !y) && tipEl && ((tipEl.hidden = !0), (i.style.cursor = ""));
@@ -14496,6 +14651,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         idle_ = idleUnits().length;
       nu_ && (nu_.classList.toggle("pending", idle_ > 0), (nu_.textContent = idle_ ? `Next unit (${idle_})` : "Next unit"));
       let k = l ? j(t, l) : null;
+      fedNotice();
       let rdNow = !p && nextFight();
       De(k, f), _e();
       // Never pop a card up under a hand that is still dragging a unit or
@@ -14647,6 +14803,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let far = Math.max(Math.abs(tw.x - f.x), Math.abs(tw.y - f.y)) > (f.mp || 0);
         return `<div class="row"><button type="button" id="enter-town" data-c="${tw.id}" ${f.kind === "leader" ? 'class="primary"' : ""}>Go to the nearest town: ${G(tw.name)}</button></div>${far ? `<p class="muted">Too far for one turn; the march carries on next turn.</p>` : ""}`;
       })()}
+      ${(() => {
+        // explorers and pioneers: change role at a town; pioneers build roads
+        if (!f || f.aboard || f.kind !== "explorer" || f.owner !== g.id) return "";
+        if (f.converting) return `<p class="find-stat">${f.converting.to === "pioneer" ? "Training as a pioneer" : "Going back to exploring"}: ready in ${Math.max(1, f.converting.ready - t.year)} year${f.converting.ready - t.year > 1 ? "s" : ""}.</p>`;
+        let atTown = t.colonies.some((c) => c.owner === g.id && Math.max(Math.abs(c.x - f.x), Math.abs(c.y - f.y)) <= (reachOf(c) || 1) + 1),
+          swap = `<div class="row"><button type="button" id="convert" ${atTown ? "" : "disabled"}>${f.pioneer ? "Back to exploring (2 years)" : "Train as a pioneer (2 years)"}</button></div><p class="muted">${f.pioneer ? "A pioneer builds roads between your towns; travel along a road is as quick as along a river." : "A pioneer builds roads between your towns."} ${atTown ? "" : "The change is made at one of your towns."}</p>`;
+        if (!f.pioneer) return swap;
+        if (f.road) {
+          let to = t.colonies.find((c) => c.id === f.road.to);
+          return `<p class="find-stat">Building the road to ${G(to ? to.name : "the town")}: ${f.road.i} of ${f.road.path.length} squares.</p><div class="row"><button type="button" id="road-stop">Stop building</button></div>`;
+        }
+        let towns = t.colonies
+          // every town of yours except the one he is standing in
+          .filter((c) => c.owner === g.id && Math.max(Math.abs(c.x - f.x), Math.abs(c.y - f.y)) > (reachOf(c) || 1))
+          .sort((a2, b2) => Math.hypot(a2.x - f.x, a2.y - f.y) - Math.hypot(b2.x - f.x, b2.y - f.y))
+          .slice(0, 5);
+        return `${towns.map((c) => { let d2 = Math.max(Math.abs(c.x - f.x), Math.abs(c.y - f.y)); return `<div class="row"><button type="button" class="build-road" data-c="${c.id}">Build a road to ${G(c.name)}</button><small class="muted"> about ${d2} squares, ${Math.max(1, Math.round(d2 * 0.4))} years</small></div>`; }).join("")}${towns.length ? "" : '<p class="muted">Found a second town to build a road to.</p>'}${swap}`;
+      })()}
       ${b.length ? `<ul>${b.map((I) => `<li>${I.name} \xB7 ${Mo[I.kind]}</li>`).join("")}</ul>` : ""}
       ${w.length > 1 ? `<ul>${w.map((I) => `<li>${I.name} \xB7 ${Mo[I.kind]}</li>`).join("")}</ul>` : ""}
       ${f ? `<div class="row">
@@ -14775,6 +14949,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         });
       let gat = s.querySelector("#gather");
       gat && (gat.onclick = () => ne(f.id, () => gatherMen(t, f.id)));
+      let cv2 = s.querySelector("#convert");
+      cv2 && (cv2.onclick = () => {
+        let res = convertScout(t, f.id);
+        x(res), res.ok && res.note && (h = res.note), R();
+      });
+      s.querySelectorAll(".build-road").forEach((bt) => {
+        bt.onclick = () => {
+          let res = startRoad(t, f.id, +bt.dataset.c);
+          x(res), res.ok && res.note && (h = res.note), R();
+        };
+      });
+      let rs = s.querySelector("#road-stop");
+      rs && (rs.onclick = () => (delete f.road, (h = `${f.name} stops work on the road.`), R()));
       let ent = s.querySelector("#enter-town");
       ent && (ent.onclick = () => ne(f.id, () => enterTown(t, f.id, +ent.dataset.c)));
       drawMini();
@@ -14818,7 +15005,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       );
     }
     function re(f) {
-      return `${f.name} \xB7 ${Mo[f.kind] || f.kind}`;
+      return `${f.name} \xB7 ${f.pioneer ? "Pioneer" : Mo[f.kind] || f.kind}`;
     }
     function x(f) {
       h = f && f.ok ? "" : (f && f.error) || "";
@@ -14971,7 +15158,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p>Drag to pan, or hold W A S D or the arrow keys to scroll (Shift scrolls faster). Wheel to zoom. Drag a unit to send it. A click only picks it up.</p>
         <p>Enter ends the turn and opens the dispatch. Enter or Esc closes it. N selects the next unit with movement left. U undoes a move. E sends the selected explorer or ship exploring.</p>
         <p>Tick Keep exploring and an explorer or ship explores on its own at the start of every turn until there is nothing left it can reach. On a ship, Explorers ashore lands every explorer aboard and sets them all exploring.</p>
-        <p>Moves play out on the map. Clicking still picks units and squares while they do. Press any key to skip ahead. A find stops everyone until you close its card.</p>
+        <p>Moves play out on the map. Clicking still picks units and squares while they do. Press Space to skip ahead. A find stops everyone until you close its card.</p>
         <p>Click outside an open colony to put it away.</p>
         <p>Ships stay on water. Explorers and settlers walk. A leader carries the soldiers, dragoons, and artillery standing on his square. Drag one of them when you want it to walk off on its own.</p>
         <p>Open a colony and the map highlights its land. Put buildings inside that highlight. Farms, forts, and war colleges are 2 by 2. The center and the other buildings are one square. Esc closes the colony.</p>
@@ -16792,10 +16979,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           f.preventDefault(), nextUnit();
           return;
         }
-        if (O && !(O.paused && m)) {
+        // While moves play, only Space or Enter skips ahead. Escape just
+        // closes what is open; nothing else acts mid-move.
+        if (O && !(O.paused && m) && (f.key === " " || f.key === "Enter")) {
           f.preventDefault(), O.paused ? He() : le();
           return;
         }
+        if (O && !(O.paused && m) && f.key !== "Escape") return;
         if (m) {
           (f.key === "Enter" || f.key === "Escape") &&
             (f.preventDefault(), (m = !1), R());
