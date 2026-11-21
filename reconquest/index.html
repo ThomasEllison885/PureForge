@@ -304,6 +304,8 @@ ul.natives li { margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
 .lead-stats button.train { padding: 1px 8px; font-size: 12px; }
 button.find-link.inline.rename { font-size: 12px; font-weight: 400; margin-left: 6px; }
 button.find-link.inline { display: inline; padding: 0; text-decoration: underline; font: inherit; color: #6a4a1e; }
+ul.hints { padding-left: 18px; margin: 8px 0 12px; }
+ul.hints li { font: 14px/1.45 "Segoe UI", sans-serif; margin: 4px 0; }
 .place-tip { position: fixed; z-index: 50; pointer-events: none; background: rgba(24, 18, 12, 0.92); color: #f4ead2; border: 1px solid #c8a656; border-radius: 4px; padding: 4px 8px; font: 13px "Segoe UI", sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .place-tip .ok { color: #cfe8a8; }
 .place-tip .no { color: #f0a898; }
@@ -913,6 +915,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     };
   var NAT_CHEAP = { settler: 0.7, infantry: 0.7, cavalry: 0.7 },
     NAT_NAMES = { infantry: "Warriors", cavalry: "Riders", explorer: "Scout" };
+  // What the empire calls its buildings.
+  var IX_NAMES = { center: "Temple", house: "Adobe houses", farm: "Maize fields", mill: "Woodcutters' yard", mine: "Stone mine", gold_mine: "Gold diggings", church: "Shrine", commerce: "Market", tavern: "Runners' lodge", dock: "Canoe landing", fort: "Warriors' house", war_college: "Eagle house" };
+  function bName(id, col) {
+    return (col && col.big && IX_NAMES[id]) || (id === "center" ? "Colony center" : (ae[id] || ye(id) || {}).name || id);
+  }
   function colMax(c) {
     return c && c.big ? 2 : 4;
   }
@@ -1840,12 +1847,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function Oo(e, n) {
     let o = [];
     for (let r of e.colonies) {
-      if (r.owner !== n) continue;
+      if (r.owner !== n || r.occupied) continue;
       no(r);
       for (let s of r.buildings) {
         if (!s.building) continue;
         let a =
-          s.id === "center" ? "colony center" : ae[s.id].name.toLowerCase();
+          bName(s.id, r).toLowerCase();
         s.building === "upgrade"
           ? ((s.level = (s.level || 1) + 1),
             s.id === "center"
@@ -1957,11 +1964,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!s) return { ok: !1, error: "No such colony." };
       if (!EUROPE_PRICE[r]) return { ok: !1, error: "Europe does not buy that." };
       if (s.big) return { ok: !1, error: "The empire has no trade across the ocean." };
+      let mo2 = (ce(e, s.owner) || {}).mother || {};
+      if (mo2.rebel) return { ok: !1, error: "The crown's ships blockade your ports. Win your independence first." };
       let t = Math.floor(Number(i));
       if (!(t > 0)) return { ok: !1, error: "Send at least 1." };
       if (s.stock[r] < t)
         return { ok: !1, error: `${s.name} has only ${s.stock[r]} ${Ne[r].toLowerCase()}.` };
-      let g = europeValue(r, t);
+      let g = Math.floor(europeValue(r, t) * ((ce(e, s.owner) || {}).mother && ce(e, s.owner).mother.independent ? 1.6 : 1));
       if (g < 1)
         return { ok: !1, error: `That much ${Ne[r].toLowerCase()} is not worth a gold piece. Send at least ${Math.ceil(1 / EUROPE_PRICE[r])}.` };
       s.stock[r] -= t;
@@ -2466,9 +2475,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // He takes only as many men as his organization allows; the rest
       // stay where they are and leave his command.
       let cap = (leaderStats(n) || {}).cmd || 99,
-        men = e.units.filter((o) => !o.aboard && o.x === n.x && o.y === n.y && o.leaderId === n.id).sort((a, b) => a.id - b.id);
+        all = e.units.filter((o) => !o.aboard && o.x === n.x && o.y === n.y && o.leaderId === n.id),
+        men = all.filter((o) => arm(o.kind)).sort((a, b) => a.id - b.id),
+        party = all.filter((o) => escort(o.kind));
       for (let o of men.slice(cap)) o.leaderId = null;
-      return [n.id, ...men.slice(0, cap).map((o) => o.id)];
+      return [n.id, ...men.slice(0, cap).map((o) => o.id), ...party.map((o) => o.id)];
     }
     return [n.id];
   }
@@ -2520,9 +2531,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               (arm(o.kind) || o.kind === "leader") &&
               ri(e, u, c).every(
                 (q) =>
-                  q.owner === o.owner && (q.kind === "leader" || arm(q.kind)),
+                  q.owner === o.owner && (q.kind === "leader" || arm(q.kind) || escort(q.kind)),
               )
-            ))
+            ) &&
+            // a settler or explorer may join its own leader's square
+            !(escort(o.kind) && ri(e, u, c).every((q) => q.owner === o.owner) && ri(e, u, c).some((q) => q.kind === "leader")))
         )
           continue;
         let y = Oe(u, c);
@@ -3790,7 +3803,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // only ever defend. More turn out as the colony grows; each level of fort
   // adds a gun. Soldiers in the colony join in, and a leader there takes
   // command of the whole defence.
-  var MILITIA_BY_LEVEL = [0, 2, 3, 4, 6];
+  // As in the original: four militia at level 1, one more each level.
+  var MILITIA_BY_LEVEL = [0, 4, 5, 6, 7];
   // A unit is in a colony when it stands on any of its buildings, the
   // center or a fort alike.
   function colonyOf(e, x, y) {
@@ -4482,7 +4496,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let me of e.players) {
       if (!me.isHuman) continue;
       let m = me.mother || (me.mother = { ...ir });
-      if (m.independent || isNatNation(me)) continue;
+      if (m.independent || m.rebel || isNatNation(me)) continue;
       let crossed = [];
       for (let r of e.players) {
         if (r === me || !pol(e).met[r.id]) continue;
@@ -4493,7 +4507,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       crossed.length ? (m.resentment = (m.resentment || 0) + 3 * crossed.length) : (m.favor = Math.min(30, (m.favor || 0) + 1));
       m.resentment = Math.max(0, (m.resentment || 0) - 1);
-      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)),
+      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1),
         took = 0;
       for (let c of e.colonies)
         if (c.owner === me.id) {
@@ -4524,6 +4538,220 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let at = c || u;
         pushEvent(e, `First contact with ${nationName(r)}. Relations: ${diploLevel(relOf(e, hum.id, r.id)).name}. The Diplomacy screen shows where you stand.`, at.x, at.y);
       }
+    }
+  }
+  // ---- The war of independence -------------------------------------------------
+  // A European player with three colonies or more may break with the crown.
+  // The crown blockades your ports (no selling in Europe) and takes no tax,
+  // and sends veteran troops against your colonies: each year the chance is
+  // the sum of your colony levels in thirty. A colony it beats is occupied
+  // and yields nothing until you retake it. Wear down enough of the crown's
+  // men and you are independent; past three fifths of the way you may
+  // settle for a commonwealth; or sue for peace once and go back.
+  var REBEL_NEED = { easy: 40, normal: 60, hard: 80, ruthless: 100 },
+    INDEP_SCORE = 20000,
+    COMMON_SCORE = 10000;
+  function rebelOf(p) {
+    return p && p.mother && p.mother.rebel;
+  }
+  function declareIndependence(e, pid) {
+    return be(e, () => {
+      let p = ce(e, pid),
+        m = p.mother || (p.mother = { ...ir });
+      if (isNatNation(p)) return B("The empire answers to no crown.");
+      if (m.independent || m.rebel) return B("That is already done.");
+      if (e.colonies.filter((c) => c.owner === pid).length < 3) return B("Found at least three colonies before you break with the crown.");
+      m.rebel = { damage: 0, need: REBEL_NEED[e.difficulty] || 60, since: e.year };
+      pushEvent(e, `${nationName(p)}'s colonies declare their independence! The crown blockades your ports and will send its troops.`);
+      return { ok: !0, discoveries: [], note: "Independence is declared. The crown's ships blockade your ports, and its troops are coming." };
+    });
+  }
+  function endRebellion(e, p, how) {
+    let m = p.mother;
+    for (let c of e.colonies) c.owner === p.id && c.occupied && delete c.occupied;
+    e.pendingCrown = [];
+    if (how === "won") (m.independent = !0), (m.commonwealth = !1), (p.score = (p.score || 0) + INDEP_SCORE), pushEvent(e, `Independence is won! The crown gives up its claim; your colonies are their own masters, and trade with Europe on better terms.`);
+    else if (how === "commonwealth") (m.commonwealth = !0), (m.resentment = 0), (m.favor = 10), (p.score = (p.score || 0) + COMMON_SCORE), pushEvent(e, `A commonwealth is agreed: the crown returns your colonies, and takes only a fifth of the old tax.`);
+    else (m.suedPeace = !0), (m.resentment = 30), (m.favor = 0), pushEvent(e, `Peace with the crown. Your colonies are returned, the court is angry, and the tax is owed again.`);
+    delete m.rebel;
+  }
+  function crownForce(e, p, col) {
+    let lvl = col.level || 1,
+      n = Math.min(12, 3 + lvl * 2 + ({ easy: -1, normal: 0, hard: 1, ruthless: 2 }[e.difficulty] || 0)),
+      rng = bn(((e.year * 31 + col.id * 7) ^ (e.seed >>> 0)) >>> 0),
+      units = [];
+    for (let k = 0; k < n; k++) {
+      let q = rng(),
+        kind = q < 0.4 ? "infantry" : q < 0.8 ? "cavalry" : "artillery";
+      units.push({ id: `k${k}`, kind, str: unitStrength(kind, 3), max: unitStrength(kind, 3), name: { infantry: "Crown regulars", cavalry: "Crown dragoons", artillery: "Crown guns" }[kind] });
+    }
+    return { name: "The crown's army", nat: p.nationId, leader: { name: `General of ${ee[p.nationId].name}`, attacks: 7, charisma: 2, rep: 2 }, units };
+  }
+  function crownWarTurn(e) {
+    for (let p of e.players) {
+      let R = rebelOf(p);
+      if (!R) continue;
+      let cols = e.colonies.filter((c) => c.owner === p.id && !c.occupied);
+      if (!cols.length) continue;
+      let chance = Math.min(0.6, cols.reduce((a, c) => a + (c.level || 1), 0) / 30);
+      if (z(p.id * 13, e.year, (e.seed >>> 0) + 4411) >= chance) continue;
+      // the target: weighted toward the larger colonies
+      let tot = cols.reduce((a, c) => a + (c.level || 1), 0),
+        pick = z(p.id * 17, e.year, (e.seed >>> 0) + 4413) * tot,
+        col = cols.find((c) => (pick -= c.level || 1) < 0) || cols[0];
+      (e.pendingCrown || (e.pendingCrown = [])).push({ id: `${e.year}:${col.id}`, col: col.id, owner: p.id });
+      p.isHuman && pushEvent(e, `The crown's army lands to retake ${col.name}!`, col.x, col.y);
+    }
+  }
+  // Settle a crown attack on a colony.
+  function resolveCrown(e, p, col, B, fresh) {
+    let R = rebelOf(p),
+      won = B.over.winner === "att",
+      hit = B.sides.def.dealt || 0,
+      tl = battleTally(B);
+    applyLosses(e, p.id, B, "def"), allyLosses(e, B, "def", p.id);
+    R && (R.damage += hit);
+    let msg;
+    if (won) (col.occupied = { units: B.sides.att.units.filter((u) => u.str > 0).map((u) => ({ id: u.id, kind: u.kind, str: u.str, max: u.max, name: u.name })) }), (msg = `The crown's troops took ${col.name}. It is occupied and yields nothing until you retake it.`);
+    else msg = `${col.name} threw back the crown's army after ${tl.rounds} rounds.`;
+    msg += ` Crown losses so far: ${R ? Math.round(R.damage) : 0} of ${R ? R.need : 0} needed for independence.`;
+    battleNews(e, `The crown attacks ${col.name}`, msg, fresh);
+    R && R.damage >= R.need && (endRebellion(e, p, "won"), (msg += " Independence is won!"));
+    return msg;
+  }
+  // You attack an occupied colony of yours to take it back.
+  function resolveRetake(e, pid, col, B, leaderId) {
+    let p = ce(e, pid),
+      R = rebelOf(p),
+      won = B.over.winner === "att",
+      L = leaderId ? e.units.find((u) => u.id === leaderId) : null,
+      up = leaderWon(e, L, won, B, "att");
+    applyLosses(e, pid, B, "att");
+    R && (R.damage += B.sides.att.dealt || 0);
+    if (won) delete col.occupied;
+    else col.occupied && (col.occupied.units = B.sides.def.units.filter((u) => u.str > 0).map((u) => ({ id: u.id, kind: u.kind, str: u.str, max: u.max, name: u.name })));
+    let msg = won ? `${col.name} is retaken from the crown.` : `The crown's garrison held ${col.name}.`;
+    msg += ` Crown losses so far: ${R ? Math.round(R.damage) : 0} of ${R ? R.need : 0}.${up ? " " + up : ""}`;
+    battleNews(e, `${won ? "Retaken" : "Repulsed"} at ${col.name}`, msg, !1);
+    R && R.damage >= R.need && (endRebellion(e, p, "won"), (msg += " Independence is won!"));
+    return msg;
+  }
+  // ---- Naval combat ------------------------------------------------------------
+  // After the original: whichever ship catches the wind acts first. To sink,
+  // each ship fires once, the windward first, for up to its hull in damage;
+  // a ship brought to nothing goes down with all aboard. To board, the
+  // bigger ship and the more soldiers aboard win; a captured ship comes
+  // over empty, everyone aboard lost. A weak defender with the wind may
+  // slip away. England's ships fight a level above themselves.
+  function hullMax(s) {
+    return 2 + (s.level || 1);
+  }
+  function hullOf(s) {
+    return s.hull == null ? hullMax(s) : s.hull;
+  }
+  function seaPower(e, s) {
+    let adm = (e.players.find((p) => p.id === s.owner) || {}).nationId === "england" ? 1 : 0;
+    return { lvl: (s.level || 1) + adm, hull: hullOf(s) + adm };
+  }
+  function boardStrength(e, s) {
+    let P = seaPower(e, s),
+      men = e.units.filter((u) => u.aboard === s.id);
+    return 8 * P.lvl + men.reduce((a, u) => a + (u.kind === "infantry" ? u.level || 1 : u.kind === "cavalry" ? (u.level || 1) / 2 : 0), 0);
+  }
+  function seaBattle(e, att, def, mode, rng) {
+    let A = seaPower(e, att),
+      D = seaPower(e, def),
+      dmgA = hullMax(att) - hullOf(att),
+      dmgD = hullMax(def) - hullOf(def),
+      gauge = Math.max(0.1, Math.min(0.9, 0.5 + 0.1 * (A.lvl - D.lvl) + 0.1 * (dmgD - dmgA))),
+      attWind = rng() < gauge,
+      out = { mode, attWind, fled: !1, sunk: null, captured: !1, hitA: 0, hitD: 0 },
+      outclassed = boardStrength(e, def) + D.hull * 4 < (boardStrength(e, att) + A.hull * 4) * 0.7;
+    // A defender clearly outmatched tries to run; with the wind it gets away.
+    if (outclassed && !attWind && rng() < 0.75) return (out.fled = !0), out;
+    let sink = (from, to, Pf) => {
+      let d = Math.floor(rng() * (Pf.hull + 1));
+      return (to.hull = hullOf(to) - d), d;
+    };
+    if (mode === "board") {
+      let a = boardStrength(e, att) * (attWind ? 1.2 : 1),
+        d = boardStrength(e, def) * (attWind ? 1 : 1.2);
+      rng() < a / (a + d) ? (out.captured = !0) : ((att.hull = hullOf(att) - 1), (out.hitA = 1));
+      return out;
+    }
+    let first = attWind ? [att, def, A, D] : [def, att, D, A];
+    let d1 = sink(first[0], first[1], first[2]);
+    attWind ? (out.hitD = d1) : (out.hitA = d1);
+    if (hullOf(first[1]) > 0) {
+      let d2 = sink(first[1], first[0], first[3]);
+      attWind ? (out.hitA = d2) : (out.hitD = d2);
+    }
+    hullOf(def) <= 0 ? (out.sunk = "def") : hullOf(att) <= 0 && (out.sunk = "att");
+    return out;
+  }
+  // Apply a sea fight to the world and describe it.
+  function resolveSea(e, att, def, mode, rng) {
+    let P = e.players.find((p) => p.id === att.owner),
+      Q = e.players.find((p) => p.id === def.owner),
+      r = seaBattle(e, att, def, mode, rng),
+      an = `${att.name || "Ship"}`,
+      dn = `the ${nationAdj(Q)} ${def.name ? def.name.toLowerCase() : "ship"}`;
+    P && Q && startWar(e, P, Q);
+    att.mp = 0;
+    let lost = (s) => {
+      let n = e.units.filter((u) => u.aboard === s.id).length;
+      return (e.units = e.units.filter((u) => u.id !== s.id && u.aboard !== s.id)), n;
+    };
+    let msg;
+    if (r.fled) msg = `${dn.replace(/^./, (c) => c.toUpperCase())} caught the wind and slipped away from ${an}.`;
+    else if (r.captured) {
+      let n = e.units.filter((u) => u.aboard === def.id).length;
+      (e.units = e.units.filter((u) => u.aboard !== def.id)), (def.owner = att.owner), (def.hull = Math.max(1, hullOf(def) - 1)), (def.dest = null), (def.autoExplore = !1), (def.name = `${def.name || "Ship"} (taken)`);
+      msg = `${an} boarded and took ${dn}${n ? `; the ${n} aboard her were lost` : ""}.`;
+    } else if (mode === "board") msg = `${an} tried to board ${dn} and was thrown back, taking damage.`;
+    else {
+      msg = `${an} fought ${dn}: ${r.hitD} damage given, ${r.hitA} taken.`;
+      r.sunk === "def" && (msg += ` ${dn.replace(/^./, (c) => c.toUpperCase())} went down${lost(def) ? " with everyone aboard" : ""}.`);
+      r.sunk === "att" && (msg += ` ${an} went down${lost(att) ? " with everyone aboard" : ""}.`);
+    }
+    att.hull != null && att.hull <= 0 && !r.sunk && lost(att);
+    battleNews(e, `Sea fight off the coast`, msg, !1);
+    return msg;
+  }
+  // Ships mend a point a year beside one of their own colonies with a dock;
+  // rival captains at war attack your ships they find alongside.
+  function seaTurn(e) {
+    let hum = e.players.find((p) => p.isHuman);
+    for (let s of e.units) {
+      if (s.kind !== "ship" || s.aboard || hullOf(s) >= hullMax(s)) continue;
+      e.colonies.some((c) => c.owner === s.owner && c.buildings.some((b) => b.id === "dock" && !b.building && Math.max(Math.abs(b.x - s.x), Math.abs(b.y - s.y)) <= 2)) && (s.hull = hullOf(s) + 1);
+    }
+    if (!hum) return;
+    let rng = bn(((e.year * 7919) ^ (e.seed >>> 0)) >>> 0);
+    for (let r of e.units.filter((u) => u.kind === "ship" && u.owner !== hum.id)) {
+      if (!e.units.includes(r) || !atWar(e, hum.id, r.owner)) continue;
+      let prey = e.units.find((u) => u.kind === "ship" && u.owner === hum.id && Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 1);
+      if (!prey || rng() > 0.35) continue;
+      let msg = resolveSea(e, r, prey, boardStrength(e, r) > boardStrength(e, prey) * 1.3 ? "board" : "sink", rng);
+      pushEvent(e, msg, prey.x, prey.y);
+    }
+  }
+  // Landmarks change hands: a find belongs to whoever has soldiers beside
+  // it. If its holder has none there and another nation has, it passes to
+  // them, and stays theirs until someone takes it back the same way.
+  function holdTurn(e) {
+    let hum = e.players.find((p) => p.isHuman);
+    for (let sp of e.map.specials || []) {
+      if (sp.foundBy == null) continue;
+      let by = new Set();
+      for (let u of e.units) !u.aboard && arm(u.kind) && Math.max(Math.abs(u.x - sp.x), Math.abs(u.y - sp.y)) <= 1 && by.add(u.owner);
+      if (!by.size || by.has(sp.foundBy) || by.size > 1) continue;
+      let to = [...by][0],
+        was = sp.foundBy,
+        P = e.players.find((p) => p.id === to),
+        name = ke[sp.kind] ? ke[sp.kind].name : "a landmark";
+      sp.foundBy = to;
+      hum && (to === hum.id ? pushEvent(e, `Your soldiers hold the ${name}. Its bonus now goes to your colonies nearby.`, sp.x, sp.y) : was === hum.id && pushEvent(e, `${nationName(P)} has taken the ${name} from you. Station soldiers beside it to take it back.`, sp.x, sp.y));
     }
   }
   // Rivals are hungry for land: their goodwill toward you wears away each
@@ -5041,7 +5269,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     let l = ln(e, n, o);
     return (
-      l && a.push(`${l.colony.name} \xB7 ${ye(l.building.id).name}`),
+      l && a.push(`${l.colony.name} \xB7 ${bName(l.building.id, l.colony)}`),
       a.join(" \xB7 ")
     );
   }
@@ -5481,6 +5709,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ? s.push(`${a} now reigns in ${n.name}.`)
       : s.push(`${a} reigns in ${n.name}.`);
     let t = e.mother || ir;
+    t.rebel && s.push(`The war for independence goes on: ${Math.round(t.rebel.damage)} of ${t.rebel.need} of the crown's strength destroyed. Its ships blockade our ports.`);
     return (
       t.independent && !(o && o.independent)
         ? s.push(
@@ -6048,6 +6277,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (lead && !lead.aboard && lead.x === i.x && lead.y === i.y)
         (n = lead.id), (i = lead);
     }
+    escort(i.kind) && (i.leaderId = null);
     if (!Xu(i.kind)) return { ok: !1, error: "That unit cannot move." };
     let s = ce(e, i.owner),
       a = Pn(e, n, { x: o, y: r }),
@@ -6650,10 +6880,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function arm(e) {
     return e === "infantry" || e === "cavalry" || e === "artillery";
   }
+  // Settlers and explorers can travel in a leader's column, at his pace,
+  // without counting against the men he commands.
+  function escort(k) {
+    return k === "settler" || k === "explorer";
+  }
   function detachMan(e, n) {
     return be(e, () => {
       let o = j(e, n);
-      if (!o || !arm(o.kind))
+      if (!o || !(arm(o.kind) || escort(o.kind)))
         return B("Select a soldier, dragoon, or artillery.");
       if (!o.leaderId) return B("He is not with a leader.");
       return (o.leaderId = null), { ok: !0, discoveries: [] };
@@ -6662,13 +6897,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function joinMan(e, n) {
     return be(e, () => {
       let o = j(e, n);
-      if (!o || !arm(o.kind))
+      if (!o || !(arm(o.kind) || escort(o.kind)))
         return B("Select a soldier, dragoon, or artillery.");
       let r = joinTarget(e, o);
       if (!r) return B("No leader of yours is near enough.");
       let cap = leaderStats(r).cmd,
-        has = e.units.filter((q) => q.leaderId === r.id && !q.aboard && q.x === r.x && q.y === r.y).length;
-      if (has >= cap) return B(`${r.name} already commands all the men he can (${cap}). Raise his organization, or give the men another leader.`);
+        has = e.units.filter((q) => q.leaderId === r.id && arm(q.kind) && !q.aboard && q.x === r.x && q.y === r.y).length;
+      if (arm(o.kind) && has >= cap) return B(`${r.name} already commands all the men he can (${cap}). Raise his organization, or give the men another leader.`);
       let col = colonyOf(e, o.x, o.y);
       // Inside a colony he simply walks over; outside he marches.
       if ((o.x === r.x && o.y === r.y) || (col && inColony(col, r))) return (o.x = r.x), (o.y = r.y), (o.leaderId = r.id), { ok: !0, discoveries: [], note: `${o.name} join${/s$/.test(o.name) ? "" : "s"} ${r.name}.` };
@@ -6820,7 +7055,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let quiet = e.log.length;
       Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), rivalFederate(e, r), (e.log.length = quiet);
     }
-    meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
+    holdTurn(e), seaTurn(e), crownWarTurn(e), meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
     crownTurn(e);
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
@@ -12370,6 +12605,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         requestAnimationFrame(() => {
           q(home ? { x: home.x, y: home.y } : g), R();
         });
+      // A new game opens with a short how-to-play card.
+      let skip = !1;
+      try {
+        skip = localStorage.getItem("reconquest-hints") === "off";
+      } catch (err) {}
+      t.year === $.startYear && !t.welcomed && !skip && setTimeout(welcomeCard, 350);
     }
     function _(f, g) {
       let k = J(),
@@ -12860,6 +13101,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     // The next fight waiting on you: a raid by warriors, or a rival army.
     function nextFight() {
+      let cw = (t.pendingCrown || []).find((q) => q.owner === V(t).id);
+      if (cw) return { key: `crown:${cw.id}`, run: () => crownPrompt(cw) };
       let rd = (t.pendingRaids || [])[0];
       if (rd) return { key: `raid:${rd.id}`, run: () => raidPrompt(rd) };
       let am = (t.pendingArmies || [])[0];
@@ -12911,7 +13154,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       ${!f && pin && pinned() ? pinCard() : f ? `<h2>${re(f)}${f.kind === "leader" && f.owner === g.id ? ' <button type="button" class="find-link inline rename" id="rename-unit">Rename</button>' : ""}</h2>` : ""}
-      ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
+      ${f ? `<p>Movement ${f.mp}.${f.level > 1 ? ` Level ${f.level}.` : ""}${f.kind === "ship" ? ` Hull ${hullOf(f)} of ${hullMax(f)}${hullOf(f) < hullMax(f) ? " (mends beside a colony with a dock)" : ""}.` : ""} ${f.aboard ? "Aboard ship." : ""}${arm(f.kind) ? ` Strength ${f.strength || 3}${f.maxStr && f.strength < f.maxStr ? ` of ${f.maxStr}` : ""}.` : ""}</p>` : ""}
       ${f && f.kind === "leader" ? (() => { let L = leaderStats(f); let own = f.owner === g.id, pt = own && f.pts > 0, row = (k, label, val, hint) => `<tr><th>${label}</th><td class="num">${val}</td><td>${pt && f.pts >= LEAD_COST[k] && (k === "move" ? L.move : L[k]) < LEAD_CAP[k] ? `<button type="button" class="train" data-train="${k}" title="Costs ${LEAD_COST[k]} point${LEAD_COST[k] === 1 ? "" : "s"}">+${LEAD_STEP[k]} · ${LEAD_COST[k]} pt</button>` : ""}</td></tr><tr class="hint"><td colspan="3">${hint}</td></tr>`;
         return `<table class="lead-stats">
           ${row("attacks", "Actions", L.attacks, "Attacks his side makes each battle turn. Without a leader, 3.")}
@@ -12921,6 +13164,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           <tr><th>Reputation</th><td class="num">${L.rep}</td><td></td></tr><tr class="hint"><td colspan="3">Earned in battle. It unsettles the enemy.</td></tr>
         </table>
         <p class="muted">${pt ? `<b>${f.pts} point${f.pts === 1 ? "" : "s"} to spend.</b> ` : ""}Experience comes from the damage his men deal and half what they take, more for a victory: the first point at 5, then 8, 11, 14 and so on${f.xp ? ` (now ${Math.floor(f.xp)} of ${5 + 3 * (f.earned || 0)})` : ""}. Actions cost 3 points, movement 2, charisma and organization 1. In a colony with soldiers he organizes the defence, and the militia fight under him on top of his organization.</p>`; })() : ""}
+      ${f && !f.aboard && escort(f.kind) && f.owner === g.id ? (() => {
+        let L0 = f.leaderId && t.units.find((I) => I.id === f.leaderId && !I.aboard && I.x === f.x && I.y === f.y);
+        if (L0) return `<div class="row"><button type="button" id="detach">Leave ${G(L0.name)}</button></div><p class="muted">Travelling with ${G(L0.name)}'s column, at his pace. Drag him to move them both.</p>`;
+        let jt = joinTarget(t, f);
+        return jt ? `<div class="row"><button type="button" id="join">Travel with ${G(jt.name)}</button></div><p class="muted">Settlers and explorers can travel in a leader's column, protected and at his pace.</p>` : "";
+      })() : ""}
       ${f && !f.aboard && arm(f.kind) && f.leaderId ? `<div class="row"><button type="button" id="detach">Leave the leader</button></div><p class="muted">He stays on this square. Drag him after that. Dragging him before that moves the men who are still with the leader.</p>` : ""}
       ${(() => {
         if (!f || f.aboard || !arm(f.kind) || f.owner !== g.id) return "";
@@ -13329,10 +13578,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (k && g) {
           l = k;
           let w = j(t, k);
+          // A ship dragged onto an enemy ship within this turn's sailing
+          // range closes with her and attacks.
+          let foeShip = w && w.kind === "ship" && t.units.find((q) => q.kind === "ship" && q.owner !== w.owner && q.x === b.x && q.y === b.y);
+          if (foeShip) {
+            let go = () => seaAttack(w, foeShip);
+            if (Math.max(Math.abs(w.x - b.x), Math.abs(w.y - b.y)) <= 1) return go();
+            let reach = kn(t, w.id),
+              best = null;
+            for (let [key, cost] of reach) {
+              let [sx, sy] = key.split(",").map(Number);
+              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) === 1 && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
+            }
+            if (!best) return (h = "She is beyond this turn's sailing."), R();
+            neThen(w.id, () => mo(t, w.id, best.x, best.y), () => {
+              let s2 = j(t, w.id);
+              s2 && Math.max(Math.abs(s2.x - b.x), Math.abs(s2.y - b.y)) <= 1 ? go() : ((h = "She could not close the distance this turn."), R());
+            });
+            return;
+          }
           let land = w && !w.aboard && w.kind !== "ship",
             vg = land && villageAt(t, b.x, b.y),
             am = land && !vg && armyAt(t, b.x, b.y),
-            rc = land && !vg && !am && t.colonies.find((c) => c.x === b.x && c.y === b.y && c.owner !== w.owner),
+            rc = land && !vg && !am && t.colonies.find((c) => c.x === b.x && c.y === b.y && (c.owner !== w.owner || c.occupied)),
             rp = land && !vg && !am && !rc && t.units.some((q) => q.owner !== w.owner && !q.aboard && q.kind !== "ship" && q.x === b.x && q.y === b.y),
             near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= 1;
           if (vg || am || rc || rp) {
@@ -13581,6 +13849,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return `<h2>${G(d.name)}</h2>
         <p>${G(qn(d))}.</p>
         <p class="muted">${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}</p>
+        <p class="muted">${P.foundBy === me_.id ? "Keep soldiers beside it: if a rival stations soldiers here while none of yours are, it becomes theirs." : "Station soldiers beside it, with none of the holder's there, and at the end of the year it becomes yours."}</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "village") {
@@ -14018,6 +14287,46 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       );
     }
     // A rival army has reached one of your colonies.
+    function welcomeCard() {
+      if (!t || p || !a.hidden) return;
+      let me = V(t),
+        nat = isNatNation(me);
+      (t.welcomed = !0), (p = !0), (a.hidden = !1);
+      a.innerHTML = `
+      <div class="card">
+        <p class="find-kicker">How to play</p>
+        <h2>${nat ? "The empire wakes" : "Landfall"}</h2>
+        <ul class="hints">
+          <li><b>Move:</b> drag a unit to where it should go. It keeps going on later turns. Drag a ship onto the shore and everyone steps off.</li>
+          <li><b>Look:</b> click anything (a unit, town, village, landmark or army) and its card opens. Click empty ground to close it.</li>
+          <li><b>${nat ? "Towns" : "Colonies"}:</b> ${nat ? "your settlers are already ashore" : "your settlers come on the second ship"}; select one and press Found colony on good ground near rivers and the coast.</li>
+          <li><b>Armies:</b> soldiers alone are slow; put them with a leader and they march at his pace. Drag them onto an enemy within a turn's march to attack.</li>
+          <li><b>Defend:</b> a leader with soldiers in a town holds it well. Without them, raiders get in.</li>
+          <li><b>Turns:</b> Next unit (N) finds anyone with moves left; End turn brings the newspaper and the year's news.</li>
+          <li><b>Rivals:</b> Diplomacy shows where you stand${nat ? ", and your federation of native villages" : ", what the king wants, and the road to independence"}.</li>
+        </ul>
+        <div class="row"><button type="button" id="hint-go" class="primary">Begin</button><button type="button" id="hint-off">Don't show this again</button></div>
+      </div>`;
+      let close = () => ((p = !1), (a.hidden = !0), R());
+      a.querySelector("#hint-go").onclick = close;
+      a.querySelector("#hint-off").onclick = () => {
+        try {
+          localStorage.setItem("reconquest-hints", "off");
+        } catch (err) {}
+        close();
+      };
+    }
+    function crownPrompt(q) {
+      let me = V(t),
+        col = t.colonies.find((c) => c.id === q.col),
+        drop = () => (t.pendingCrown = (t.pendingCrown || []).filter((w) => w !== q));
+      if (!col || col.owner !== me.id || col.occupied || !rebelOf(me)) return drop(), R();
+      _(col.x, col.y);
+      preBattle({ kind: "attack", title: `The crown's army storms ${col.name}`, att: crownForce(t, me, col), def: colonyDefence(t, col), warn: "Veterans of the old country. If they win, the colony is occupied until you take it back. Every man of theirs you strike down counts toward independence." }, "def", (B) => {
+        let msg = resolveCrown(t, me, col, B, !0);
+        drop(), t.log.push(msg), (h = msg), R();
+      });
+    }
     function armyPrompt(id) {
       let P = pol(t),
         A = P.armies.find((q) => q.id === id),
@@ -14081,7 +14390,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${rows}
         <section class="drow">
           <h3>${isNatNation(me) ? "The Great Speaker" : "The crown"}</h3>
-          ${isNatNation(me) ? `<p class="muted">${G(je(ee[me.nationId], t.year))} asks no tax and no tribute. No crown across the ocean tells you whom to fight. Your federation counts ${fedCount(t, me.id)} village${fedCount(t, me.id) === 1 ? "" : "s"}: send a leader to a friendly village to invite it, or win one by force.</p>` : `<p class="muted">Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}. ${m.taxRate != null ? `Last year's tax was ${Math.round(m.taxRate * 100)}% of your colonies' gold.` : "Tax is taken each year from your colonies' gold."} The angrier the court, the higher the tax.</p>`}
+          ${isNatNation(me) ? `<p class="muted">${G(je(ee[me.nationId], t.year))} asks no tax and no tribute. No crown across the ocean tells you whom to fight. Your federation counts ${fedCount(t, me.id)} village${fedCount(t, me.id) === 1 ? "" : "s"}: send a leader to a friendly village to invite it, or win one by force.</p>` : `<p class="muted">Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}. ${m.taxRate != null ? `Last year's tax was ${Math.round(m.taxRate * 100)}% of your colonies' gold.` : "Tax is taken each year from your colonies' gold."} The angrier the court, the higher the tax.</p>${(() => {
+            if (m.independent) return '<p class="find-stat">Independent. No tax, and Europe buys at better prices.</p>';
+            let Rb = m.rebel,
+              ncol = t.colonies.filter((c) => c.owner === me.id).length;
+            if (Rb)
+              return `<p class="find-stat">At war with the crown: ${Math.round(Rb.damage)} of ${Rb.need} of its troops' strength destroyed.</p>
+              <div class="row">${Rb.damage >= Rb.need * 0.6 ? '<button type="button" id="crown-common" class="primary">Accept a commonwealth</button>' : ""}${m.suedPeace ? "" : '<button type="button" id="crown-peace">Sue for peace</button>'}</div>
+              <p class="muted">Win by wearing down the crown's armies. Past three fifths of the way you may settle for a commonwealth: your colonies back and a fifth of the tax. Suing for peace returns your colonies and the old tax, once only.</p>`;
+            return `${m.commonwealth ? '<p class="muted">A commonwealth: the crown takes a fifth of the old tax.</p>' : ""}<div class="row"><button type="button" id="crown-indep" ${ncol >= 3 && !m.suedPeace ? "" : "disabled"}>Declare independence</button></div><p class="muted">${ncol >= 3 ? (m.suedPeace ? "You sued for peace once; the crown will not be defied again." : "Break with the crown: no more tax, but its ports are closed to you and its troops will come for your colonies. Wear them down to win.") : "Found at least three colonies before breaking with the crown."}</p>`;
+          })()}`}
         </section>
         <div class="row"><button type="button" id="diplo-close" class="primary">Close</button></div>
       </div>`);
@@ -14093,6 +14411,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }),
       );
       a.querySelector("#diplo-close").onclick = () => ((p = !1), (a.hidden = !0), R());
+      let ci = a.querySelector("#crown-indep");
+      ci && (ci.onclick = () => { let r2 = declareIndependence(t, me.id); x(r2), diploScreen(r2.ok ? r2.note : r2.error); });
+      let cc = a.querySelector("#crown-common");
+      cc && (cc.onclick = () => (endRebellion(t, me, "commonwealth"), diploScreen("A commonwealth is agreed. Your colonies are returned.")));
+      let cp = a.querySelector("#crown-peace");
+      cp && (cp.onclick = () => (endRebellion(t, me, "peace"), diploScreen("Peace with the crown. Your colonies are returned, and the tax is owed again.")));
     }
     // A rival's offer, shown after the paper.
     function offerPrompt(of) {
@@ -14211,6 +14535,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a.querySelectorAll(".attack-opts button").forEach((el) => (el.onclick = () => ((p = !1), (a.hidden = !0), pick(opts[+el.dataset.k]))));
       a.querySelector("#atk-cancel").onclick = () => ((p = !1), (a.hidden = !0), R());
     }
+    function seaAttack(s, foe) {
+      let Q = t.players.find((p) => p.id === foe.owner),
+        aboard = (x) => t.units.filter((u) => u.aboard === x.id).length,
+        warn = atWar(t, s.owner, foe.owner) ? "" : ` ${warWarn(foe.owner)}`;
+      chooseAttack(
+        `${s.name || "Your ship"} against the ${nationAdj(Q)} ${(foe.name || "ship").toLowerCase()}`,
+        `Your hull ${hullOf(s)} of ${hullMax(s)}, ${aboard(s)} aboard. Theirs: hull ${hullOf(foe)} of ${hullMax(foe)}, ${aboard(foe)} aboard. Whoever catches the wind acts first, and a weaker ship may run.${warn}`,
+        [
+          { id: "sink", label: "Sink her", hint: "Trade broadsides. A ship brought to nothing goes down with everyone aboard." },
+          { id: "board", label: "Board her", hint: "Soldiers aboard help. Win and the ship is yours, empty; those aboard her are lost. Fail and your ship is damaged." },
+        ],
+        (opt) => {
+          let msg = resolveSea(t, s, foe, opt.id, bn((Date.now() >>> 0) ^ 0x5ea));
+          t.log.push(msg), (h = msg), R();
+        },
+      );
+    }
     function noTroops(what) {
       (h = `Only soldiers, dragoons and artillery can attack ${what}. A leader brings the men with him.`), R();
     }
@@ -14246,6 +14587,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     function attackColony(u, col) {
       let F = myForce(u);
       if (!F.troops.length) return noTroops("a colony");
+      if (col.owner === F.me_ && col.occupied) {
+        let def = { name: "Crown garrison", nat: V(t).nationId, scene: { kind: "town", level: col.level || 1 }, cover: { att: 3, def: 1, rout: 0.5 }, leader: { name: "Crown commander", attacks: 6, charisma: 2, rep: 1 }, units: col.occupied.units.map((q) => ({ ...q })) };
+        return preBattle({ kind: "attack", title: `Retaking ${col.name}`, att: F.att, def }, "att", (B) => afterAttack(F, resolveRetake(t, F.me_, col, B, F.lead && F.lead.id)));
+      }
       let owner = t.players.find((q) => q.id === col.owner),
         def = colonyDefence(t, col);
       chooseAttack(
@@ -14300,7 +14645,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         here = u ? an(t, f.id, T, u.x, u.y) : null;
       return `
         <div class="pick placing">
-          <h3 class="side-sub">Placing: ${G(B.name)}</h3>
+          <h3 class="side-sub">Placing: ${G(bName(T, f))}</h3>
           <p class="muted">${G(B.produces || "")}. Costs ${qe(ge(T))}.</p>
           ${u ? (here && here.ok ? `<p>Here:</p>${Ht(t, f, { id: T, x: u.x, y: u.y })}` : `<p class="down">${G((here && here.error) || "Not here.")}</p>`) : ""}
           <button type="button" id="cancel-place">Cancel</button>
@@ -14313,7 +14658,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let nn = ye(E.id).squares === 4 ? "2 by 2" : "1 square",
             Eo = ge(E.id),
             zr = Me(f.stock, Eo);
-          return `<button type="button" class="build${T === E.id ? " on" : ""}${zr ? "" : " short"}" data-tool="${E.id}" title="${G(E.produces)}">${E.name}<small>${qe(Eo)} \xB7 ${nn}</small></button>`;
+          return `<button type="button" class="build${T === E.id ? " on" : ""}${zr ? "" : " short"}" data-tool="${E.id}" title="${G(E.produces)}">${G(bName(E.id, f))}<small>${qe(Eo)} \xB7 ${nn}</small></button>`;
         }).join(""),
         b = Ce.map((E) => {
           let $e = g.net[E],
@@ -14322,7 +14667,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }).join(""),
         w = f.buildings.filter((E) => E.building),
         F = w.length
-          ? `<ul class="underway">${w.map((E) => `<li>${E.id === "center" ? "Colony center" : ae[E.id].name}: ${E.building === "new" ? "being built" : `raising to level ${(E.level || 1) + 1}`}, ready next turn</li>`).join("")}</ul>`
+          ? `<ul class="underway">${w.map((E) => `<li>${G(bName(E.id, f))}: ${E.building === "new" ? "being built" : `raising to level ${(E.level || 1) + 1}`}, ready next turn</li>`).join("")}</ul>`
           : "",
         D = f.buildings.find((E) => E.id === "center"),
         L = f.level + 1,
@@ -14335,7 +14680,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           nn = ge(U.id, $e);
         te = `
         <div class="pick">
-          <h3 class="side-sub">${G(E.name)} \xB7 level ${U.level || 1}</h3>
+          <h3 class="side-sub">${G(bName(U.id, f))} \xB7 level ${U.level || 1}</h3>
           <p class="muted">${G(E.produces)}. Needs ${E.workers * (U.level || 1)} workers.</p>
           ${Ht(t, f, U)}
           ${qa(t, f, U)}
@@ -14429,7 +14774,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land.</small></button>`}</div>
       ${garrison}
       ${X}
-      ${f.big ? "" : sell}
+      ${f.occupied ? `<p class="find-stat">Occupied by the crown's troops (${f.occupied.units.length}). It yields nothing until you retake it: drag soldiers beside it onto the town.</p>` : ""}
+      ${f.big ? "" : rebelOf(V(t)) ? '<p class="muted">The crown\'s ships blockade your ports: nothing can be sold in Europe until independence is won.</p>' : sell}
       ${natHtml}
       <p class="muted">Click anywhere outside the colony to go back to the map.</p>`),
         (s.querySelector("#auto-toggle").onclick = () => {
