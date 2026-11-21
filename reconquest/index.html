@@ -7921,8 +7921,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }
       };
     if (settling && baseZoom != null && baseZoom !== rz) {
-      // the overview underneath, so ground just uncovered is never black
-      blitTerrace(e, o.map, r, null), layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
+      // the overview underneath, so ground just uncovered is never black;
+      // only if it is already made, since making it takes a long moment
+      terrainOf(o.map).over && blitTerrace(e, o.map, r, null), layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom), current();
       clearTimeout(settleTimer), (settleTimer = setTimeout(() => mapRepaint && mapRepaint(), 130));
       return;
     }
@@ -7956,7 +7957,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           break;
         }
       }
-    if (!complete) blitTerrace(e, o.map, r, null), baseZoom != null && baseZoom !== rz && (layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom));
+    if (!complete)
+      baseZoom != null && baseZoom !== rz
+        ? (terrainOf(o.map).over && blitTerrace(e, o.map, r, null), layer(baseZoom), prevZoom !== baseZoom && layer(prevZoom))
+        : blitTerrace(e, o.map, r, null);
     current();
     complete && ((baseZoom = rz), (prevZoom = null));
     // Keep memory in check: forget the tiles least recently on screen,
@@ -14305,7 +14309,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (c && P) {
           let v = Fe(f),
             b = tileAt(t.map, v.x, v.y, d);
-          Math.abs(f.clientX - c.x) + Math.abs(f.clientY - c.y) > 4 &&
+          Math.abs(f.clientX - c.x) + Math.abs(f.clientY - c.y) > 8 &&
             ((c.moved = !0), (l = P)),
             (!u || u.x !== b.x || u.y !== b.y) && ((u = b), pe());
           return;
@@ -14313,10 +14317,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (c) {
           let v = f.clientX - c.x,
             b = f.clientY - c.y;
-          Math.abs(v) + Math.abs(b) > 4 && (c.moved = !0),
-            (d.ox = c.ox + v),
-            (d.oy = c.oy + b),
-            pe();
+          // a click that wobbles a little is still a click, and the map
+          // does not shift under it
+          Math.abs(v) + Math.abs(b) > 8 && (c.moved = !0),
+            c.moved && ((d.ox = c.ox + v), (d.oy = c.oy + b), pe());
           return;
         }
         if (!t || o.hidden) return;
@@ -14388,6 +14392,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       requestAnimationFrame(tick);
     }
     function Rn(f, g) {
+      // any click on the map puts the colonies list away
+      listCols = !1;
       if (O && O.paused) {
         He();
         return;
@@ -14465,7 +14471,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         R();
     }
     function Re(f) {
-      (y = f), (T = null), (S = null), (m = !1), (a.hidden = !0);
+      (y = f), (T = null), (S = null), (m = !1), (a.hidden = !0), (listCols = !1);
       let g = t.colonies.find((k) => k.id === f);
       g && glide(g.x, g.y, Math.max(zoomAnim ? zoomAnim.to : d.zoom, $.zoom.colony)), R();
     }
@@ -15719,6 +15725,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     s.addEventListener("click", (ev) => {
       ev.target && ev.target.id === "card-x" && (y ? Kn() : ((l = null), (pin = null), (listCols = !1), (h = ""), R()));
     }),
+    // A click on the dark space around a card closes it, as its own close
+    // button would. Cards that wait on a choice have no such button and stay.
+    (() => {
+      let md = e.querySelector("#modal"),
+        downOut = !1;
+      md.addEventListener("pointerdown", (ev) => (downOut = ev.target === md));
+      md.addEventListener("click", (ev) => {
+        if (!downOut || ev.target !== md) return;
+        downOut = !1;
+        let shut = [...md.querySelectorAll("button")].find((b) => !b.disabled && /^(close|close the paper|carry on|back to the map|done|cancel)$/i.test(b.textContent.trim()));
+        shut && shut.click();
+      });
+    })(),
     (e.querySelector("#diplo").onclick = () => t && diploScreen()),
     (e.querySelector("#year-sum").onclick = () => t && summaryBox(pol(t).events.length ? pol(t).events : pol(t).lastEvents || [], !0)),
     (e.querySelector("#end").onclick = () => ie()),
