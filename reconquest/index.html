@@ -306,6 +306,7 @@ button.find-link.inline.rename { font-size: 12px; font-weight: 400; margin-left:
 button.find-link.inline { display: inline; padding: 0; text-decoration: underline; font: inherit; color: #6a4a1e; }
 ul.hints { padding-left: 18px; margin: 8px 0 12px; }
 ul.hints li { font: 14px/1.45 "Segoe UI", sans-serif; margin: 4px 0; }
+.score-card table.stock th, .score-card table.stock td { font-size: 13px; padding: 3px 6px; }
 .place-tip { position: fixed; z-index: 50; pointer-events: none; background: rgba(24, 18, 12, 0.92); color: #f4ead2; border: 1px solid #c8a656; border-radius: 4px; padding: 4px 8px; font: 13px "Segoe UI", sans-serif; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 .place-tip .ok { color: #cfe8a8; }
 .place-tip .no { color: #f0a898; }
@@ -3048,7 +3049,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         chars || (chars = Ni.split("")), (chars[idx] = String.fromCharCode(65 + n)), (gained += 20);
       }
     claimMemo.set(o, cur);
-    gained && ((e.map.firstClaim = chars.join("")), (o.score = (o.score || 0) + gained)), li(e, n);
+    gained && ((e.map.firstClaim = chars.join("")), addScore(o, "explore", gained)), li(e, n);
   }
   function li(e, n) {
     let o = e.map.specials || [];
@@ -3239,6 +3240,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (u) => u.owner === n && u.kind === "ship" && e.units.some((s) => s.aboard === u.id && s.kind === "settler"),
     );
     if (store) {
+      // A storeship that cannot reach its landing puts everyone ashore on
+      // the nearest beach after a few years; the settlers walk from there.
+      store.carry = (store.carry || 0) + 1;
+      if (store.carry > 4) {
+        let spots = Xe(e, store.id);
+        if (spots.length) {
+          for (let q of e.units.filter((u) => u.aboard === store.id)) xo(e, q.id, spots[0][0], spots[0][1]);
+          (p.siteA = null), (store.carry = 0);
+        }
+      }
+    }
+    if (store && e.units.some((s) => s.aboard === store.id && s.kind === "settler")) {
       rivalSiteOk(e, p.siteA) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
       let s = p.siteA;
       if (s && Xe(e, store.id).some(([a, b]) => a === s.x && b === s.y)) {
@@ -3321,7 +3334,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       msg = "Carved trail markers show the old paths. From now on your explorers travel farther each turn.";
     } else if (!p.perks.calendar) {
       p.perks.calendar = 1;
-      p.score = (p.score || 0) + 60;
+      addScore(p, "finds", 60);
       msg = "A carved stone calendar. Word of it raises your standing at home by 60.";
     } else msg = cache();
     s.prize = msg;
@@ -3562,8 +3575,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // Close range +15%, two squares +5%, three nothing.
         b += [0, 6, 2, 0][Math.min(3, dist)] || 0;
       }
-      // Nations train their men differently.
+      // Nations train their men differently, and colleges teach tactics.
       b += (NAT_AIM[S.nat] || {})[bCls(u)] || 0;
+      b += ((S.res && S.res[bCls(u)] && S.res[bCls(u)].atk) || 0) * 2;
+      let TS = B.sides[t.side];
+      b -= (TS.res && TS.res[bCls(t)] && TS.res[bCls(t)].def) || 0;
       let th = Bo({ bonus: b });
       // Guns firing on guns hit half as often; men and horses rushing guns
       // that stand alone get twice the attempts.
@@ -3847,7 +3863,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let real = here.find((u) => u.kind === "leader"),
       armed = here.some((u) => arm(u.kind)),
       cover = real && armed ? { att: 8, def: 5, rout: 0.8 } : real ? { att: 6, def: 3, rout: 0.65 } : armed ? { att: 4, def: 2, rout: 0.5 } : { att: 3, def: 1, rout: 0.5 };
-    return { name: col.name, nat: (e.players.find((q) => q.id === col.owner) || {}).nationId, scene: { kind: "town", level: col.level || 1, big: !!col.big }, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
+    return { name: col.name, nat: (e.players.find((q) => q.id === col.owner) || {}).nationId, res: resOf(e.players.find((q) => q.id === col.owner)), scene: { kind: "town", level: col.level || 1, big: !!col.big }, cover, leader: leader ? (leader.id ? leaderStats(leader) : leader) : null, leaderId: leader ? leader.id || null : null, units };
   }
   function nativeAllies(e, col, exceptNation) {
     if (!e.natives) return [];
@@ -3874,7 +3890,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nat = nationOf(e, v);
     if (!p || v.fed != null) return "";
     (v.fed = pid), (v.size = Math.min(8, (v.size || 1) * 2)), (v.warriors = Math.max(v.warriors, v.size + 2)), (v.raidCool = 2);
-    p.score = (p.score || 0) + FED_SCORE;
+    addScore(p, "federation", FED_SCORE);
     for (let n2 of natives(e).nations) n2 !== nat && shiftAttitude(n2, pid, -4);
     nat && shiftAttitude(nat, pid, forced ? -25 : 5);
     let msg = `${v.name} of the ${nat ? nat.name : "native"} people ${forced ? "is brought into" : "joins"} the ${nationName(p)}'s federation.`;
@@ -3905,8 +3921,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let v of natives(e).villages) {
       if (v.fed != null) continue;
       let nat = nationOf(e, v);
-      if ((nat.att[r.id] || 0) < 0 || !cols.some((c) => Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 25)) continue;
-      z(v.id, e.year, (e.seed >>> 0) + 3301) < 0.12 && federate(e, r.id, v, !1);
+      if ((nat.att[r.id] || 0) < -10 || !cols.some((c) => Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 80)) continue;
+      z(v.id, e.year, (e.seed >>> 0) + 3301) < 0.25 && federate(e, r.id, v, !1);
     }
   }
   // Allied warriors who fell are lost to their village; when the colony
@@ -3930,6 +3946,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   var VET_AT = { eu: [0, 4, 7, 12, 17], nat: [0, 3, 6, 10, 15] };
   function applyLosses(e, side, B, sideKey) {
     let p = e.players.find((q) => q.id === side),
+      _sc = p && addScore(p, "battles", Math.round((B.sides[sideKey].dealt || 0) * 20)),
       steps = isNatNation(p) ? VET_AT.nat : VET_AT.eu;
     for (let bu of B.sides[sideKey].units) {
       let u = typeof bu.id === "number" ? e.units.find((q) => q.id === bu.id) : null;
@@ -4369,7 +4386,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       units = here.filter((q) => arm(q.kind)).map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name }));
     // Men with no soldiers to guard them still put up a fight of sorts.
     units.length || here.filter((q) => q.kind !== "ship").forEach((q, k) => units.push({ id: `c${k}`, kind: "militia", str: 2, militia: !0, name: q.name || "Colonists" }));
-    return { name: `${nationAdj(owner)} party`.replace(/^./, (c) => c.toUpperCase()), nat: owner && owner.nationId, leader: lead ? leaderStats(lead) : null, leaderId: lead ? lead.id : null, units };
+    return { name: `${nationAdj(owner)} party`.replace(/^./, (c) => c.toUpperCase()), nat: owner && owner.nationId, res: resOf(owner), leader: lead ? leaderStats(lead) : null, leaderId: lead ? lead.id : null, units };
   }
   // ---- Diplomacy, the crown, rival armies, and the end of the game ---------
   // Every pair of European players stands somewhere on an eight-step scale
@@ -4540,6 +4557,133 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
   }
+  // ---- War College research ------------------------------------------------------
+  // A nation with a finished War College can study tactics with gold from
+  // that colony: attack (each level +5% to hit) and defence (each level
+  // makes them 2.5% harder to hit) for infantry, cavalry and artillery,
+  // and leadership (each level gives newly commissioned leaders two more
+  // points). Up to level 4 each; each level costs more.
+  var RESEARCH = [
+      ["foot", "atk", "Infantry attack"],
+      ["foot", "def", "Infantry defence"],
+      ["horse", "atk", "Cavalry attack"],
+      ["horse", "def", "Cavalry defence"],
+      ["gun", "atk", "Artillery attack"],
+      ["gun", "def", "Artillery defence"],
+      ["lead", "lvl", "Leadership"],
+    ],
+    RES_MAX = 4;
+  function resOf(p) {
+    return (p && p.research) || {};
+  }
+  function resLvl(p, cls, k) {
+    return ((resOf(p)[cls] || {})[k]) || 0;
+  }
+  function resCost(cls, lvl) {
+    return (cls === "lead" ? 60 : 40) * (lvl + 1);
+  }
+  function collegeOf(e, pid) {
+    return e.colonies.find((c) => c.owner === pid && !c.occupied && c.buildings.some((b) => b.id === "war_college" && !b.building)) || null;
+  }
+  function study(e, pid, cls, k) {
+    return be(e, () => {
+      let p = ce(e, pid),
+        col = collegeOf(e, pid);
+      if (!col) return B("Build a War College first.");
+      let lv = resLvl(p, cls, k);
+      if (lv >= RES_MAX) return B("That is as far as it goes.");
+      let cost = resCost(cls, lv);
+      if (col.stock.gold < cost) return B(`That costs ${cost} gold; ${col.name} has ${col.stock.gold}.`);
+      col.stock.gold -= cost;
+      let R = p.research || (p.research = {});
+      (R[cls] || (R[cls] = {}))[k] = lv + 1;
+      return { ok: !0, discoveries: [], note: `${(RESEARCH.find((q) => q[0] === cls && q[1] === k) || [, , "Research"])[2]} rises to level ${lv + 1}.` };
+    });
+  }
+  // Computer nations with a college study a little each year.
+  function aiStudy(e, r) {
+    // Without a college of their own, rivals still learn slowly from home.
+    let col = collegeOf(e, r.id) || e.colonies.find((c) => c.owner === r.id && (c.level || 1) >= 2) || (e.year - $.startYear >= 30 && e.colonies.find((c) => c.owner === r.id));
+    if (!col) return;
+    let opts = RESEARCH.filter(([c, k]) => resLvl(r, c, k) < RES_MAX && !(isNatNation(r) && c === "gun")).sort((a, b) => resLvl(r, a[0], a[1]) - resLvl(r, b[0], b[1]));
+    let pick = opts[Math.floor(z(r.id, e.year, (e.seed >>> 0) + 4601) * Math.min(3, opts.length))];
+    if (!pick) return;
+    let cost = resCost(pick[0], resLvl(r, pick[0], pick[1])),
+      gain = () => (((r.research || (r.research = {}))[pick[0]] || (r.research[pick[0]] = {}))[pick[1]] = resLvl(r, pick[0], pick[1]) + 1);
+    col.stock.gold >= cost * 2 ? ((col.stock.gold -= cost), gain()) : (e.year - $.startYear) % 9 === r.id % 9 && gain();
+  }
+  // ---- Trade alliances -------------------------------------------------------------
+  // A standing deal with a friendly nation: every year one of your
+  // colonies sends a set amount of one good and receives another. A fair
+  // deal warms relations a little each year; war ends it.
+  var TRADE_VALUE = { food: 1, wood: 1.2, metal: 3, goods: 5 };
+  function proposeAlliance(e, pid, rid, colId, give, n, want, m) {
+    return be(e, () => {
+      let P = pol(e),
+        col = e.colonies.find((c) => c.id === colId && c.owner === pid),
+        theirs = e.colonies.filter((c) => c.owner === rid).sort((a, b) => (col ? Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y) : 0))[0];
+      if (!col || !theirs) return B("Pick one of your colonies; they need a colony too.");
+      if (atWar(e, pid, rid)) return B("Not while at war.");
+      if (relOf(e, pid, rid) < DIPLO[5].min) return B("Relations must be Cordial or better.");
+      if (!(n > 0 && m > 0) || give === want) return B("Choose two different goods and amounts.");
+      if ((P.alliances || []).some((q) => q.a === pid && q.b === rid)) return B("You already have a trade alliance with them.");
+      let fair = n * TRADE_VALUE[give] >= m * TRADE_VALUE[want] * 0.9;
+      if (!fair) return B(`${nationName(ce(e, rid))} turns it down: they want at least as much value as they give.`);
+      (P.alliances || (P.alliances = [])).push({ id: P.nextArmy++, a: pid, b: rid, colA: col.id, colB: theirs.id, give, n, want, m, since: e.year });
+      return { ok: !0, discoveries: [], note: `A trade alliance with ${nationName(ce(e, rid))}: ${col.name} sends ${n} ${Ne[give].toLowerCase()} each year for ${m} ${Ne[want].toLowerCase()}.` };
+    });
+  }
+  function allianceTurn(e) {
+    let P = pol(e),
+      keep = [];
+    for (let q of P.alliances || []) {
+      let A = e.colonies.find((c) => c.id === q.colA && c.owner === q.a),
+        Bc = e.colonies.find((c) => c.id === q.colB && c.owner === q.b);
+      if (!A || !Bc || atWar(e, q.a, q.b)) {
+        pushEvent(e, `The trade alliance with ${nationName(ce(e, q.b))} has ended.`);
+        continue;
+      }
+      if (A.stock[q.give] >= q.n && Bc.stock[q.want] >= q.m) (A.stock[q.give] -= q.n), (Bc.stock[q.give] += q.n), (Bc.stock[q.want] -= q.m), (A.stock[q.want] += q.m), shiftRel(e, q.a, q.b, 1);
+      keep.push(q);
+    }
+    P.alliances = keep;
+  }
+  // ---- Spies -------------------------------------------------------------------------
+  // Send a spy against a nation: espionage shows their armies' makeup and
+  // their colonies' defenders for three years; sabotage knocks a level off
+  // a building in their nearest colony. Each mission in a year costs twice
+  // the last. A spy who is caught sours relations.
+  function spyCost(p, e) {
+    let n = p.spyYear === e.year ? p.spyCount || 0 : 0;
+    return 50 * 2 ** n;
+  }
+  function sendSpy(e, pid, rid, kind) {
+    return be(e, () => {
+      let p = ce(e, pid),
+        r = ce(e, rid),
+        cost = spyCost(p, e),
+        purse = e.colonies.filter((c) => c.owner === pid && !c.occupied).sort((a, b) => b.stock.gold - a.stock.gold)[0];
+      if (!purse || purse.stock.gold < cost) return B(`A spy costs ${cost} gold this year; no colony of yours has that much.`);
+      purse.stock.gold -= cost;
+      p.spyYear === e.year ? (p.spyCount = (p.spyCount || 0) + 1) : ((p.spyYear = e.year), (p.spyCount = 1));
+      let roll = z(rid * 13 + (p.spyCount || 0), e.year, (e.seed >>> 0) + 4701),
+        ok = roll < (kind === "spy" ? 0.4 : 0.22),
+        caught = !ok && z(rid * 17 + (p.spyCount || 0), e.year, (e.seed >>> 0) + 4703) < 0.3,
+        msg;
+      if (ok && kind === "spy") (((pol(e).intel || (pol(e).intel = {}))[rid] = e.year + 3), (msg = `Your spy reports on ${nationName(r)}: for three years you will see what their armies and garrisons are made of.`));
+      else if (ok) {
+        let col = e.colonies.filter((c) => c.owner === rid).sort((a, b) => b.level - a.level)[0],
+          bs = col ? col.buildings.filter((b) => b.id !== "center" && !b.building) : [],
+          b = bs[Math.floor(z(rid, e.year, (e.seed >>> 0) + 4705) * bs.length)];
+        b ? ((b.level || 1) > 1 ? (b.level -= 1) : (col.buildings = col.buildings.filter((q) => q !== b)), (msg = `Sabotage at ${col.name}: their ${bName(b.id, col).toLowerCase()} is damaged.`)) : (msg = "Your saboteur found nothing worth wrecking.");
+      } else msg = caught ? `Your spy was caught by ${nationName(r)}. They are furious.` : "Your spy came back with nothing.";
+      caught && shiftRel(e, pid, rid, -20);
+      return { ok: !0, discoveries: [], note: msg };
+    });
+  }
+  function intelOn(e, rid) {
+    return ((pol(e).intel || {})[rid] || 0) >= e.year;
+  }
   // ---- The war of independence -------------------------------------------------
   // A European player with three colonies or more may break with the crown.
   // The crown blockades your ports (no selling in Europe) and takes no tax,
@@ -4570,8 +4714,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let m = p.mother;
     for (let c of e.colonies) c.owner === p.id && c.occupied && delete c.occupied;
     e.pendingCrown = [];
-    if (how === "won") (m.independent = !0), (m.commonwealth = !1), (p.score = (p.score || 0) + INDEP_SCORE), pushEvent(e, `Independence is won! The crown gives up its claim; your colonies are their own masters, and trade with Europe on better terms.`);
-    else if (how === "commonwealth") (m.commonwealth = !0), (m.resentment = 0), (m.favor = 10), (p.score = (p.score || 0) + COMMON_SCORE), pushEvent(e, `A commonwealth is agreed: the crown returns your colonies, and takes only a fifth of the old tax.`);
+    if (how === "won") (m.independent = !0), (m.commonwealth = !1), addScore(p, "crown", INDEP_SCORE), pushEvent(e, `Independence is won! The crown gives up its claim; your colonies are their own masters, and trade with Europe on better terms.`);
+    else if (how === "commonwealth") (m.commonwealth = !0), (m.resentment = 0), (m.favor = 10), addScore(p, "crown", COMMON_SCORE), pushEvent(e, `A commonwealth is agreed: the crown returns your colonies, and takes only a fifth of the old tax.`);
     else (m.suedPeace = !0), (m.resentment = 30), (m.favor = 0), pushEvent(e, `Peace with the crown. Your colonies are returned, the court is angry, and the tax is owed again.`);
     delete m.rebel;
   }
@@ -4585,12 +4729,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         kind = q < 0.4 ? "infantry" : q < 0.8 ? "cavalry" : "artillery";
       units.push({ id: `k${k}`, kind, str: unitStrength(kind, 3), max: unitStrength(kind, 3), name: { infantry: "Crown regulars", cavalry: "Crown dragoons", artillery: "Crown guns" }[kind] });
     }
-    return { name: "The crown's army", nat: p.nationId, leader: { name: `General of ${ee[p.nationId].name}`, attacks: 7, charisma: 2, rep: 2 }, units };
+    return { name: "The crown's army", nat: p.nationId, res: { foot: { atk: 2, def: 2 }, horse: { atk: 2, def: 2 }, gun: { atk: 2, def: 2 } }, leader: { name: `General of ${ee[p.nationId].name}`, attacks: 7, charisma: 2, rep: 2 }, units };
   }
   function crownWarTurn(e) {
     for (let p of e.players) {
       let R = rebelOf(p);
-      if (!R) continue;
+      if (!R || !p.isHuman) continue;
       let cols = e.colonies.filter((c) => c.owner === p.id && !c.occupied);
       if (!cols.length) continue;
       let chance = Math.min(0.6, cols.reduce((a, c) => a + (c.level || 1), 0) / 30);
@@ -4726,14 +4870,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (s.kind !== "ship" || s.aboard || hullOf(s) >= hullMax(s)) continue;
       e.colonies.some((c) => c.owner === s.owner && c.buildings.some((b) => b.id === "dock" && !b.building && Math.max(Math.abs(b.x - s.x), Math.abs(b.y - s.y)) <= 2)) && (s.hull = hullOf(s) + 1);
     }
-    if (!hum) return;
-    let rng = bn(((e.year * 7919) ^ (e.seed >>> 0)) >>> 0);
-    for (let r of e.units.filter((u) => u.kind === "ship" && u.owner !== hum.id)) {
-      if (!e.units.includes(r) || !atWar(e, hum.id, r.owner)) continue;
-      let prey = e.units.find((u) => u.kind === "ship" && u.owner === hum.id && Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 1);
-      if (!prey || rng() > 0.35) continue;
-      let msg = resolveSea(e, r, prey, boardStrength(e, r) > boardStrength(e, prey) * 1.3 ? "board" : "sink", rng);
-      pushEvent(e, msg, prey.x, prey.y);
+    let rng = bn(((e.year * 7919) ^ (e.seed >>> 0)) >>> 0),
+      sees = (x, y) => hum && hum.explored[C(x, y, e.map.width)] === "1";
+    for (let r of e.units.filter((u) => u.kind === "ship" && !(hum && u.owner === hum.id))) {
+      if (!e.units.includes(r) || e.units.some((q) => q.aboard === r.id && q.kind === "settler")) continue;
+      let foes = e.units.filter((u) => u.kind === "ship" && u.owner !== r.owner && atWar(e, r.owner, u.owner));
+      if (!foes.length) continue;
+      let prey = foes.find((u) => Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 1);
+      if (prey) {
+        if (rng() > 0.35) continue;
+        let msg = resolveSea(e, r, prey, boardStrength(e, r) > boardStrength(e, prey) * 1.3 ? "board" : "sink", rng);
+        (hum && prey.owner === hum.id) || sees(prey.x, prey.y) ? pushEvent(e, msg, prey.x, prey.y) : e.battleNews && e.battleNews.pop();
+        continue;
+      }
+      // hunt: a warship goes after the nearest enemy sail within reach,
+      // ships carrying men first
+      let near = foes
+        .filter((u) => Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 16)
+        .sort((a, b) => (e.units.some((q) => q.aboard === b.id) - e.units.some((q) => q.aboard === a.id)) || Math.hypot(a.x - r.x, a.y - r.y) - Math.hypot(b.x - r.x, b.y - r.y))[0];
+      near && ((r.dest = { x: near.x, y: near.y }), (r.autoExplore = !1));
     }
   }
   // Landmarks change hands: a find belongs to whoever has soldiers beside
@@ -4745,6 +4900,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (sp.foundBy == null) continue;
       let by = new Set();
       for (let u of e.units) !u.aboard && arm(u.kind) && Math.max(Math.abs(u.x - sp.x), Math.abs(u.y - sp.y)) <= 1 && by.add(u.owner);
+      for (let A of pol(e).armies) A.hold != null && Math.max(Math.abs(A.x - sp.x), Math.abs(A.y - sp.y)) <= 1 && by.add(A.owner);
       if (!by.size || by.has(sp.foundBy) || by.size > 1) continue;
       let to = [...by][0],
         was = sp.foundBy,
@@ -4752,6 +4908,42 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         name = ke[sp.kind] ? ke[sp.kind].name : "a landmark";
       sp.foundBy = to;
       hum && (to === hum.id ? pushEvent(e, `Your soldiers hold the ${name}. Its bonus now goes to your colonies nearby.`, sp.x, sp.y) : was === hum.id && pushEvent(e, `${nationName(P)} has taken the ${name} from you. Station soldiers beside it to take it back.`, sp.x, sp.y));
+    }
+  }
+  // Computer nations deal with one another as well: crowded neighbours sour
+  // and may go to war; long wars may end. A grown European colony empire
+  // may rise against its crown, and settle it in the field.
+  function rivalPairsTurn(e) {
+    let ais = e.players.filter((p) => !p.isHuman);
+    for (let a of ais)
+      for (let b of ais) {
+        if (a.id >= b.id) continue;
+        let near = e.colonies.some((c) => c.owner === a.id && e.colonies.some((d) => d.owner === b.id && Math.max(Math.abs(c.x - d.x), Math.abs(c.y - d.y)) <= 30)),
+          r = z(a.id * 31 + b.id, e.year, (e.seed >>> 0) + 4501);
+        near && shiftRel(e, a.id, b.id, -2);
+        if (!atWar(e, a.id, b.id)) relOf(e, a.id, b.id) < DIPLO[2].min && near && r < 0.12 && setRel(e, a.id, b.id, -100);
+        else europeAt(e, a, b) !== "war" && r < 0.12 && setRel(e, a.id, b.id, -30);
+      }
+    for (let p of ais) {
+      if (isNatNation(p)) continue;
+      let m = p.mother || (p.mother = { ...ir }),
+        cols = e.colonies.filter((c) => c.owner === p.id);
+      if (!m.rebel && !m.independent && !m.suedPeace && cols.length >= 4 && e.year - $.startYear >= 35 && z(p.id, e.year, (e.seed >>> 0) + 4507) < 0.04) {
+        m.rebel = { damage: 0, need: REBEL_NEED[e.difficulty] || 60, since: e.year };
+        pushEvent(e, `${nationName(p)}'s colonies have risen against their crown!`);
+      }
+      if (!m.rebel) continue;
+      // the crown's landings against a rebel computer nation are fought out
+      let cur = e.colonies.filter((c) => c.owner === p.id && !c.occupied);
+      if (cur.length && z(p.id * 7, e.year, (e.seed >>> 0) + 4509) < Math.min(0.6, cur.reduce((x, c) => x + (c.level || 1), 0) / 30)) {
+        let col = cur[Math.floor(z(p.id * 9, e.year, (e.seed >>> 0) + 4511) * cur.length)],
+          B = bAutoFinish(battleNew({ kind: "attack", att: crownForce(e, p, col), def: colonyDefence(e, col) }, (e.year * 53 + col.id) >>> 0));
+        resolveCrown(e, p, col, B, !1);
+      }
+      if (!m.rebel) continue;
+      let held = e.colonies.filter((c) => c.owner === p.id && c.occupied).length;
+      if (m.rebel.damage >= m.rebel.need * 0.6 && z(p.id * 11, e.year, (e.seed >>> 0) + 4513) < 0.3) endRebellion(e, p, "commonwealth");
+      else if (held && held * 2 >= cols.length) endRebellion(e, p, "peace");
     }
   }
   // Rivals are hungry for land: their goodwill toward you wears away each
@@ -4818,9 +5010,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let grace = { easy: 30, normal: 20, hard: 14, ruthless: 10 }[e.difficulty] || 20,
         since = e.year - $.startYear - grace,
         biggest = Math.min(12, 4 + Math.floor(Math.max(0, since) / 8));
-      if (since < 0 || !hum || !atWar(e, hum.id, r.id) || P.armies.some((a) => a.owner === r.id) || P.pool[r.id] < 4) continue;
-      let mine = e.colonies.filter((c) => c.owner === hum.id);
-      if (!mine.length || !cols.length) continue;
+      if (since < 0 || P.armies.some((a) => a.owner === r.id) || P.pool[r.id] < 4 || !cols.length) continue;
       // The column it could raise now: European crowns field about 40%
       // infantry, 40% cavalry and 20% guns; the empire half and half.
       let n = Math.min(biggest, Math.floor(P.pool[r.id])),
@@ -4832,18 +5022,48 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           kind = isNatNation(r) ? (q < 0.5 ? "infantry" : "cavalry") : q < 0.4 ? "infantry" : q < 0.8 ? "cavalry" : "artillery";
         troops.push({ kind, str: unitStrength(kind, lvl) });
       }
-      // It marches only on a colony it judges itself clearly stronger
-      // than, and picks the one it likes its chances against best. If none
-      // qualifies it keeps building up.
+      // What it might march on, best first: its own towns held by the
+      // crown, then the colonies of anyone it is at war with (you or
+      // another nation) that it judges itself clearly stronger than, then a
+      // landmark an enemy holds near its towns, then a hostile village.
       let best = null,
-        probe = { id: 0, owner: r.id, leader: { name: "probe", attacks: 3 + lvl, charisma: lvl, rep: 0 }, troops };
-      for (let c of cols)
-        for (let m of mine) {
-          let d = Math.hypot(c.x - m.x, c.y - m.y);
-          if (d > 90) continue;
-          let odds = bOdds({ kind: d > 25 ? "raid" : "attack", att: armyForce(e, probe), def: colonyDefence(e, m) }, 10).defWin,
-            score = odds + d / 400;
-          odds < 0.4 && (!best || score < best.score) && (best = { from: c, to: m, d, score });
+        probe = { id: 0, owner: r.id, leader: { name: "probe", attacks: 3 + lvl, charisma: lvl, rep: 0 }, troops },
+        consider = (from, to, score, extra) => (!best || score < best.score) && (best = { from, to, score, ...extra }),
+        nearOf = (x, y) => cols.reduce((b, c) => (!b || Math.hypot(c.x - x, c.y - y) < Math.hypot(b.x - x, b.y - y) ? c : b), null);
+      for (let m of e.colonies) {
+        let own = m.owner === r.id;
+        if (own ? !m.occupied : !atWar(e, r.id, m.owner)) continue;
+        let c = own ? nearOf(m.x, m.y) : nearOf(m.x, m.y),
+          d = Math.hypot(c.x - m.x, c.y - m.y);
+        if (d > 90 || (own && c === m)) continue;
+        let def = own ? { name: "Crown garrison", cover: { att: 3, def: 1, rout: 0.5 }, leader: { name: "Crown commander", attacks: 6, charisma: 2, rep: 1 }, units: m.occupied.units } : colonyDefence(e, m),
+          odds = bOdds({ kind: own || d <= 25 ? "attack" : "raid", att: armyForce(e, probe), def }, 10).defWin;
+        odds < 0.4 && consider(c, m, (own ? -1 : 0) + odds + d / 400, { kind: own ? "retake" : "colony" });
+      }
+      // The empire looks to the villages before the landmarks.
+      let villagesFirst = isNatNation(r);
+      if (!best && !villagesFirst)
+        for (let sp of e.map.specials || []) {
+          if (sp.foundBy == null || sp.foundBy === r.id || !(atWar(e, r.id, sp.foundBy) || z(sp.id, e.year, (e.seed >>> 0) + 4471) < 0.15)) continue;
+          let c = nearOf(sp.x, sp.y),
+            d = Math.hypot(c.x - sp.x, c.y - sp.y);
+          d <= 30 && consider(c, { x: sp.x, y: sp.y, id: sp.id }, 1 + d / 100, { kind: "landmark" });
+        }
+      if (!best && e.natives)
+        for (let v of e.natives.villages) {
+          let nt = nationOf(e, v);
+          if (v.fed === r.id || !nt || (nt.att[r.id] || 0) > (isNatNation(r) ? 0 : -30)) continue;
+          let c = nearOf(v.x, v.y),
+            d = Math.hypot(c.x - v.x, c.y - v.y);
+          if (d > (isNatNation(r) ? 70 : 30)) continue;
+          bOdds({ kind: "attack", att: armyForce(e, probe), def: villageForce(e, v, !1) }, 8).defWin < 0.4 && consider(c, { x: v.x, y: v.y, id: v.id }, 2 + d / 100, { kind: "village" });
+        }
+      if (!best && villagesFirst)
+        for (let sp of e.map.specials || []) {
+          if (sp.foundBy == null || sp.foundBy === r.id || !atWar(e, r.id, sp.foundBy)) continue;
+          let c = nearOf(sp.x, sp.y),
+            d = Math.hypot(c.x - sp.x, c.y - sp.y);
+          d <= 30 && consider(c, { x: sp.x, y: sp.y, id: sp.id }, 1 + d / 100, { kind: "landmark" });
         }
       if (!best) continue;
       let path = landPath(e, best.from, best.to);
@@ -4852,31 +5072,103 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let names = (ee[r.nationId] || {}).leaders || ["Captain"],
         L = { name: names[(r.nextLeader || 1) % names.length], lvl: Math.min(4, lvl), attacks: 3 + lvl, charisma: lvl, cmd: 12, rep: 0 };
       r.nextLeader = (r.nextLeader || 1) + 1;
-      P.armies.push({ id: P.nextArmy++, owner: r.id, leader: L, troops, x: best.from.x, y: best.from.y, from: best.from.id, path, step: 0, target: best.to.id, seen: !1 });
+      P.armies.push({ id: P.nextArmy++, owner: r.id, leader: L, troops, x: best.from.x, y: best.from.y, from: best.from.id, path, step: 0, target: best.kind === "colony" || best.kind === "retake" ? best.to.id : null, aim: best.kind, aimId: best.to.id, seen: !1 });
     }
     // Columns on the march.
-    let still = [];
+    let still = [],
+      sees = (x, y) => hum && hum.explored[C(x, y, e.map.width)] === "1",
+      home = (A) => (P.pool[A.owner] = (P.pool[A.owner] || 0) + A.troops.length * 0.7);
     for (let A of P.armies) {
-      let owner = e.players.find((p) => p.id === A.owner),
-        col = e.colonies.find((c) => c.id === A.target);
-      if (!owner || !col || col.owner === A.owner) continue;
-      if (hum && col.owner === hum.id && !atWar(e, hum.id, owner.id)) {
-        pushEvent(e, `Peace holds: the ${nationAdj(owner)} column under ${A.leader.name} turns back.`, A.x, A.y);
-        P.pool[owner.id] = (P.pool[owner.id] || 0) + A.troops.length * 0.7;
+      let owner = e.players.find((p) => p.id === A.owner);
+      if (!owner) continue;
+      let aim = A.aim || "colony";
+      // A picket holding a landmark stays until the year is out.
+      if (aim === "landmark" && A.hold != null) {
+        let sp = (e.map.specials || []).find((q) => q.id === A.aimId);
+        if (!sp || --A.hold <= 0) {
+          home(A);
+          continue;
+        }
+        still.push(A);
+        continue;
+      }
+      let col = aim === "colony" || aim === "retake" ? e.colonies.find((c) => c.id === A.target) : null,
+        goal = col || (aim === "landmark" ? (e.map.specials || []).find((q) => q.id === A.aimId) : aim === "village" && e.natives ? e.natives.villages.find((q) => q.id === A.aimId) : null);
+      if (!goal) {
+        home(A);
+        continue;
+      }
+      if (aim === "colony" && (col.owner === A.owner || !atWar(e, A.owner, col.owner))) {
+        hum && col.owner === hum.id && pushEvent(e, `Peace holds: the ${nationAdj(owner)} column under ${A.leader.name} turns back.`, A.x, A.y);
+        home(A);
+        continue;
+      }
+      if (aim === "retake" && (col.owner !== A.owner || !col.occupied)) {
+        home(A);
         continue;
       }
       A.step = Math.min(A.path.length - 1, A.step + ARMY_SPEED);
       [A.x, A.y] = A.path[A.step];
-      let near = Math.max(Math.abs(A.x - col.x), Math.abs(A.y - col.y)) <= 1;
-      if (hum && col.owner === hum.id) {
-        let w = e.map.width,
-          visible = (e.colonies.some((c) => c.owner === hum.id && Math.max(Math.abs(c.x - A.x), Math.abs(c.y - A.y)) <= 10) || e.units.some((u) => u.owner === hum.id && !u.aboard && Math.max(Math.abs(u.x - A.x), Math.abs(u.y - A.y)) <= 4));
+      let near = Math.max(Math.abs(A.x - goal.x), Math.abs(A.y - goal.y)) <= 1;
+      if (aim === "colony" && hum && col.owner === hum.id) {
+        let visible = e.colonies.some((c) => c.owner === hum.id && Math.max(Math.abs(c.x - A.x), Math.abs(c.y - A.y)) <= 10) || e.units.some((u) => u.owner === hum.id && !u.aboard && Math.max(Math.abs(u.x - A.x), Math.abs(u.y - A.y)) <= 4);
         visible && !P.met[owner.id] && (P.met[owner.id] = e.year);
         visible && !A.seen && ((A.seen = !0), pushEvent(e, `A ${nationAdj(owner)} army under ${A.leader.name}, about ${A.troops.length} men, is marching on ${col.name}.`, A.x, A.y));
         if (near) {
           (e.pendingArmies || (e.pendingArmies = [])).push(A.id);
           pushEvent(e, `The ${nationAdj(owner)} army under ${A.leader.name} has reached ${col.name}!`, col.x, col.y);
         }
+        still.push(A);
+        continue;
+      }
+      if (!near) {
+        still.push(A);
+        continue;
+      }
+      // Fights between computer nations, or with villages, are settled at once.
+      let seed = (e.year * 977 + A.id * 31) >>> 0,
+        auto = (spec) => bAutoFinish(battleNew(spec, seed));
+      if (aim === "colony") {
+        let mode = armyPlan(e, A, col),
+          B = auto({ kind: mode === "raid" ? "raid" : "attack", att: armyForce(e, A), def: colonyDefence(e, col) }),
+          msg = resolveArmyAttack(e, A, col, mode, B, !1);
+        sees(col.x, col.y) && pushEvent(e, msg, col.x, col.y);
+        continue;
+      }
+      if (aim === "retake") {
+        let B = auto({ kind: "attack", att: armyForce(e, A), def: { name: "Crown garrison", cover: { att: 3, def: 1, rout: 0.5 }, leader: { name: "Crown commander", attacks: 6, charisma: 2, rep: 1 }, units: col.occupied.units } }),
+          won = B.over.winner === "att",
+          R2 = rebelOf(owner);
+        R2 && (R2.damage += B.sides.att.dealt || 0);
+        won ? delete col.occupied : (col.occupied.units = B.sides.def.units.filter((u) => u.str > 0).map((u) => ({ id: u.id, kind: u.kind, str: u.str, max: u.max, name: u.name })));
+        sees(col.x, col.y) && pushEvent(e, `${nationName(owner)} ${won ? "retook" : "failed to retake"} ${col.name} from its crown.`, col.x, col.y);
+        R2 && R2.damage >= R2.need && endRebellion(e, owner, "won");
+        home(A);
+        continue;
+      }
+      if (aim === "landmark") {
+        // A picket stands beside the landmark for some years.
+        (A.hold = 6), still.push(A);
+        continue;
+      }
+      if (aim === "village") {
+        let v = goal,
+          nt = nationOf(e, v),
+          B = auto({ kind: "attack", att: armyForce(e, A), def: villageForce(e, v, !1) }),
+          won = B.over.winner === "att";
+        nt && (nt.att[owner.id] = Math.min(nt.att[owner.id] || 0, -60));
+        v.warriors = Math.max(1, v.warriors - B.sides.def.units.filter((u) => u.str <= 0).length);
+        if (won) {
+          if (isNatNation(owner)) federate(e, owner.id, v, !0);
+          else {
+            natives(e).villages = natives(e).villages.filter((q) => q !== v);
+            let c = e.colonies.find((q) => q.id === A.from);
+            c && (c.stock.gold += v.gold || 0);
+          }
+        }
+        sees(v.x, v.y) && pushEvent(e, `${nationName(owner)} ${won ? (isNatNation(owner) ? "brought" : "burned") : "attacked"} ${v.name}${won && isNatNation(owner) ? " into its federation by force" : won ? "" : " and was driven off"}.`, v.x, v.y);
+        home(A);
+        continue;
       }
       still.push(A);
     }
@@ -4888,6 +5180,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return {
       name: `${nationAdj(owner)} army`.replace(/^./, (c) => c.toUpperCase()),
       nat: owner && owner.nationId,
+      res: resOf(owner),
       leader: A.leader,
       hidden: !!hidden,
       units: A.troops.map((q, k) => ({ id: `x${A.id}-${k}`, kind: q.kind, str: q.str, max: q.str, name: UNIT_KINDS[q.kind].name })),
@@ -4914,6 +5207,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       won = B.over.winner === "att",
       tl = battleTally(B),
       before = col.name,
+      whose = whoseColony(e, col),
+      hum = e.players.find((p) => p.isHuman),
+      mine = hum && col.owner === hum.id,
+      known = mine || (hum && hum.explored[C(col.x, col.y, e.map.width)] === "1"),
       out = "";
     applyLosses(e, col.owner, B, "def"), allyLosses(e, B, "def", col.owner);
     let up = leaderWon(e, DL, !won, B, "def"),
@@ -4935,12 +5232,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let left = B.sides.att.units.filter((u) => u.str > 0).length;
     P.pool[owner.id] = (P.pool[owner.id] || 0) + left * 0.8;
     P.armies = P.armies.filter((q) => q !== A);
-    battleNews(
-      e,
-      `${mode === "capture" ? "Assault" : "Raid"} on ${before}`,
-      `A ${nationAdj(owner)} army under ${A.leader.name} ${mode === "capture" ? "stormed" : "raided"} our colony of ${before}, held by ${bLabel(def.units)}${def.leader ? ` under ${def.leader.name}` : ""}. The fight lasted ${tl.rounds} round${tl.rounds === 1 ? "" : "s"}. ${out} They lost ${tl.attLost}; we lost ${tl.defLost}.`,
-      !!fresh,
-    );
+    known &&
+      battleNews(
+        e,
+        `${mode === "capture" ? "Assault" : "Raid"} on ${before}`,
+        `A ${nationAdj(owner)} army under ${A.leader.name} ${mode === "capture" ? "stormed" : "raided"} ${whose}, held by ${bLabel(def.units)}${def.leader ? ` under ${def.leader.name}` : ""}. The fight lasted ${tl.rounds} round${tl.rounds === 1 ? "" : "s"}. ${out} ${mine ? `They lost ${tl.attLost}; we lost ${tl.defLost}.` : `The attackers lost ${tl.attLost}; the defenders lost ${tl.defLost}.`}`,
+        !!fresh,
+      );
     return out + (up ? " " + up : "");
   }
   // You attack a rival army in the field.
@@ -5073,7 +5371,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nm = names[(p.nextLeader || 1) % names.length];
     p.nextLeader = (p.nextLeader || 1) + 1;
     let u = Le(e, p, "leader", col.x, col.y, nm);
-    freshLeader(u, lvl), (u.mp = 0), p.nationId === "spain" && (u.pts += 2);
+    freshLeader(u, lvl), (u.mp = 0), p.nationId === "spain" && (u.pts += 2), (u.pts += 2 * resLvl(p, "lead", "lvl"));
     return { ok: !0, note: `${nm} takes command at ${col.name}: ${u.attacks} actions a battle turn, charisma ${u.charisma}, organization ${u.cmd} men, movement +${u.move}.` };
   }
   // ---- The end of the game ----
@@ -5444,6 +5742,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       r.has(s) || (r.add(s), e.glimpsed.push(s));
     }
   }
+  // Score is kept by source, for the breakdown.
+  var SCORE_KINDS = { explore: "Exploring", colonies: "Colonies", finds: "Finds and wonders", battles: "Battles", federation: "Federation", crown: "Independence" };
+  function addScore(p, kind, n) {
+    if (!p || !n) return;
+    (p.score = (p.score || 0) + n), ((p.scoreBy || (p.scoreBy = {}))[kind] = (p.scoreBy[kind] || 0) + n);
+  }
   function Hs(e) {
     let n = e.map.width * e.map.height;
     (!e.map.firstClaim || e.map.firstClaim.length !== n) &&
@@ -5461,7 +5765,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           a.id === "center" || a.building === "new" || (o += a.level || 1);
       }
       let i = n.mark;
-      (n.score = (n.score || 0) + o),
+      addScore(n, "colonies", o),
         (n.gain = i == null ? 0 : n.score - i),
         (n.mark = n.score);
     }
@@ -6719,6 +7023,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         nextColony: n.nextColony,
         mother: n.mother,
         score: n.score || 0,
+        research: JSON.parse(JSON.stringify(n.research || {})),
+        scoreBy: { ...(n.scoreBy || {}) },
+        spyYear: n.spyYear,
+        spyCount: n.spyCount,
       })),
       firstClaim: e.map.firstClaim || "",
       charts: {
@@ -6754,7 +7062,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (i.nextLeader = r.nextLeader),
         (i.nextColony = r.nextColony),
         (i.mother = r.mother),
-        typeof r.score === "number" && (i.score = r.score);
+        typeof r.score === "number" && (i.score = r.score),
+        r.research && (i.research = r.research),
+        r.scoreBy && (i.scoreBy = r.scoreBy),
+        (i.spyYear = r.spyYear),
+        (i.spyCount = r.spyCount);
     }
     co(e.map.rivers, o.charts.rivers),
       co(e.map.peaks, o.charts.peaks),
@@ -7053,9 +7365,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           })());
       // What rivals do at home is not news to you; the dispatch covers them.
       let quiet = e.log.length;
-      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), rivalFederate(e, r), (e.log.length = quiet);
+      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), rivalFederate(e, r), aiStudy(e, r), (e.log.length = quiet);
     }
-    holdTurn(e), seaTurn(e), crownWarTurn(e), meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
+    holdTurn(e), seaTurn(e), crownWarTurn(e), rivalPairsTurn(e), allianceTurn(e), meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
     crownTurn(e);
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
@@ -12131,6 +12443,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <button type="button" id="cols-btn" class="ghost" title="Your colonies">Colonies</button>
         <button type="button" id="diplo" class="ghost" title="Relations with the other nations and the crown">Diplomacy</button>
         <button type="button" id="year-sum" class="ghost" title="What happened this year">This year</button>
+        <button type="button" id="score-btn" class="ghost" title="Standings and where the points come from">Score</button>
         <button type="button" id="end" class="primary">End turn</button>
         <button type="button" id="save" class="ghost">Save</button>
         <button type="button" id="help" class="ghost">Keys</button>
@@ -14281,7 +14594,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let F = myForce(u);
       if (!F.troops.length) return noTroops("an army");
       let ow = t.players.find((q) => q.id === A.owner),
-        def = armyForce(t, A, !0);
+        def = armyForce(t, A, !intelOn(t, A.owner));
       preBattle({ kind: "attack", title: `Attack on the ${nationAdj(ow)} army under ${A.leader.name}`, att: F.att, def, scene: sceneAt(t, A.x, A.y), warn: warWarn(A.owner) }, "att", (B) =>
         afterAttack(F, resolveArmyBattle(t, F.me_, A, B, F.lead && F.lead.id)),
       );
@@ -14314,6 +14627,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           localStorage.setItem("reconquest-hints", "off");
         } catch (err) {}
         close();
+      };
+    }
+    function allianceForm(rid) {
+      let me = V(t),
+        mine = t.colonies.filter((c) => c.owner === me.id && !c.occupied),
+        goods = Object.keys(TRADE_VALUE),
+        opt = (sel) => goods.map((k) => `<option value="${k}" ${k === sel ? "selected" : ""}>${Ne[k]}</option>`).join("");
+      a.innerHTML = `
+      <div class="card">
+        <p class="find-kicker">Trade alliance</p>
+        <h2>A standing deal with ${G(nationName(ce(t, rid)))}</h2>
+        <p class="muted">Every year your colony sends one good and receives another from their nearest colony. They accept a deal worth at least as much to them as to you: goods are worth most, then metal, wood and crops.</p>
+        <div class="transfer"><label class="pick">From <select id="al-col">${mine.map((c) => `<option value="${c.id}">${G(c.name)}</option>`).join("")}</select></label></div>
+        <div class="transfer"><label class="pick">Send <input id="al-n" type="number" min="1" value="10"> <select id="al-give">${opt("wood")}</select></label></div>
+        <div class="transfer"><label class="pick">For <input id="al-m" type="number" min="1" value="3"> <select id="al-want">${opt("metal")}</select></label></div>
+        <div class="row"><button type="button" id="al-go" class="primary">Propose</button><button type="button" id="al-back">Back</button></div>
+      </div>`;
+      a.querySelector("#al-back").onclick = () => diploScreen();
+      a.querySelector("#al-go").onclick = () => {
+        let res = proposeAlliance(t, me.id, rid, +a.querySelector("#al-col").value, a.querySelector("#al-give").value, Math.floor(+a.querySelector("#al-n").value), a.querySelector("#al-want").value, Math.floor(+a.querySelector("#al-m").value));
+        x(res), res.ok && t.log.push(res.note), diploScreen(res.ok ? res.note : res.error);
       };
     }
     function crownPrompt(q) {
@@ -14374,7 +14708,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             met
               ? `<div class="row">${war ? `<button type="button" data-act="peace" data-r="${r.id}">Offer peace</button>` : `<button type="button" data-act="war" data-r="${r.id}">Declare war</button>`}
             <button type="button" data-act="gift" data-r="${r.id}">Give 20 gold</button>
-            <button type="button" data-act="demand" data-r="${r.id}">Demand tribute</button></div>`
+            <button type="button" data-act="demand" data-r="${r.id}">Demand tribute</button></div>
+            <div class="row">${!war && v >= DIPLO[5].min && t.colonies.some((c) => c.owner === me.id) && t.colonies.some((c) => c.owner === r.id) ? `<button type="button" data-ally="${r.id}">Trade alliance</button>` : ""}
+            <button type="button" data-spy="${r.id}:spy">Send a spy (${spyCost(me, t)} gold)</button>
+            <button type="button" data-spy="${r.id}:sabotage">Sabotage (${spyCost(me, t)} gold)</button></div>
+            ${(P.alliances || []).filter((q) => q.a === me.id && q.b === r.id).map((q) => `<p class="muted">Trade alliance: ${G((t.colonies.find((c) => c.id === q.colA) || {}).name || "")} sends ${q.n} ${Ne[q.give].toLowerCase()} a year for ${q.m} ${Ne[q.want].toLowerCase()}. <button type="button" class="find-link inline" data-unally="${q.id}">End it</button></p>`).join("")}
+            ${intelOn(t, r.id) ? `<p class="muted">Your spies report on their armies and garrisons until ${(P.intel || {})[r.id]}.</p>` : ""}`
               : ""
           }
         </section>`;
@@ -14411,6 +14750,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }),
       );
       a.querySelector("#diplo-close").onclick = () => ((p = !1), (a.hidden = !0), R());
+      a.querySelectorAll("[data-spy]").forEach((el) => {
+        el.onclick = () => {
+          let [rid, kind] = el.dataset.spy.split(":"),
+            res = sendSpy(t, me.id, +rid, kind);
+          x(res), res.ok && t.log.push(res.note), diploScreen(res.ok ? res.note : res.error);
+        };
+      });
+      a.querySelectorAll("[data-unally]").forEach((el) => {
+        el.onclick = () => ((P.alliances = (P.alliances || []).filter((q) => q.id !== +el.dataset.unally)), diploScreen("The trade alliance is ended."));
+      });
+      a.querySelectorAll("[data-ally]").forEach((el) => {
+        el.onclick = () => allianceForm(+el.dataset.ally);
+      });
       let ci = a.querySelector("#crown-indep");
       ci && (ci.onclick = () => { let r2 = declareIndependence(t, me.id); x(r2), diploScreen(r2.ok ? r2.note : r2.error); });
       let cc = a.querySelector("#crown-common");
@@ -14489,6 +14841,35 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a.querySelector("#sum-close").onclick = () => (close(), R());
     }
     // The game is decided.
+    function researchPanel(f) {
+      let me = V(t);
+      return `<h3 class="side-sub">Research</h3><table class="lead-stats">${RESEARCH.filter(([c]) => !(f.big && c === "gun"))
+        .map(([c, k, label]) => {
+          let lv = resLvl(me, c, k),
+            cost = resCost(c, lv);
+          return `<tr><th>${label}</th><td class="num">${lv} / ${RES_MAX}</td><td>${lv < RES_MAX ? `<button type="button" class="train" data-study="${c}:${k}" ${f.stock.gold >= cost ? "" : "disabled"}>+1 \u00b7 ${cost} gold</button>` : ""}</td></tr>`;
+        })
+        .join("")}</table><p class="muted">Paid from this colony's gold. Attack makes that arm hit more often; defence makes it harder to hit; leadership gives new leaders two more points each level. Militia use your research too.</p>`;
+    }
+    // The standings, broken down by where each nation's points came from.
+    function scoreCard() {
+      let me = V(t),
+        P = pol(t),
+        list = t.players.filter((q) => q === me || P.met[q.id]).sort((a2, b2) => (b2.score || 0) - (a2.score || 0)),
+        kinds = Object.keys(SCORE_KINDS);
+      p = !0;
+      (a.hidden = !1),
+        (a.innerHTML = `
+      <div class="card score-card">
+        <p class="find-kicker">Standings</p>
+        <h2>Where the points come from</h2>
+        <table class="stock"><tr><th></th>${kinds.map((k) => `<th class="num">${SCORE_KINDS[k]}</th>`).join("")}<th class="num">Total</th></tr>
+        ${list.map((q) => `<tr><td>${q === me ? "<b>You</b>" : G(nationName(q))}</td>${kinds.map((k) => `<td class="num">${Es(((q.scoreBy || {})[k]) || 0)}</td>`).join("")}<td class="num"><b>${Es(q.score || 0)}</b></td></tr>`).join("")}</table>
+        <p class="muted">Only nations you have met are shown. The best score when the years run out wins: ${Math.max(0, P.length - (t.year - $.startYear))} years remain.</p>
+        <div class="row"><button type="button" id="score-close" class="primary">Close</button></div>
+      </div>`);
+      a.querySelector("#score-close").onclick = () => ((p = !1), (a.hidden = !0), R());
+    }
     function endScreen(over) {
       let win = t.players.find((q) => q.id === over.winner),
         me = V(t),
@@ -14500,7 +14881,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p class="find-kicker">${over.year}</p>
         <h2>${win === me ? "Victory" : `${G(nationName(win))} wins`}</h2>
         <p>${over.why === "score" ? `${G(win === me ? "You" : nationName(win))} reached ${pol(t).target.toLocaleString()} points first.` : `The ${pol(t).length} years are over, and ${G(win === me ? "yours is" : nationName(win) + "'s is")} the best score.`}</p>
-        <ol>${list.map((q) => `<li>${G(q === me ? `You, ${nationName(q)}` : nationName(q))}: ${Es(q.score || 0)}</li>`).join("")}</ol>
+        <table class="stock"><tr><th></th>${Object.keys(SCORE_KINDS).map((k) => `<th class="num">${SCORE_KINDS[k]}</th>`).join("")}<th class="num">Total</th></tr>${list.map((q) => `<tr><td>${G(q === me ? `You, ${nationName(q)}` : nationName(q))}</td>${Object.keys(SCORE_KINDS).map((k) => `<td class="num">${Es(((q.scoreBy || {})[k]) || 0)}</td>`).join("")}<td class="num"><b>${Es(q.score || 0)}</b></td></tr>`).join("")}</table>
         <div class="row"><button type="button" id="end-on" class="primary">Keep playing</button></div>
       </div>`);
       a.querySelector("#end-on").onclick = () => ((over.seen = !0), (p = !1), (a.hidden = !0), R());
@@ -14517,7 +14898,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         me_,
         lead,
         troops,
-        att: { name: "Your force", nat: V(t).nationId, leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
+        att: { name: "Your force", nat: V(t).nationId, res: resOf(V(t)), leader: L, units: troops.map((q) => ({ id: q.id, kind: q.kind, str: q.strength || 3, max: q.maxStr || q.strength || 3, name: q.name })) },
       };
     }
     // Ask what the attack is for before the battle is shown.
@@ -14684,6 +15065,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           <p class="muted">${G(E.produces)}. Needs ${E.workers * (U.level || 1)} workers.</p>
           ${Ht(t, f, U)}
           ${qa(t, f, U)}
+          ${U.id === "war_college" && !U.building ? researchPanel(f) : ""}
           ${U.building ? "<p>Under construction. Ready next turn.</p>" : (U.level || 1) >= 4 ? '<p class="muted">At the top level.</p>' : `<button type="button" id="up-building" ${Me(f.stock, nn) ? "" : "disabled"}>Raise to level ${$e}<small>${qe(nn)}</small></button>`}
           <button type="button" id="tear-down" class="${tearArm === `${U.x},${U.y}` ? "danger" : ""}">${tearArm === `${U.x},${U.y}` ? "Click again to tear it down. Nothing is refunded." : U.building ? "Abandon construction" : "Tear down"}</button>
         </div>`;
@@ -14964,6 +15346,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         R();
     }
     (e.querySelector("#next-unit").onclick = () => nextUnit()),
+    (e.querySelector("#score-btn").onclick = () => t && scoreCard()),
+    // Research buttons in the War College card.
+    s.addEventListener("click", (ev) => {
+      let b2 = ev.target.closest && ev.target.closest("[data-study]");
+      if (!b2 || !t) return;
+      let [c, k] = b2.dataset.study.split(":"),
+        res = study(t, V(t).id, c, k);
+      x(res), res.ok && res.note && ((h = res.note), t.log.push(res.note)), R();
+    }),
     (e.querySelector("#cols-btn").onclick = () => t && ((listCols = !listCols), (l = null), (pin = null), y && ((y = null), (T = null), (S = null)), R())),
     s.addEventListener("click", (ev) => {
       ev.target && ev.target.id === "card-x" && (y ? Kn() : ((l = null), (pin = null), (listCols = !1), (h = ""), R()));
