@@ -910,7 +910,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   var NAT_AIM = { england: { gun: 2 }, france: { horse: 2 }, spain: { foot: 2 }, ixtal: { horse: 2 } },
     NAT_PERKS = {
       spain: "Explorers travel farther, infantry shoot straighter, and every leader you commission starts with 2 points to spend.",
-      portugal: "Every unit, ships included, travels farther each turn.",
+      portugal: "Every unit, ships included, travels farther each turn, and every dock is a trading post that brings in goods and gold each year.",
       england: "Ships sail farther, and artillery shoots straighter.",
       france: "The native nations start friendlier toward you and stay that way, and dragoons shoot straighter.",
       netherlands: "Colony gold earns 5% interest every year.",
@@ -1574,6 +1574,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let o = (ae[e] && ae[e].cost) || {};
     return Object.fromEntries(Object.entries(o).map(([r, i]) => [r, i * n]));
   }
+  // Every building a colony already has makes the next one, or the next
+  // level, a little dearer, so a colony has to choose what it builds.
+  function colCost(c, id, lvl = 1, up) {
+    let base = ge(id, lvl);
+    if (id === "center" || !c) return base;
+    let k = c.buildings.filter((b) => b.id !== "center").length - (up ? 1 : 0),
+      m = Math.pow(1.05, Math.max(0, k));
+    return Object.fromEntries(Object.entries(base).map(([r, v]) => [r, Math.ceil(v * m)]));
+  }
+  // What a colony's storehouses hold. Food also keeps a few years' eating.
+  function storeCap(c, r) {
+    if (r === "gold") return 1 / 0;
+    let n = 100 + 150 * (c.level || 1) + (c.big ? 300 : 0);
+    return r === "food" ? n + Math.ceil((c.population || 0) / we.eatPer) * 3 : n;
+  }
   function Me(e, n) {
     return Object.entries(n).every(([o, r]) => (e[o] || 0) >= r);
   }
@@ -1607,8 +1622,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return n;
   }
   function yn(e, n) {
+    // Workers go to the fields first, so a colony with too many shops
+    // still feeds itself.
     let o = Wr(n),
-      r = o ? Math.min(1, (n.population || 0) / o) : 1,
+      fj = 0;
+    for (let c of n.buildings)
+      gn(c) && c.id === "farm" && (fj += ((ae.farm && ae.farm.workers) || 0) * (c.level || 1));
+    let pop = n.population || 0,
+      r = o ? Math.min(1, pop / o) : 1,
+      rf = fj ? Math.min(1, pop / fj) : 1,
+      ro = o > fj ? Math.min(1, Math.max(0, pop - fj) / (o - fj)) : 1,
       i = eo(),
       s = eo();
     for (let c of n.buildings) {
@@ -1619,8 +1642,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         m = rn(e, c.id, c.x, c.y, n.owner).total,
         gm = n.big && c.id === "gold_mine",
         y = Math.max(0, 1 + ((gm ? Math.max(-90, p) : p) + m) / 100) * (gm ? 1.5 : 1);
-      for (let [S, M] of Object.entries(h)) i[S] += M * (c.level || 1) * y * r;
+      let st = c.id === "farm" ? rf : ro;
+      for (let [S, M] of Object.entries(h)) i[S] += M * (c.level || 1) * y * st;
     }
+    // Portuguese docks are trading posts: each level brings in goods and gold.
+    if ((ce(e, n.owner) || {}).nationId === "portugal")
+      for (let c of n.buildings)
+        gn(c) && c.id === "dock" && ((i.goods += (c.level || 1) * ro), (i.gold += (c.level || 1) * ro));
     for (let c of Object.keys(i)) i[c] = Math.floor(i[c]);
     let a = 0;
     for (let c of n.buildings)
@@ -1848,7 +1876,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return o;
   }
   function Oo(e, n) {
-    let o = [];
+    let o = [],
+      full = [];
     for (let r of e.colonies) {
       if (r.owner !== n || r.occupied) continue;
       no(r);
@@ -1874,6 +1903,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
       let i = yn(e, r);
       for (let s of Ce) r.stock[s] = Math.max(0, r.stock[s] + i.net[s]);
+      // Whatever the storehouses cannot hold goes to waste.
+      let lost = 0;
+      for (let s of Ce) {
+        let cap = storeCap(r, s);
+        r.stock[s] > cap && ((lost += r.stock[s] - cap), (r.stock[s] = cap));
+      }
+      lost && full.push(r.name);
       if (
         ((r.lastTurn = { made: i.made, used: i.used, net: i.net }),
         i.net.food < 0 && r.stock.food === 0)
@@ -1894,6 +1930,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       r.housing = i.housing;
     }
+    full.length && o.push(`The storehouses are full in ${full.join(", ")}; the surplus went to waste. Build, trade or ship it to another colony.`);
     return o;
   }
   function no(e) {
@@ -2773,7 +2810,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (s.building) return B("That building is already under construction.");
     if ((s.level || 1) >= 4) return B("That building is at the top level.");
     let a = ae[s.id].name.toLowerCase(),
-      t = ge(s.id, (s.level || 1) + 1);
+      t = colCost(i, s.id, (s.level || 1) + 1, 1);
     return Me(i.stock, t)
       ? (_n(i.stock, t),
         (s.building = "upgrade"),
@@ -2790,7 +2827,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!s.ok) return s;
     let a = Gn(e, n),
       t = ye(o);
-    _n(a.stock, ge(o)),
+    _n(a.stock, colCost(a, o)),
       a.buildings.push({
         id: o,
         level: 1,
@@ -2817,7 +2854,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (!s) return B("No such colony.");
     // Rival governors build in their own colonies; you can only build in yours.
     let own = ce(e, s.owner);
-    if (s.owner !== V(e).id && (!own || own.isHuman)) return B("That is not your colony.");
+    let me0 = V(e);
+    if (me0 && s.owner !== me0.id && (!own || own.isHuman)) return B("That is not your colony.");
     if (o === "center") return B("The city is already standing.");
     let a = ye(o);
     if (!a) return B("Unknown building.");
@@ -2844,7 +2882,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         } else if (!Ho(h.terrain))
           return B("Build on plains, forest, or hills.");
       }
-    let t = ge(o);
+    let t = colCost(s, o);
     return Me(s.stock, t)
       ? { ok: !0, discoveries: [] }
       : B(
@@ -2889,13 +2927,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return a;
   }
   function ln(e, n, o) {
-    for (let r of e.colonies)
+    for (let r of e.colonies) {
+      // Buildings sit within a colony's reach, so skip far colonies.
+      if (Math.max(Math.abs(n - r.x), Math.abs(o - r.y)) > (reachOf(r) || 1) + 2) continue;
       for (let i of r.buildings) {
         let s = i.w || 1,
           a = i.h || 1;
         if (n >= i.x && n < i.x + s && o >= i.y && o < i.y + a)
           return { colony: r, building: i };
       }
+    }
     return null;
   }
   function si(e) {
@@ -2962,8 +3003,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     (e.year += $.yearsPerTurn), (e.season = 0), Dn(e);
     for (let r of e.players) ze(e, r.id);
     e.undo = [];
-    let n = V(e),
-      o = ee[n.nationId];
+    let n = V(e);
+    if (!n) return { ok: !0 };
+    let o = ee[n.nationId];
     return (
       e.log.push(`${e.year}. ${je(o, e.year)} reigns in ${o.name}.`), { ok: !0 }
     );
@@ -3048,7 +3090,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (cur.charCodeAt(idx) !== 49 || (prev && prev.length === cur.length && prev.charCodeAt(idx) === 49) || Ni[idx] !== ".") continue;
         let terr = e.map.tiles[idx].terrain;
         if (terr === "ocean" || terr === "coast") continue;
-        chars || (chars = Ni.split("")), (chars[idx] = String.fromCharCode(65 + n)), (gained += 20);
+        chars || (chars = Ni.split("")), (chars[idx] = String.fromCharCode(65 + n)), (gained += 10);
       }
     claimMemo.set(o, cur);
     gained && ((e.map.firstClaim = chars.join("")), addScore(o, "explore", gained)), li(e, n);
@@ -3191,15 +3233,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       !!t &&
       Ho(t.terrain) &&
       !ln(e, s.x, s.y) &&
-      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < $.colonySpacing)
+      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < $.colonySpacing) &&
+      !natives(e).villages.some((v) => Math.max(Math.abs(v.x - s.x), Math.abs(v.y - s.y)) <= 3)
     );
   }
-  function rivalSite(e, n, cx, cy, coastal, avoid) {
+  function rivalSite(e, n, cx, cy, coastal, avoid, wide) {
     let p = ce(e, n),
       { width: w, height: h, tiles } = e.map,
       best = null,
       bs = -1 / 0,
-      R = 40;
+      R = wide ? 90 : 40;
     for (let y = Math.max(1, cy - R); y <= Math.min(h - 2, cy + R); y++)
       for (let x = Math.max(1, cx - R); x <= Math.min(w - 2, cx + R); x++) {
         if (p.explored[y * w + x] !== "1") continue;
@@ -3228,9 +3271,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     f.ok && f.colony && (f.colony.governor = "balanced");
     return f.ok;
   }
+  // Rivals grow by sending settlers out from their biggest colony, one
+  // band at a time, until they hold a fair spread of land.
+  function rivalTrain(e, n) {
+    let mine = e.colonies.filter((c) => c.owner === n && !c.occupied),
+      cap = Math.min(7, 2 + Math.floor(mine.reduce((a, c) => a + c.population, 0) / 600));
+    if (!mine.length || mine.length >= cap) return;
+    if (e.units.some((u) => u.owner === n && u.kind === "settler")) return;
+    if (mine.some((c) => c.buildings.some((b) => b.recruit && b.recruit.kind === "settler"))) return;
+    for (let c of mine.sort((a, b) => b.population - a.population)) {
+      let h = c.buildings.filter((b) => b.id === "house" && !b.building && !b.recruit).sort((a, b) => (b.level || 1) - (a.level || 1))[0];
+      if (!h) continue;
+      for (let lv = Math.min(2, h.level || 1); lv >= 1; lv--) {
+        let need = rc("settler", lv, c.big);
+        if (!need || c.population < need.people + 30) continue;
+        if (Ja(e, c.id, h.x, h.y, "settler", lv).ok) return;
+      }
+    }
+  }
   function rivalMoves(e, n) {
     let p = ce(e, n);
     if (!p || p.isHuman) return;
+    rivalTrain(e, n);
     let { width: w, height: h } = e.map;
     for (let u of e.units)
       u.owner === n &&
@@ -3285,14 +3347,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s && (L.dest = { x: s.site ? s.site.x : s.x, y: s.site ? s.site.y : s.y });
     }
     for (let q of walkers) {
+      // A settler that has not moved for a few years gives up its spot.
+      let at = q.site && q.x === q.site.x && q.y === q.site.y,
+        still = q.lastAt && q.lastAt[0] === q.x && q.lastAt[1] === q.y;
+      (q.stuck = !at && still ? (q.stuck || 0) + 1 : 0), (q.lastAt = [q.x, q.y]);
+      if (q.stuck >= 3 && q.site) (p.badSites || (p.badSites = [])).push(q.site), p.badSites.length > 12 && p.badSites.shift(), (q.site = null), (q.stuck = 0);
+      // Somebody else's men standing on the spot, or another nation's
+      // settlers headed there, mean looking elsewhere.
+      // The settler that set out first keeps a contested spot.
+      let rivalsS = e.units.filter((o) => o.kind === "settler" && o.owner !== n && o.site),
+        theirs = rivalsS.map((o) => o.site);
+      if (q.site) {
+        let near = rivalsS.filter((o) => Math.max(Math.abs(o.site.x - q.site.x), Math.abs(o.site.y - q.site.y)) < $.colonySpacing),
+          blocked = e.units.some((o) => o.owner !== n && !o.aboard && o.x === q.site.x && o.y === q.site.y);
+        (blocked || near.some((o) => o.id < q.id)) && (q.site = null);
+      }
+      theirs = rivalsS.filter((o) => !q.site || o.id < q.id).map((o) => o.site);
       if (!rivalSiteOk(e, q.site)) {
-        let others = walkers.filter((o) => o !== q).map((o) => o.site);
-        q.site = rivalSite(e, n, q.x, q.y, !1, others);
+        let others = walkers.filter((o) => o !== q).map((o) => o.site).concat(theirs, p.badSites || []);
+        q.site = rivalSite(e, n, q.x, q.y, !1, others) || ((q.stuck || 0) % 4 === 1 ? rivalSite(e, n, q.x, q.y, !1, others, !0) : null);
       }
       if (!q.site) continue;
       q.x === q.site.x && q.y === q.site.y ? rivalFound(e, q) : (q.dest = { x: q.site.x, y: q.site.y });
     }
-    mr(e, n), cr(e, n);
+    PF("rm.mr", () => mr(e, n)), PF("rm.cr", () => cr(e, n));
     for (let q of e.units.filter((u) => u.owner === n && u.kind === "settler" && !u.aboard && u.site))
       q.x === q.site.x && q.y === q.site.y && rivalFound(e, q);
     // Rivals name what they reach first straight away.
@@ -3847,7 +3925,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // do not recruit: one more each level, under a garrison commander.
     let rival = e.players.find((p) => p.id === col.owner && !p.isHuman);
     if (rival) {
-      for (let k = 0; k < 1 + (col.level || 1); k++) units.push({ id: `r${k}`, kind: k === 2 && !col.big ? "artillery" : "infantry", str: 3 + Math.min(1, (col.level || 1) - 1), name: col.big ? "Temple guard" : k === 2 ? "Garrison guns" : "Regulars" });
+      // A nation down to its last colony throws everyone into the walls.
+      let last = e.colonies.filter((c) => c.owner === col.owner).length <= 1 ? 2 : 0;
+      for (let k = 0; k < 1 + (col.level || 1) + last; k++) units.push({ id: `r${k}`, kind: k === 2 && !col.big ? "artillery" : "infantry", str: 3 + Math.min(1, (col.level || 1) - 1), name: col.big ? "Temple guard" : k === 2 ? "Garrison guns" : "Regulars" });
       leader || (leader = { name: `Commander of ${col.name}`, attacks: 4, charisma: 1, rep: 0, cmd: 12 });
     }
     // Friendly villages close by send warriors to help, never against
@@ -3886,7 +3966,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // towns from farther away, trades with any of its towns, never raids the
   // empire, and raids the towns of anyone at war with it. The other
   // nations grow uneasy at each one.
-  var FED_SCORE = 150;
+  var FED_SCORE = 600;
   function federate(e, pid, v, forced) {
     let p = ce(e, pid),
       nat = nationOf(e, v);
@@ -4924,7 +5004,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           r = z(a.id * 31 + b.id, e.year, (e.seed >>> 0) + 4501);
         near && shiftRel(e, a.id, b.id, -2);
         if (!atWar(e, a.id, b.id)) relOf(e, a.id, b.id) < DIPLO[2].min && near && r < 0.12 && setRel(e, a.id, b.id, -100);
-        else europeAt(e, a, b) !== "war" && r < 0.12 && setRel(e, a.id, b.id, -30);
+        else {
+          // A side down to its last colony sues for peace.
+          let ca = e.colonies.filter((c) => c.owner === a.id).length,
+            cb = e.colonies.filter((c) => c.owner === b.id).length;
+          (Math.min(ca, cb) <= 1 ? r < 0.45 : europeAt(e, a, b) !== "war" && r < 0.12) && setRel(e, a.id, b.id, -30);
+        }
       }
     for (let p of ais) {
       if (isNatNation(p)) continue;
@@ -5006,7 +5091,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let r of e.players) {
       if (r.isHuman) continue;
       let cols = e.colonies.filter((c) => c.owner === r.id);
-      P.pool[r.id] = Math.min(14, (P.pool[r.id] || 0) + cols.reduce((a, c) => a + scale * (0.6 + 0.4 * (c.level || 1)), 0));
+      // A wide empire is harder to call to arms: beyond four colonies each
+      // one adds less to the field army.
+      P.pool[r.id] = Math.min(14, (P.pool[r.id] || 0) + cols.reduce((a, c) => a + scale * (0.6 + 0.4 * (c.level || 1)), 0) * (cols.length > 4 ? 4 / cols.length : 1));
       // Rivals spend their first years building, not marching: no army sets
       // out before the grace years are up, and early armies are small.
       let grace = { easy: 30, normal: 20, hard: 14, ruthless: 10 }[e.difficulty] || 20,
@@ -5283,6 +5370,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // ---- Trade offers ----
   // A rival at Neutral or better may offer a trade each year. You choose
   // which of your colonies pays and which receives.
+  // Offers waiting behind other notices can go stale: no trading with a
+  // nation that has since gone to war, no peace offer once peace is made.
+  function staleOffers(e) {
+    let P = pol(e),
+      hum = e.players.find((p) => p.isHuman);
+    hum && (P.offers = P.offers.filter((q) => (q.kind === "trade" ? !atWar(e, hum.id, q.from) : q.kind === "peace" ? atWar(e, hum.id, q.from) : !0)));
+  }
   function tradeOffersTurn(e) {
     let P = pol(e),
       hum = e.players.find((p) => p.isHuman);
@@ -5395,6 +5489,70 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     m.taxRate != null && out.push(`Tax this year: ${Math.round(m.taxRate * 100)}%, ${m.taxTaken || 0} gold. Resentment at court ${m.resentment || 0}, favor ${m.favor || 0}.`);
     let T = P.length - (e.year - $.startYear);
     out.push(`The best score after ${P.length} years wins. ${Math.max(0, T)} years remain.`);
+    return out;
+  }
+  // ---- Test tools: statistics and a health check for headless runs ----
+  function simStats(e) {
+    let P = pol(e),
+      per = e.players.map((p) => {
+        let cols = e.colonies.filter((c) => c.owner === p.id),
+          us = e.units.filter((u) => u.owner === p.id),
+          kinds = {};
+        for (let u of us) kinds[u.kind] = (kinds[u.kind] || 0) + 1;
+        return {
+          nation: p.nationId,
+          wasHuman: !!p.wasHuman,
+          colonies: cols.length,
+          levels: cols.reduce((a, c) => a + (c.level || 1), 0),
+          people: cols.reduce((a, c) => a + (c.population || 0), 0),
+          occupied: cols.filter((c) => c.occupied).length,
+          gold: cols.reduce((a, c) => a + (c.stock.gold || 0), 0),
+          score: Math.round((p.score || 0) / 20),
+          by: Object.fromEntries(Object.entries(p.scoreBy || {}).map(([k, v]) => [k, Math.round(v / 20)])),
+          units: kinds,
+          research: Object.values(p.research || {}).reduce((a, o) => a + Object.values(o).reduce((x, y) => x + y, 0), 0),
+          fed: e.natives ? e.natives.villages.filter((v) => v.fed === p.id).length : 0,
+          crown: p.mother ? (p.mother.independent ? "independent" : p.mother.commonwealth ? "commonwealth" : p.mother.rebel ? "rebel" : p.mother.suedPeace ? "sued" : "") : "",
+        };
+      });
+    return {
+      year: e.year,
+      per,
+      wars: Object.entries(P.rel).filter(([, v]) => v <= -100).map(([k]) => k),
+      armies: P.armies.length,
+      villages: e.natives ? e.natives.villages.length : 0,
+      landmarksHeld: (e.map.specials || []).filter((s) => s.foundBy != null).length,
+      alliances: (P.alliances || []).length,
+    };
+  }
+  function healthCheck(e) {
+    let out = [],
+      { width: w, height: h } = e.map,
+      ids = new Set(),
+      byId = new Map(e.units.map((u) => [u.id, u]));
+    for (let u of e.units) {
+      ids.has(u.id) && out.push(`duplicate unit id ${u.id}`), ids.add(u.id);
+      if (!(u.x >= 0 && u.y >= 0 && u.x < w && u.y < h)) out.push(`unit ${u.id} ${u.kind} off the map at ${u.x},${u.y}`);
+      if (!e.players.some((p) => p.id === u.owner)) out.push(`unit ${u.id} has no owner`);
+      if (u.aboard != null) {
+        let s = byId.get(u.aboard);
+        !s ? out.push(`unit ${u.id} ${u.kind} aboard a missing ship`) : s.kind !== "ship" ? out.push(`unit ${u.id} aboard a ${s.kind}`) : s.owner !== u.owner && out.push(`unit ${u.id} aboard another nation's ship`);
+        continue;
+      }
+      let t = se(e, u.x, u.y);
+      if (t) {
+        let wet = mn[t.terrain].pass !== "land";
+        u.kind === "ship" ? !wet && out.push(`ship ${u.id} on land at ${u.x},${u.y}`) : wet && out.push(`${u.kind} ${u.id} in the water at ${u.x},${u.y}`);
+      }
+      if (u.leaderId != null && !byId.get(u.leaderId)) out.push(`unit ${u.id} follows a missing leader`);
+      if (!Number.isFinite(u.mp)) out.push(`unit ${u.id} has movement ${u.mp}`);
+    }
+    for (let c of e.colonies) {
+      e.players.some((p) => p.id === c.owner) || out.push(`colony ${c.name} has no owner`);
+      for (let k of Ce) Number.isFinite(c.stock[k]) && c.stock[k] >= 0 || out.push(`colony ${c.name} has ${k} ${c.stock[k]}`);
+      Number.isFinite(c.population) && c.population >= 0 || out.push(`colony ${c.name} population ${c.population}`);
+    }
+    for (let A of pol(e).armies) (!A.path || !A.path.length) && out.push(`army ${A.id} has no path`);
     return out;
   }
   function gameEndCheck(e) {
@@ -5614,14 +5772,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function er(e, n) {
     let o = [];
     for (let r of e.colonies)
-      if (!(r.owner !== n || !r.governor || !Ze[r.governor]))
+      if (!(r.owner !== n || !r.governor || !Ze[r.governor])) {
+        // A governor with nothing to do rests a few years before looking again.
+        if (r.govIdle != null && e.year - r.govIdle < 3 && e.year >= r.govIdle) continue;
+        r.govIdle = null;
         for (let i = 0; i < $.governorBuildsPerTurn; i++) {
           let s = ui(e, r);
-          if (!s) break;
+          if (!s) {
+            i || (r.govIdle = e.year);
+            break;
+          }
           o.push(s);
         }
+      }
     return o;
   }
+  var govMiss = new WeakMap();
   function ui(e, n) {
     let o = Ze[n.governor],
       r = yn(e, n),
@@ -5647,16 +5813,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return `${n.name}'s governor began raising the colony to level ${n.level + 1}.`;
     let a =
         r.housing > n.population * (n.governor === "growth" ? 1.3 : 1.1) + 10,
-      t = ci(e, n, o.mix).filter((d) => !(d === "house" && a)),
+      // No new workshops while the colony can't staff the ones it has.
+      // Portuguese governors also raise docks, their trading posts.
+      t = ci(e, n, (ce(e, n.owner) || {}).nationId === "portugal" && n.buildings.filter((b) => b.id === "dock").length < 3 ? { ...o.mix, dock: 1 } : o.mix).filter((d) => !(d === "house" && a) && (r.staffing >= 0.95 || d === "house" || d === "farm" || d === "fort")),
+      // Nothing more for a store that is nearly full.
+      glut = { mill: "wood", mine: "metal", commerce: "goods", farm: "food" },
       l = [
         ...i.filter((d) => !n.buildings.some((u) => u.id === d && u.building)),
         ...t.filter((d) => !i.includes(d)),
-      ];
+      ].filter((d) => (!glut[d] || (n.stock[glut[d]] || 0) + 3 * Math.max(0, r.net[glut[d]]) < storeCap(n, glut[d])) && !(d === "house" && r.net.food <= 0));
+    let miss = govMiss.get(n);
+    (!miss || miss.y !== e.year) && govMiss.set(n, (miss = { y: e.year, s: new Set() }));
     for (let d of l) {
+      if (miss.s.has(d)) continue;
       let u = fi(e, n, d);
-      if (!u) continue;
+      if (!u) {
+        miss.s.add(d);
+        continue;
+      }
       if (jn(e, n.id, d, u.x, u.y).ok)
         return `${n.name}'s governor began building a ${ae[d].name.toLowerCase()}.`;
+      miss.s.add(d);
     }
     if (n.level < 4 && !(s && s.building) && Qo(n) && sn(e, n.id).ok)
       return `${n.name}'s governor began raising the colony to level ${n.level + 1}.`;
@@ -5664,7 +5841,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let c = n.buildings
         .filter((p) => p.id === d && !p.building && (p.level || 1) < 4)
         .sort((p, m) => (p.level || 1) - (m.level || 1))[0];
-      if (!c || !Me(n.stock, ge(c.id, (c.level || 1) + 1))) continue;
+      if (!c || !Me(n.stock, colCost(n, c.id, (c.level || 1) + 1, 1))) continue;
       if (Un(e, n.id, c.x, c.y).ok)
         return `${n.name}'s governor began raising a ${ae[d].name.toLowerCase()} to level ${(c.level || 1) + 1}.`;
     }
@@ -5773,7 +5950,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
   }
   function Es(e) {
-    return e % 20 === 0 ? String(e / 20) : (e / 20).toFixed(2);
+    return String(Math.round(e / 20));
   }
   function fs(e) {
     let n = V(e).id,
@@ -5861,6 +6038,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return `<ul class="mods">${s.map((a) => `<li>${q(a)}</li>`).join("")}</ul>`;
   }
   function tr(e) {
+    // Headless runs (no player at the controls) keep score but print no paper.
+    if (!e.players.some((p) => p.isHuman)) return Ps(e), (e.battleNews = []), void 0;
     to(e);
     Ps(e);
     let n = e.dispatch || null,
@@ -5972,7 +6151,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ? `${fresh[0]} is entered on the charts.`
           : `Entered on the charts: ${fresh.slice(0, 5).join(", ")}${fresh.length > 5 ? `, and ${fresh.length - 5} more` : ""}.`,
       );
-    let gn = e.governorNews || [];
+    // The same news from several buildings is one line with a count.
+    let gnCount = new Map();
+    for (let g of e.governorNews || []) gnCount.set(g, (gnCount.get(g) || 0) + 1);
+    let gn = [...gnCount].map(([g, k]) => (k > 1 ? `${g.replace(/\.$/, "")} (\u00d7${k}).` : g));
     i.push(...gn.slice(0, 4));
     gn.length > 4 && i.push(`And ${gn.length - 4} more pieces of colony news; the log at the bottom of the screen has them all.`);
     if ((e.arrivedThisTurn || []).includes(n.id))
@@ -7304,7 +7486,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let r = hr(e, unitId, col.x, col.y);
       if (!r.ok) return r;
       let mover = arm(u.kind) && u.leaderId ? j(e, u.leaderId) || u : u;
-      return { ...r, note: mover.x === col.x && mover.y === col.y ? `${mover.name} is in ${col.name}.` : `${mover.name} is on the way to ${col.name}.` };
+      let is = mover.kind === "settler" ? "are" : "is";
+      return { ...r, note: mover.x === col.x && mover.y === col.y ? `${mover.name} ${is} in ${col.name}.` : `${mover.name} ${is} on the way to ${col.name}.` };
     });
   }
   function Cr(e, n, o, r) {
@@ -7331,6 +7514,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         { ok: !0, discoveries: [], note: s[0] || "" }
       );
     });
+  }
+  function PF(k, f) {
+    let P = window.__prof;
+    if (!P) return f();
+    let t = performance.now(), r = f();
+    P[k] = (P[k] || 0) + performance.now() - t;
+    return r;
   }
   function Er(e) {
     e.undo = [];
@@ -7372,10 +7562,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           })());
       // What rivals do at home is not news to you; the dispatch covers them.
       let quiet = e.log.length;
-      Oo(e, r.id), er(e, r.id), rivalMoves(e, r.id), rivalFederate(e, r), aiStudy(e, r), (e.log.length = quiet);
+      PF("Oo", () => Oo(e, r.id)), PF("er", () => er(e, r.id)), PF("rivalMoves", () => rivalMoves(e, r.id)), PF("fed", () => rivalFederate(e, r)), PF("study", () => aiStudy(e, r)), (e.log.length = quiet);
     }
-    holdTurn(e), seaTurn(e), crownWarTurn(e), rivalPairsTurn(e), allianceTurn(e), meetTurn(e), europeTurn(e), rivalMoodTurn(e), rivalArmyTurn(e), tradeOffersTurn(e);
-    crownTurn(e);
+    PF("hold", () => holdTurn(e)), PF("sea", () => seaTurn(e)), PF("crownWar", () => crownWarTurn(e)), PF("pairs", () => rivalPairsTurn(e)), PF("alli", () => allianceTurn(e)), PF("meet", () => meetTurn(e)), PF("europe", () => europeTurn(e)), PF("mood", () => rivalMoodTurn(e)), PF("army", () => rivalArmyTurn(e)), PF("offers", () => tradeOffersTurn(e));
+    PF("crown", () => crownTurn(e));
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
       nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
@@ -13422,7 +13612,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         H !== rdNow.key && ((H = rdNow.key), rdNow.run());
       } else if (!p && t.politics && t.politics.over && !t.politics.over.seen) {
         H !== "end" && ((H = "end"), endScreen(t.politics.over));
-      } else if (!p && t.politics && t.politics.offers.length) {
+      } else if (!p && t.politics && t.politics.offers.length && (staleOffers(t), t.politics.offers.length)) {
         let of = t.politics.offers[0],
           w = `offer:${of.id}`;
         H !== w && ((H = w), offerPrompt(of));
@@ -14884,7 +15074,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <h2>${G(nationName(r))} offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()}</h2>
         <p class="muted">A fair trade warms relations. The goods change hands at once.</p>
         <label class="pick">Paid from <select id="of-pay">${opts(payDef)}</select></label>
-        <label class="pick">Delivered to <select id="of-get">${opts(payDef)}</select></label>
+        <label class="pick">Delivered to <select id="of-get">${opts(mine.slice().sort((x1, x2) => (x1.stock[of.give] || 0) - (x2.stock[of.give] || 0))[0])}</select></label>
         <p id="of-err" class="down"></p>
         <div class="row"><button type="button" id="of-yes" class="primary">Accept</button><button type="button" id="of-no">Decline</button></div>
       </div>`;
@@ -15091,7 +15281,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let v = ye(T),
         b = an(t, f.id, T, g, k),
         w = Ve(t, T, g, k),
-        F = b.ok ? `${v.name} fits here. Costs ${qe(ge(T))}.` : b.error,
+        F = b.ok ? `${v.name} fits here. Costs ${qe(colCost(f, T))}.` : b.error,
         L = rn(t, T, g, k, f.owner)
           .sources.map((U) => `${U.name} +${U.amount}%`)
           .join(", ");
@@ -15106,7 +15296,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return `
         <div class="pick placing">
           <h3 class="side-sub">Placing: ${G(bName(T, f))}</h3>
-          <p class="muted">${G(B.produces || "")}. Costs ${qe(ge(T))}.</p>
+          <p class="muted">${G(B.produces || "")}. Costs ${qe(colCost(f, T))}.</p>
           ${u ? (here && here.ok ? `<p>Here:</p>${Ht(t, f, { id: T, x: u.x, y: u.y })}` : `<p class="down">${G((here && here.error) || "Not here.")}</p>`) : ""}
           <button type="button" id="cancel-place">Cancel</button>
         </div>`;
@@ -15116,14 +15306,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         k = V(t),
         v = Qn.map((E) => {
           let nn = ye(E.id).squares === 4 ? "2 by 2" : "1 square",
-            Eo = ge(E.id),
+            Eo = colCost(f, E.id),
             zr = Me(f.stock, Eo);
           return `<button type="button" class="build${T === E.id ? " on" : ""}${zr ? "" : " short"}" data-tool="${E.id}" title="${G(E.produces)}">${G(bName(E.id, f))}<small>${qe(Eo)} \xB7 ${nn}</small></button>`;
         }).join(""),
         b = Ce.map((E) => {
           let $e = g.net[E],
             nn = $e > 0 ? `+${$e}` : `${$e}`;
-          return `<tr><td>${Ne[E]}</td><td class="num">${f.stock[E]}</td><td class="num ${$e < 0 ? "down" : $e > 0 ? "up" : ""}">${nn}</td></tr>`;
+          let cap = storeCap(f, E),
+            full = f.stock[E] >= cap;
+          return `<tr><td>${Ne[E]}</td><td class="num${full ? " down" : ""}">${f.stock[E]}${cap < 1 / 0 ? `<small class="muted"> / ${cap}</small>` : ""}</td><td class="num ${$e < 0 ? "down" : $e > 0 ? "up" : ""}">${nn}</td></tr>`;
         }).join(""),
         w = f.buildings.filter((E) => E.building),
         F = w.length
@@ -15137,7 +15329,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (U && U.id !== "center") {
         let E = ae[U.id],
           $e = (U.level || 1) + 1,
-          nn = ge(U.id, $e);
+          nn = colCost(f, U.id, $e, 1);
         te = `
         <div class="pick">
           <h3 class="side-sub">${G(bName(U.id, f))} \xB7 level ${U.level || 1}</h3>
@@ -15547,6 +15739,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             select: (f) => {
               (l = f), R();
             },
+            // Play years with nobody at the controls: your nation is handed to
+            // the computer for the run. Returns errors, timing, stats and health.
+            sim: (years) => {
+              let hum = t.players.find((p) => p.isHuman),
+                errs = [],
+                tl = [],
+                t0 = performance.now();
+              hum && ((hum.isHuman = !1), (hum.wasHuman = !0));
+              for (let k = 0; k < years; k++) {
+                let a0 = performance.now();
+                try {
+                  Er(t);
+                } catch (err) {
+                  errs.push(`${t.year}: ${err.message} ${String(err.stack || "").split("\n")[1] || ""}`);
+                  if (errs.length > 5) break;
+                }
+                tl.push(performance.now() - a0), (t.pendingCrown = []), (t.pendingArmies = []), (t.pendingRaids = []);
+              }
+              hum && (hum.isHuman = !0);
+              return { errs, ms: Math.round(performance.now() - t0), maxTurn: Math.round(Math.max(...tl)), stats: simStats(t), problems: healthCheck(t) };
+            },
+            health: () => healthCheck(t),
+            stats: () => simStats(t),
           });
   }
   Gr(document.getElementById("app"));
