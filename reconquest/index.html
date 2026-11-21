@@ -519,7 +519,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.05";
+    "1.06";
   var on = [
       {
         id: "spain",
@@ -4587,14 +4587,63 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function nearestOwn(e, pid, x, y) {
     return e.colonies.filter((c) => c.owner === pid).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0] || null;
   }
+  // Plunder is shared out among your colonies by the room each has left
+  // once this year's own output is in, so as little as possible spills
+  // over the storehouses and goes to waste. Gold has no limit and goes to
+  // the nearest colony. Returns where it went: [{ c, n }].
   function bankLoot(e, pid, x, y, k, n) {
-    let c = nearestOwn(e, pid, x, y);
-    if (c) c.stock[k] += n;
-    else if (k === "gold") {
-      let p = ce(e, pid);
-      p.treasury = (p.treasury || 0) + n;
+    let cols = e.colonies.filter((c) => c.owner === pid);
+    if (!cols.length) {
+      if (k === "gold") {
+        let p = ce(e, pid);
+        p.treasury = (p.treasury || 0) + n;
+      }
+      return [];
     }
-    return c;
+    if (k === "gold") {
+      let c = nearestOwn(e, pid, x, y);
+      return (c.stock.gold = (c.stock.gold || 0) + n), [{ c, n }];
+    }
+    let near = (c) => Math.hypot(c.x - x, c.y - y),
+      room = cols.map((c) => {
+        let made = Math.max(0, (yn(e, c).net || {})[k] || 0);
+        return { c, r: Math.max(0, storeCap(c, k) - (c.stock[k] || 0) - made) };
+      }),
+      total = room.reduce((a, q) => a + q.r, 0),
+      out = new Map(),
+      give = (c, m) => m > 0 && out.set(c, (out.get(c) || 0) + m);
+    if (total >= n) {
+      // in proportion to the room each has; what rounding leaves goes to
+      // the roomiest
+      let left = n;
+      for (let q of room) {
+        let m = Math.min(q.r, Math.floor((n * q.r) / total));
+        give(q.c, m), (left -= m), (q.r -= m);
+      }
+      room.sort((a, b) => b.r - a.r || near(a.c) - near(b.c));
+      for (let q of room) {
+        if (left <= 0) break;
+        let m = Math.min(left, q.r);
+        give(q.c, m), (left -= m);
+      }
+    } else {
+      // more than everyone can hold: fill every storehouse, and the rest
+      // goes where it will last longest (this year's output may yet be
+      // spent), else the nearest
+      for (let q of room) give(q.c, q.r);
+      let left = n - total,
+        best = cols.slice().sort((a, b) => storeCap(b, k) - (b.stock[k] || 0) - (storeCap(a, k) - (a.stock[k] || 0)) || near(a) - near(b))[0];
+      give(best, left);
+    }
+    let list = [...out].map(([c, m]) => ({ c, n: m })).sort((a, b) => b.n - a.n);
+    for (let q of list) q.c.stock[k] = (q.c.stock[k] || 0) + q.n;
+    return list;
+  }
+  // Where plunder went, in words: "Roanoke 200 crops, Jamestown 147 crops".
+  function lootWords(dest) {
+    let by = new Map();
+    for (let [k, list] of dest) for (let q of list) by.set(q.c, (by.get(q.c) || []).concat(`${q.n} ${Ne[k].toLowerCase()}`));
+    return [...by].map(([c, w]) => `${c.name} ${w.join(", ")}`).join("; ");
   }
   // Your soldiers raid a village: no need to win, only to hold on inside it.
   // The longer they stay, the more gold they carry off. The village stands,
@@ -4610,7 +4659,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       tl = battleTally(B),
       rounds = B.raidRounds + (won ? 3 : 0),
       g = Math.floor(v.gold * Math.min(0.6, rounds * 0.12)),
-      col = g > 0 ? bankLoot(e, pid, v.x, v.y, "gold", g) : null;
+      col = g > 0 ? (bankLoot(e, pid, v.x, v.y, "gold", g)[0] || {}).c : null;
     v.gold -= g;
     battleNews(
       e,
@@ -4732,6 +4781,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       out = r.burned
         ? `${before} is burned to the ground${r.took.length ? `; we carried off ${r.took.join(", ")}` : ""}.${fallBackWords(e, r.fb, "Their")}`
         : `Our raiders ${r.took.length ? `carried off ${r.took.join(", ")}` : "took nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.${dead > 0 ? ` ${dead} colonists were killed.` : ""}`;
+      r.sent && (out += ` The plunder went to ${r.sent}.`);
     }
     battleNews(
       e,
@@ -5694,12 +5744,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // the defenders carry nothing off.
     let rounds = B.raidRounds,
       share = raidShare(B),
-      took = [];
+      took = [],
+      dest = [];
     for (let k of ["food", "wood", "goods", "metal", "gold"]) {
       if (col.stock[k] == null) continue;
       let n = Math.floor(col.stock[k] * share);
-      n > 0 && ((col.stock[k] -= n), bankLoot(e, pid, col.x, col.y, k, n), took.push(`${n} ${Ne[k].toLowerCase()}`));
+      n > 0 && ((col.stock[k] -= n), dest.push([k, bankLoot(e, pid, col.x, col.y, k, n)]), took.push(`${n} ${Ne[k].toLowerCase()}`));
     }
+    let sent = lootWords(dest);
     let wrecked = wreckBuildings(e, col, Math.max(0, rounds - 2), e.year * 3 + col.id),
       burned = B.over.winner === "att";
     let fb = null;
@@ -5707,7 +5759,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       e.colonies = e.colonies.filter((c) => c !== col);
       fb = fallBack(e, col.owner, col.x, col.y, attFrom(e, B), !0);
     }
-    return { took, wrecked, burned, fb };
+    return { took, wrecked, burned, fb, sent };
   }
   // ---- Trade offers ----
   // A rival at Neutral or better may offer a trade each year. You choose
@@ -17277,7 +17329,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             paint: R,
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
-            fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce },
+            fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
