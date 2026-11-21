@@ -13575,6 +13575,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           [zoomSeen, zoomSeenAt, baseZoom, prevZoom] = keep;
         } catch (err) {}
       };
+      // Each nation lands somewhere of its own.
+      let TH = {
+          spain: { sky: [[40, 40, 70], [190, 110, 80], [250, 170, 90]], far: "rgba(150,90,70,0.85)", mid: "#4a3224", ledge: "#3a2818", peak: "mesa", deco: "cactus", mist: 0.15, tag: "Across the ocean, a world to claim for the Crown." },
+          portugal: { sky: [[30, 50, 90], [150, 140, 130], [250, 200, 130]], far: "rgba(70,110,90,0.8)", mid: "#24402c", ledge: "#1f3a20", peak: "sugarloaf", deco: "palm", sea: !0, ship: !0, mist: 0.2, tag: "A green coast beyond the line of the treaty." },
+          england: { sky: [[40, 50, 70], [120, 120, 130], [210, 170, 140]], far: "rgba(80,95,110,0.85)", mid: "#26362c", ledge: "#1c2a1c", peak: "snow", deco: "pine", sea: !0, ship: !0, mist: 0.5, tag: "A wild shore, and a charter to settle it." },
+          france: { sky: [[30, 40, 80], [150, 110, 130], [245, 180, 120]], far: "rgba(80,90,120,0.85)", mid: "#2a3a2a", ledge: "#1f2a1c", peak: "ridge", deco: "oak", river: !0, mist: 0.3, tag: "Up the great river, into the heart of the land." },
+          netherlands: { sky: [[35, 50, 80], [140, 140, 150], [235, 200, 150]], far: "rgba(90,110,100,0.8)", mid: "#2c4030", ledge: "#20301e", peak: "hill", deco: "oak", sea: !0, ship: !0, mist: 0.25, tag: "A sheltered harbour at the edge of the wild." },
+          ixtal: { sky: [[40, 30, 60], [200, 100, 70], [255, 190, 100]], far: "rgba(90,70,80,0.85)", mid: "#22382a", ledge: "#1a2e1c", peak: "volcano", deco: "palm", sea: !0, ship: !0, mist: 0.2, tag: "Strange sails are seen off the empire's coast." },
+        },
+        th = TH[natId] || TH.england;
       let draw = (ms) => {
         let W = cv.clientWidth || window.innerWidth,
           H = cv.clientHeight || window.innerHeight,
@@ -13583,10 +13593,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let g = cv.getContext("2d"),
           u = Math.min(1, ms / DUR),
           ease = (a, b) => Math.max(0, Math.min(1, (ms - a) / (b - a))),
-          sky = g.createLinearGradient(0, 0, 0, H);
+          sky = g.createLinearGradient(0, 0, 0, H),
+          rgb = (c, k) => `rgb(${Math.round(c[0] + k * 30)},${Math.round(c[1] + k * 30)},${Math.round(c[2] + k * 25)})`;
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
         // dawn coming up
-        sky.addColorStop(0, `rgb(${20 + u * 40},${34 + u * 50},${66 + u * 60})`), sky.addColorStop(0.55, `rgb(${120 + u * 90},${90 + u * 70},${110 + u * 20})`), sky.addColorStop(1, `rgb(${230 + u * 20},${150 + u * 50},${90 + u * 30})`);
+        sky.addColorStop(0, rgb(th.sky[0], u)), sky.addColorStop(0.55, rgb(th.sky[1], u)), sky.addColorStop(1, rgb(th.sky[2], u * 0.5));
         (g.fillStyle = sky), g.fillRect(0, 0, W, H);
         let sunY = H * (0.66 - 0.16 * u),
           sg = g.createRadialGradient(W * 0.64, sunY, 0, W * 0.64, sunY, H * 0.35);
@@ -13596,17 +13607,53 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           for (let [x, y] of pts) g.lineTo(x * W + shift, H * (base - y));
           g.lineTo(W, H), g.fill();
         };
-        range(far, 0.62, "rgba(70,80,110,0.85)", -ms * 0.004);
-        // the great peak, out of the mist
+        range(far, 0.62, th.far, -ms * 0.004);
+        // the landmark
         let px = W * 0.64,
           py = H * 0.2,
           pb = H * 0.66,
-          pw = W * 0.26;
-        (g.fillStyle = "#4a5068"), g.beginPath(), g.moveTo(px - pw, pb), g.lineTo(px - pw * 0.25, py + H * 0.08), g.lineTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw, pb), g.fill();
-        (g.fillStyle = "#5e6684"), g.beginPath(), g.moveTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw, pb), g.lineTo(px + pw * 0.1, pb), g.fill();
-        (g.fillStyle = "#f2f0ea"), g.beginPath(), g.moveTo(px - pw * 0.25, py + H * 0.08), g.lineTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw * 0.16, py + H * 0.12), g.lineTo(px + pw * 0.05, py + H * 0.085), g.lineTo(px - pw * 0.08, py + H * 0.12), g.fill();
-        (g.fillStyle = "rgba(255,226,180,0.35)"), g.beginPath(), g.moveTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw * 0.16, py + H * 0.12), g.fill();
-        // mist across the mountain's foot, lifting
+          pw = W * 0.26,
+          poly = (col, pts) => ((g.fillStyle = col), g.beginPath(), pts.forEach(([x, y], q) => (q ? g.lineTo(x, y) : g.moveTo(x, y))), g.fill());
+        if (th.peak === "snow") {
+          poly("#4a5068", [[px - pw, pb], [px - pw * 0.25, py + H * 0.08], [px, py], [px + pw * 0.3, py + H * 0.1], [px + pw, pb]]);
+          poly("#5e6684", [[px, py], [px + pw * 0.3, py + H * 0.1], [px + pw, pb], [px + pw * 0.1, pb]]);
+          poly("#f2f0ea", [[px - pw * 0.25, py + H * 0.08], [px, py], [px + pw * 0.3, py + H * 0.1], [px + pw * 0.16, py + H * 0.12], [px + pw * 0.05, py + H * 0.085], [px - pw * 0.08, py + H * 0.12]]);
+          poly("rgba(255,226,180,0.35)", [[px, py], [px + pw * 0.3, py + H * 0.1], [px + pw * 0.16, py + H * 0.12]]);
+        } else if (th.peak === "mesa") {
+          // a long, flat-topped butte with sheer red cliffs, and smaller ones
+          let butte = (cx, w2, top, col, lit) => {
+            poly(col, [[cx - w2 * 1.25, pb], [cx - w2 * 1.05, top + H * 0.06], [cx - w2, top + H * 0.02], [cx - w2 * 0.95, top], [cx + w2 * 0.9, top], [cx + w2, top + H * 0.03], [cx + w2 * 1.05, top + H * 0.07], [cx + w2 * 1.3, pb]]);
+            poly(lit, [[cx + w2 * 0.2, top], [cx + w2 * 0.9, top], [cx + w2, top + H * 0.03], [cx + w2 * 1.05, top + H * 0.07], [cx + w2 * 1.3, pb], [cx + w2 * 0.45, pb]]);
+            for (let q = 1; q < 4; q++) (g.strokeStyle = "rgba(60,20,10,0.18)"), (g.lineWidth = 1.5), g.beginPath(), g.moveTo(cx - w2 * 1.02, top + q * (pb - top) * 0.22), g.lineTo(cx + w2 * 1.05, top + q * (pb - top) * 0.22), g.stroke();
+            disc(g, cx, top + 1, w2 * 0.9, 3, "rgba(80,100,50,0.6)");
+          };
+          butte(px + pw * 0.75, pw * 0.22, pb - H * 0.12, "#7a3a24", "#9e5230");
+          butte(px - pw * 0.15, pw * 0.55, py + H * 0.22, "#8a3e22", "#b25a32");
+          butte(px - pw * 1.05, pw * 0.16, pb - H * 0.08, "#74382a", "#94502e");
+        } else if (th.peak === "sugarloaf") {
+          (g.fillStyle = "#56645a"), g.beginPath(), g.moveTo(px - pw * 0.45, pb), g.bezierCurveTo(px - pw * 0.4, py + H * 0.1, px - pw * 0.15, py, px + pw * 0.02, py), g.bezierCurveTo(px + pw * 0.25, py, px + pw * 0.35, py + H * 0.15, px + pw * 0.42, pb), g.fill();
+          (g.fillStyle = "rgba(255,230,190,0.25)"), g.beginPath(), g.moveTo(px + pw * 0.02, py), g.bezierCurveTo(px + pw * 0.25, py, px + pw * 0.35, py + H * 0.15, px + pw * 0.42, pb), g.lineTo(px + pw * 0.2, pb), g.fill();
+          (g.fillStyle = "#4a5a4c"), g.beginPath(), g.moveTo(px + pw * 0.35, pb), g.bezierCurveTo(px + pw * 0.4, pb - H * 0.16, px + pw * 0.6, pb - H * 0.17, px + pw * 0.7, pb), g.fill();
+          for (let q = 0; q < 14; q++) disc(g, px - pw * 0.5 + q * pw * 0.09, pb - H * 0.015, pw * 0.06, H * 0.03, "#2e5a32");
+        } else if (th.peak === "ridge") {
+          poly("#46546a", [[0, pb], [W * 0.2, py + H * 0.18], [W * 0.38, py + H * 0.14], [W * 0.55, py + H * 0.2], [W * 0.62, py + H * 0.06], [W * 0.7, py + H * 0.02], [W * 0.78, py + H * 0.08], [W, py + H * 0.2], [W, pb]]);
+          poly("#eef0ea", [[W * 0.62, py + H * 0.06], [W * 0.7, py + H * 0.02], [W * 0.78, py + H * 0.08], [W * 0.72, py + H * 0.07], [W * 0.69, py + H * 0.09]]);
+          for (let q = 0; q < 26; q++) disc(g, q * W * 0.04, pb - H * 0.02 - Math.sin(q) * H * 0.01, W * 0.03, H * 0.035, q % 2 ? "#2e4a30" : "#365638");
+        } else if (th.peak === "hill") {
+          (g.fillStyle = "#3e5a3a"), g.beginPath(), g.moveTo(px - pw, pb), g.quadraticCurveTo(px, py + H * 0.12, px + pw, pb), g.fill();
+          (g.fillStyle = "rgba(255,240,200,0.18)"), g.beginPath(), g.moveTo(px - pw * 0.2, py + H * 0.25), g.quadraticCurveTo(px + pw * 0.4, py + H * 0.22, px + pw, pb), g.lineTo(px + pw * 0.4, pb), g.fill();
+          for (let q = 0; q < 18; q++) disc(g, px - pw * 0.9 + q * pw * 0.1, pb - H * 0.02 - Math.sin(q * 0.4) * H * 0.04, pw * 0.07, H * 0.03, q % 2 ? "#2a4a2c" : "#335a34");
+        } else if (th.peak === "volcano") {
+          poly("#4a3a3a", [[px - pw, pb], [px - pw * 0.14, py + H * 0.06], [px + pw * 0.12, py + H * 0.06], [px + pw, pb]]);
+          poly("#5e4a46", [[px, py + H * 0.06], [px + pw * 0.12, py + H * 0.06], [px + pw, pb], [px + pw * 0.2, pb]]);
+          disc(g, px - pw * 0.01, py + H * 0.065, pw * 0.13, H * 0.012, "rgba(255,120,40,0.8)");
+          for (let q = 0; q < 8; q++) {
+            let k = ((ms / 1400 + q / 8) % 1);
+            disc(g, px + Math.sin(q * 1.7) * pw * 0.05 + k * pw * 0.25, py + H * 0.05 - k * H * 0.2, (10 + k * 40) * (H / 700), (8 + k * 26) * (H / 700), `rgba(110,100,100,${0.5 * (1 - k)})`);
+          }
+          g.save(), g.translate(px - pw * 0.55, pb - H * 0.005), g.scale(H / 260, H / 260), ixStepped(g, 0, 0, 16, 4, 5, IX.stone, IX.red), g.restore();
+        }
+        // mist across the landmark's foot, lifting
         let mist = 1 - ease(300, 1900);
         for (let q = 0; q < 9; q++) {
           let mx2 = W * (0.3 + q * 0.07) + Math.sin(ms / 900 + q) * 24,
@@ -13614,10 +13661,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             rx2 = W * 0.16;
           g.save(), g.translate(mx2, my2), g.scale(1, 0.22);
           let mg = g.createRadialGradient(0, 0, 0, 0, 0, rx2);
-          mg.addColorStop(0, `rgba(240,232,232,${0.16 + mist * 0.42})`), mg.addColorStop(1, "rgba(240,232,232,0)");
+          mg.addColorStop(0, `rgba(240,232,232,${th.mist * 0.4 + mist * 0.42})`), mg.addColorStop(1, "rgba(240,232,232,0)");
           (g.fillStyle = mg), g.beginPath(), g.arc(0, 0, rx2, 0, Math.PI * 2), g.fill(), g.restore();
         }
-        range(mid, 0.72, "#2e3a3a", -ms * 0.01);
+        range(mid, 0.72, th.mid, -ms * 0.01);
+        // the sea, with the sun on it, and the ship that brought them
+        if (th.sea) {
+          let sy = H * 0.7,
+            sea = g.createLinearGradient(0, sy, 0, H);
+          sea.addColorStop(0, "#5a7a96"), sea.addColorStop(1, "#24405a"), (g.fillStyle = sea), g.fillRect(W * 0.3, sy, W * 0.7, H - sy);
+          for (let q = 0; q < 14; q++) ln_(g, W * 0.6 + Math.sin(q * 3.1) * W * 0.05, sy + 6 + q * 7, W * 0.68 + Math.sin(q * 3.1) * W * 0.05, sy + 6 + q * 7, `rgba(255,230,180,${0.5 - q * 0.03})`, 1.4);
+          if (th.ship) {
+            let shx = W * (0.86 - ease(0, 3000) * 0.03),
+              shy = H * 0.8 + Math.sin(ms / 500) * 2,
+              ss = H / 200;
+            g.save(), g.translate(shx, shy), g.scale(ss, ss), g.rotate(Math.sin(ms / 700) * 0.03), Tt(g, flagCol), g.restore();
+          }
+        }
+        // a river winding up toward the hills
+        if (th.river) {
+          (g.fillStyle = "#4e7290"), g.beginPath(), g.moveTo(W * 0.62, H * 0.7), g.quadraticCurveTo(W * 0.58, H * 0.8, W * 0.7, H * 0.86), g.quadraticCurveTo(W * 0.82, H * 0.94, W * 0.74, H), g.lineTo(W * 0.98, H), g.quadraticCurveTo(W * 0.9, H * 0.9, W * 0.78, H * 0.84), g.quadraticCurveTo(W * 0.66, H * 0.78, W * 0.64, H * 0.7), g.fill();
+          for (let q = 0; q < 6; q++) ln_(g, W * (0.7 + q * 0.03), H * (0.86 + q * 0.02), W * (0.74 + q * 0.03), H * (0.86 + q * 0.02), "rgba(255,230,190,0.35)", 1.2);
+        }
         // birds
         for (let b of birds) {
           let bx = (b.x + ms / 9000) * W,
@@ -13625,10 +13690,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             f = Math.sin(ms / 120 + b.x * 20) * 4 * b.s;
           (g.strokeStyle = "rgba(30,30,40,0.7)"), (g.lineWidth = 1.6), g.beginPath(), g.moveTo(bx - 8 * b.s, by - f), g.quadraticCurveTo(bx - 3 * b.s, by - 4 * b.s, bx, by), g.quadraticCurveTo(bx + 3 * b.s, by - 4 * b.s, bx + 8 * b.s, by - f), g.stroke();
         }
-        // the near ledge the explorer climbs
-        (g.fillStyle = "#1f2a1c"), g.beginPath(), g.moveTo(0, H * 0.78), g.quadraticCurveTo(W * 0.18, H * 0.7, W * 0.36, H * 0.74), g.quadraticCurveTo(W * 0.44, H * 0.76, W * 0.46, H * 0.86), g.lineTo(W * 0.5, H), g.lineTo(0, H), g.fill();
+        // the near ledge the explorer climbs, with what grows there
+        (g.fillStyle = th.ledge), g.beginPath(), g.moveTo(0, H * 0.78), g.quadraticCurveTo(W * 0.18, H * 0.7, W * 0.36, H * 0.74), g.quadraticCurveTo(W * 0.44, H * 0.76, W * 0.46, H * 0.86), g.lineTo(W * 0.5, H), g.lineTo(0, H), g.fill();
         (g.fillStyle = "rgba(255,220,160,0.18)"), g.beginPath(), g.moveTo(0, H * 0.78), g.quadraticCurveTo(W * 0.18, H * 0.7, W * 0.36, H * 0.74), g.lineTo(W * 0.36, H * 0.75), g.quadraticCurveTo(W * 0.18, H * 0.715, 0, H * 0.79), g.fill();
-        for (let q = 0; q < 5; q++) disc(g, W * (0.05 + q * 0.07), H * (0.77 - q * 0.008), 6 + q, 3, "rgba(60,80,40,0.8)");
+        let dk = H / 260,
+          plant = (x, y, z2) => {
+            g.save(), g.translate(x, y), g.scale(dk * z2, dk * z2);
+            if (th.deco === "cactus") ln_(g, 0, 0, 0, -22, "#3e6a34", 5), ln_(g, 0, -10, 7, -12, "#3e6a34", 3.6), ln_(g, 7, -12, 7, -18, "#3e6a34", 3.6), ln_(g, 0, -7, -6, -9, "#3e6a34", 3.6), ln_(g, -6, -9, -6, -15, "#3e6a34", 3.6);
+            else if (th.deco === "palm") {
+              (g.strokeStyle = "#5a4026"), (g.lineWidth = 3), g.beginPath(), g.moveTo(0, 0), g.quadraticCurveTo(4, -14, 2, -30), g.stroke();
+              for (let k = 0; k < 6; k++) {
+                let a2 = -Math.PI / 2 + (k - 2.5) * 0.55;
+                (g.strokeStyle = "#2e6a30"), (g.lineWidth = 2.4), g.beginPath(), g.moveTo(2, -30), g.quadraticCurveTo(2 + Math.cos(a2) * 10, -30 + Math.sin(a2) * 10 - 4, 2 + Math.cos(a2) * 16, -30 + Math.sin(a2) * 8 + 6), g.stroke();
+              }
+            } else if (th.deco === "pine") (g.fillStyle = "#1e3a22"), g.beginPath(), g.moveTo(0, -34), g.lineTo(-10, 0), g.lineTo(10, 0), g.fill(), (g.fillStyle = "#2a4a2c"), g.beginPath(), g.moveTo(0, -34), g.lineTo(10, 0), g.lineTo(3, 0), g.fill();
+            else ln_(g, 0, 0, 0, -12, "#3b2a18", 3), disc(g, 0, -20, 12, 10, "#2f5a2c"), disc(g, -4, -24, 7, 6, "#3e6a34"), disc(g, 5, -22, 6, 5, "#4a7a3c");
+            g.restore();
+          };
+        plant(W * 0.05, H * 0.79, 1.3), plant(W * 0.13, H * 0.755, 1), plant(W * 0.42, H * 0.8, 0.9);
+        for (let q = 0; q < 5; q++) disc(g, W * (0.05 + q * 0.07), H * (0.77 - q * 0.008), 6 + q, 3, "rgba(60,80,40,0.6)");
         // the explorer walks up, stops, and plants the flag
         let walk = ease(0, 1700),
           ex = W * (-0.04 + 0.34 * (1 - (1 - walk) * (1 - walk))),
@@ -13636,23 +13716,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           sc = Math.max(2.2, H / 190),
           moving = walk < 1;
         g.save(), g.translate(ex, ey), g.scale(sc, sc), $t(g, 0, "explorer", natId, moving ? ms / 110 : null), g.restore();
-        let plant = ease(1800, 2300);
-        if (plant > 0) {
+        let plantF = ease(1800, 2300);
+        if (plantF > 0) {
           let fx = ex + 14 * sc,
             fy = ey + 2 * sc,
-            pole = 30 * sc * plant;
+            pole = 30 * sc * plantF;
           ln_(g, fx, fy, fx, fy - pole, "#3a2a18", Math.max(2, sc * 0.9));
-          if (plant >= 1) {
-            let wv = (k2) => Math.sin(ms / 160 + k2) * 2 * sc;
-            (g.fillStyle = flagCol), g.beginPath(), g.moveTo(fx, fy - pole), g.quadraticCurveTo(fx + 9 * sc, fy - pole + wv(0), fx + 18 * sc, fy - pole + 1 * sc + wv(1)), g.lineTo(fx + 18 * sc, fy - pole + 11 * sc + wv(1)), g.quadraticCurveTo(fx + 9 * sc, fy - pole + 10 * sc + wv(0), fx, fy - pole + 11 * sc), g.fill();
-          }
+          plantF >= 1 && natFlag(g, natId, fx, fy - pole, 18 * sc, 12 * sc, ms / 140);
         }
-        // the title
+        // the title, and a line for the nation
         let ta = ease(900, 1700);
         if (ta > 0) {
-          (g.globalAlpha = ta), (g.textAlign = "center"), (g.fillStyle = "#fff6e4"), (g.shadowColor = "rgba(0,0,0,0.5)"), (g.shadowBlur = 8);
+          (g.globalAlpha = ta), (g.textAlign = "center"), (g.fillStyle = "#fff6e4"), (g.shadowColor = "rgba(0,0,0,0.55)"), (g.shadowBlur = 8);
           (g.font = `600 ${Math.round(Math.min(64, W / 14))}px Palatino, Georgia, serif`), g.fillText("The New World", W * 0.5, H * 0.16);
-          (g.font = `${Math.round(Math.min(24, W / 40))}px Palatino, Georgia, serif`), g.fillText(`${(t && t.year) || $.startYear} \u00b7 ${(ee[natId] && ee[natId].name) || ""}`, W * 0.5, H * 0.16 + Math.min(40, W / 24));
+          (g.font = `${Math.round(Math.min(24, W / 40))}px Palatino, Georgia, serif`), g.fillText(`${(t && t.year) || $.startYear} · ${(ee[natId] && ee[natId].name) || ""}`, W * 0.5, H * 0.16 + Math.min(40, W / 24));
+          (g.font = `italic ${Math.round(Math.min(19, W / 52))}px Palatino, Georgia, serif`), (g.globalAlpha = ta * ease(1300, 2100)), g.fillText(th.tag, W * 0.5, H * 0.16 + Math.min(70, W / 14));
           (g.globalAlpha = 1), (g.shadowBlur = 0);
         }
         // the hourglass, sand running and the glass turning over
@@ -13664,8 +13742,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (h2.fillStyle = "#c8a656"), h2.fillRect(-14, -26, 28, 4), h2.fillRect(-14, 22, 28, 4);
         (h2.strokeStyle = "rgba(240,232,210,0.9)"), (h2.lineWidth = 1.6), h2.beginPath(), h2.moveTo(-11, -22), h2.lineTo(11, -22), h2.lineTo(2, 0), h2.lineTo(11, 22), h2.lineTo(-11, 22), h2.lineTo(-2, 0), h2.closePath(), h2.stroke();
         (h2.fillStyle = "#e8c070"), h2.beginPath();
-        let top = 1 - sand;
-        h2.moveTo(-9 * top, -2 - 18 * top), h2.lineTo(9 * top, -2 - 18 * top), h2.lineTo(1, -1), h2.lineTo(-1, -1), h2.fill();
+        let topS = 1 - sand;
+        h2.moveTo(-9 * topS, -2 - 18 * topS), h2.lineTo(9 * topS, -2 - 18 * topS), h2.lineTo(1, -1), h2.lineTo(-1, -1), h2.fill();
         h2.beginPath(), h2.moveTo(-10, 21), h2.lineTo(10, 21), h2.lineTo(10 * (1 - sand * 0.6), 21 - 14 * sand), h2.lineTo(-10 * (1 - sand * 0.6), 21 - 14 * sand), h2.fill();
         sand < 1 && !turning && ln_(h2, 0, 0, 0, 21 - 14 * sand, "#e8c070", 1);
         h2.restore();
