@@ -519,7 +519,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.04";
+    "1.05";
   var on = [
       {
         id: "spain",
@@ -4640,6 +4640,66 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // building a round. Raiders who wipe out or drive off the defence burn
   // the colony to the ground. To capture it, you must win; it changes
   // hands with some damage.
+  // Beaten men who live through a fight fall back to a square beside it,
+  // and their leader with them: a good leader is worth keeping. Only when
+  // every fighting man is dead does the leader fall too, and anyone else
+  // with them (settlers, explorers) is lost. Ships in a fallen town's port
+  // put out to the water beside it. from: where the winners came from, so
+  // the losers fall back away from them.
+  function fallBack(e, owner, x, y, from, townGone) {
+    let here = e.units.filter((q) => q.owner === owner && !q.aboard && q.x === x && q.y === y),
+      W = e.map.width,
+      men = here.filter((q) => arm(q.kind)),
+      ships = here.filter((q) => q.kind === "ship"),
+      rest = here.filter((q) => !arm(q.kind) && q.kind !== "ship"),
+      lead = rest.find((q) => q.kind === "leader"),
+      res = { men, lead, lost: [], to: null };
+    if (!here.length) return res;
+    let around = [];
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        let xx = x + dx,
+          yy = y + dy;
+        if ((!dx && !dy) || xx < 0 || yy < 0 || xx >= W || yy >= e.map.height) continue;
+        around.push({ x: xx, y: yy, tile: e.map.tiles[yy * W + xx] });
+      }
+    let far = (q) => (from ? Math.hypot(q.x - from.x, q.y - from.y) : 0);
+    // ships: to open water beside the town if the town is gone
+    if (townGone && ships.length) {
+      let sea = around.filter((q) => Je(q.tile.terrain)).sort((a, b) => far(b) - far(a))[0];
+      for (let sh of ships) sea ? ((sh.x = sea.x), (sh.y = sea.y), (sh.dest = null)) : res.lost.push(sh);
+    }
+    if (!men.length) {
+      res.lost.push(...rest);
+    } else {
+      let foeHere = (q) => e.units.some((u) => u.owner !== owner && !u.aboard && u.x === q.x && u.y === q.y),
+        colAt = (q) => e.colonies.find((c) => c.x === q.x && c.y === q.y),
+        ok = around.filter((q) => !Je(q.tile.terrain) && !foeHere(q) && !(colAt(q) && colAt(q).owner !== owner)),
+        // their own town beside them first, then the square furthest from the enemy
+        to = ok.sort((a, b) => (colAt(b) ? 9 : 0) + far(b) - ((colAt(a) ? 9 : 0) + far(a)))[0];
+      if (to)
+        for (let q of men.concat(rest)) (q.x = to.x), (q.y = to.y), (q.dest = null), (q.mp = 0);
+      res.to = to || { x, y };
+    }
+    res.lost.length && (e.units = e.units.filter((q) => !res.lost.includes(q)));
+    return res;
+  }
+  // Words for what fallBack did, for the news and the summary.
+  function fallBackWords(e, fb, whose) {
+    if (!fb) return "";
+    let L = fb.lead;
+    if (fb.men.length) return ` ${whose} survivors, ${bLabel(fb.men.map((q) => ({ name: q.name || UNIT_KINDS[q.kind].name })))}${L ? ` under ${L.name}` : ""}, fell back.`;
+    if (L && fb.lost.includes(L)) return ` ${L.name} fell with ${whose.toLowerCase()} men.`;
+    return "";
+  }
+  // Where the winning side stood: the first of its men still on the map.
+  function attFrom(e, B) {
+    for (let bu of B.sides.att.units) {
+      let u = typeof bu.id === "number" && e.units.find((q) => q.id === bu.id);
+      if (u) return { x: u.x, y: u.y };
+    }
+    return null;
+  }
   function resolveColonyAttack(e, pid, col, mode, B, leaderId) {
     let owner = e.players.find((p) => p.id === col.owner),
       _w = owner && startWar(e, ce(e, pid), owner),
@@ -4657,20 +4717,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       where = `the ${nationAdj(owner)} colony of ${before}`;
     if (mode === "capture") {
       if (won) {
-        let wrecked = wreckBuildings(e, col, 1, e.year);
-        for (let u of e.units.filter((q) => q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y)) e.units = e.units.filter((q) => q !== u);
+        let wrecked = wreckBuildings(e, col, 1, e.year),
+          fb = fallBack(e, col.owner, col.x, col.y, attFrom(e, B), !0);
         (col.owner = pid), (col.governor = null);
         for (let id of B.sides.att.units.map((u) => u.id)) {
           let u = e.units.find((q) => q.id === id);
           u && ((u.x = col.x), (u.y = col.y));
         }
         L && ((L.x = col.x), (L.y = col.y));
-        out = `${before} is ours. The fighting cost it ${wrecked.length ? `its ${wrecked[0]}` : "little"}${dead > 0 ? ` and ${dead} colonists` : ""}.`;
+        out = `${before} is ours. The fighting cost it ${wrecked.length ? `its ${wrecked[0]}` : "little"}${dead > 0 ? ` and ${dead} colonists` : ""}.${fallBackWords(e, fb, "Their")}`;
       } else out = `The assault on ${before} failed.`;
     } else {
       let r = raidSpoils(e, col, B, pid);
       out = r.burned
-        ? `${before} is burned to the ground${r.took.length ? `; we carried off ${r.took.join(", ")}` : ""}.`
+        ? `${before} is burned to the ground${r.took.length ? `; we carried off ${r.took.join(", ")}` : ""}.${fallBackWords(e, r.fb, "Their")}`
         : `Our raiders ${r.took.length ? `carried off ${r.took.join(", ")}` : "took nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.${dead > 0 ? ` ${dead} colonists were killed.` : ""}`;
     }
     battleNews(
@@ -4693,10 +4753,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       tl = battleTally(B),
       DL = B.sides.def.leaderId ? e.units.find((u) => u.id === B.sides.def.leaderId) : null;
     applyLosses(e, pid, B, "att"), owner && applyLosses(e, owner.id, B, "def"), leaderWon(e, DL, !won, B, "def");
-    let lost = [];
-    if (won)
-      for (let u of e.units.filter((q) => q.owner !== pid && !q.aboard && q.x === x && q.y === y)) lost.push(u.name || u.kind), (e.units = e.units.filter((q) => q !== u));
-    let out = won ? `The ${nationAdj(owner)} party is destroyed${lost.length ? `: ${lost.join(", ")}` : ""}.` : "Our attack was beaten off.";
+    let fb = won && owner ? fallBack(e, owner.id, x, y, attFrom(e, B), !1) : null,
+      out = won
+        ? fb && fb.men.length
+          ? `The ${nationAdj(owner)} party is beaten.${fallBackWords(e, fb, "Their")}`
+          : `The ${nationAdj(owner)} party is destroyed${fb && fb.lost.length ? `: ${fb.lost.map((u) => u.name || u.kind).join(", ")}` : ""}.${fallBackWords(e, fb, "Their")}`
+        : "Our attack was beaten off.";
     battleNews(e, `Skirmish with the ${nationAdj(owner)}`, `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} fell on a ${nationAdj(owner)} party in the open. ${out} We lost ${tl.attLost}; they lost ${tl.defLost}.`, !1);
     return out + (up ? " " + up : "");
   }
@@ -5424,6 +5486,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let owner = e.players.find((p) => p.id === A.owner);
       if (!owner) continue;
       let aim = A.aim || "colony";
+      // A beaten army marches home the way it came, its leader at its head.
+      if (aim === "home") {
+        if (!A.path || A.step >= A.path.length - 1) {
+          home(A);
+          continue;
+        }
+        (A.step = Math.min(A.path.length - 1, A.step + ARMY_SPEED)), ([A.x, A.y] = A.path[A.step]);
+        still.push(A);
+        continue;
+      }
       // A picket holding a landmark stays until the year is out.
       if (aim === "landmark" && A.hold != null) {
         let sp = (e.map.specials || []).find((q) => q.id === A.aimId);
@@ -5475,6 +5547,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           B = auto({ kind: mode === "raid" ? "raid" : "attack", att: armyForce(e, A), def: colonyDefence(e, col) }),
           msg = resolveArmyAttack(e, A, col, mode, B, !1);
         sees(col.x, col.y) && pushEvent(e, msg, col.x, col.y);
+        A.aim === "home" && still.push(A);
         continue;
       }
       if (aim === "retake") {
@@ -5561,19 +5634,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (mode === "capture") {
       if (won) {
         wreckBuildings(e, col, 1, e.year);
-        e.units = e.units.filter((q) => !(q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y));
+        let fb = fallBack(e, col.owner, col.x, col.y, { x: A.x, y: A.y }, !0);
         (col.owner = A.owner), (col.governor = "balanced");
-        out = `${before} has fallen to the ${nationAdj(owner)}.`;
+        out = `${before} has fallen to the ${nationAdj(owner)}.${fallBackWords(e, fb, mine ? "Your" : "Its")}`;
       } else out = `${before} held against the ${nationAdj(owner)} assault.`;
     } else {
       let r = raidSpoils(e, col, B, owner.id);
-      out = r.burned ? `The ${nationAdj(owner)} burned ${before} to the ground.` : r.took.length || r.wrecked.length ? `The ${nationAdj(owner)} raiders carried off ${r.took.join(", ") || "nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.` : `${before} drove off the ${nationAdj(owner)} raiders.`;
+      out = r.burned ? `The ${nationAdj(owner)} burned ${before} to the ground.${fallBackWords(e, r.fb, mine ? "Your" : "Its")}` : r.took.length || r.wrecked.length ? `The ${nationAdj(owner)} raiders carried off ${r.took.join(", ") || "nothing"}${r.wrecked.length ? ` and wrecked the ${r.wrecked.join(", ")}` : ""}.` : `${before} drove off the ${nationAdj(owner)} raiders.`;
     }
     dead > 0 && (out += ` ${dead} colonists were killed.`);
-    // The survivors go home.
-    let left = B.sides.att.units.filter((u) => u.str > 0).length;
-    P.pool[owner.id] = (P.pool[owner.id] || 0) + left * 0.8;
-    P.armies = P.armies.filter((q) => q !== A);
+    // The survivors march home with their leader; with none left, he is lost too.
+    armyFallBack(A, B, "att") || (P.armies = P.armies.filter((q) => q !== A));
     known &&
       battleNews(
         e,
@@ -5582,6 +5653,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         !!fresh,
       );
     return out + (up ? " " + up : "");
+  }
+  // A rival army that lost a fight but still has men turns for home along
+  // the road it came by, a step back from the fight straight away.
+  function armyFallBack(A, B, sideKey) {
+    let alive = B.sides[sideKey].units.filter((u) => u.str > 0);
+    if (!alive.length) return !1;
+    A.troops = alive.map((u) => ({ kind: u.kind, str: u.str }));
+    A.aim = "home";
+    A.path = A.path && A.path.length ? A.path.slice(0, (A.step || 0) + 1).reverse() : [[A.x, A.y]];
+    A.step = Math.min(A.path.length - 1, 1);
+    [A.x, A.y] = A.path[A.step];
+    return !0;
   }
   // You attack a rival army in the field.
   function resolveArmyBattle(e, pid, A, B, leaderId) {
@@ -5594,8 +5677,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       tl = battleTally(B);
     applyLosses(e, pid, B, "att");
     let alive = B.sides.def.units.filter((u) => u.str > 0);
-    won || !alive.length ? (P.armies = P.armies.filter((q) => q !== A)) : (A.troops = alive.map((u) => ({ kind: u.kind, str: u.str })));
-    let out = won ? `The ${nationAdj(owner)} army under ${A.leader.name} is broken.` : `The ${nationAdj(owner)} army beat off our attack.`;
+    // Beaten, the survivors fall back toward home with their leader; only
+    // when every man is down is the army, leader and all, gone.
+    let fled = alive.length && won && armyFallBack(A, B, "def");
+    !alive.length ? (P.armies = P.armies.filter((q) => q !== A)) : won || (A.troops = alive.map((u) => ({ kind: u.kind, str: u.str })));
+    let out = won ? (fled ? `The ${nationAdj(owner)} army under ${A.leader.name} is beaten; ${A.leader.name} falls back with ${alive.length} men.` : `The ${nationAdj(owner)} army under ${A.leader.name} is destroyed, and ${A.leader.name} with it.`) : `The ${nationAdj(owner)} army beat off our attack.`;
     battleNews(e, `Battle with the ${nationAdj(owner)}`, `Our force of ${bLabel(B.sides.att.units)}${L ? ` under ${L.name}` : ""} attacked the ${nationAdj(owner)} army under ${A.leader.name} in the field. ${out} We lost ${tl.attLost}; they lost ${tl.defLost}.`, !1);
     return out + (up ? " " + up : "");
   }
@@ -5616,11 +5702,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     let wrecked = wreckBuildings(e, col, Math.max(0, rounds - 2), e.year * 3 + col.id),
       burned = B.over.winner === "att";
+    let fb = null;
     if (burned) {
       e.colonies = e.colonies.filter((c) => c !== col);
-      e.units = e.units.filter((q) => !(q.owner === col.owner && !q.aboard && q.x === col.x && q.y === col.y));
+      fb = fallBack(e, col.owner, col.x, col.y, attFrom(e, B), !0);
     }
-    return { took, wrecked, burned };
+    return { took, wrecked, burned, fb };
   }
   // ---- Trade offers ----
   // A rival at Neutral or better may offer a trade each year. You choose
@@ -17190,6 +17277,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             paint: R,
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
+            fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
