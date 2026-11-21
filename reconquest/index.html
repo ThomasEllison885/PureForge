@@ -46,10 +46,13 @@ button.ghost { background: transparent; color: var(--paper); border-color: #3d51
 @media (prefers-reduced-motion: reduce) { #next-unit.pending { animation: none; } }
 
 #battle {
-  max-width: 920px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 32px 20px 48px;
+  padding: 14px 20px 24px;
 }
+#battle h1 { font-size: 30px; margin: 0 0 2px; }
+#battle .sub { margin: 0 0 6px; }
+#battle .row.btop { margin: 4px 0 6px; }
 #setup {
   max-width: none;
   margin: 0;
@@ -233,13 +236,24 @@ ul.colony-list { padding-left: 0; list-style: none; }
 ul.colony-list li { margin: 6px 0; font-family: "Segoe UI", sans-serif; font-size: 14px; }
 ul.colony-list small { color: #5c5144; }
 /* Battle board */
-.bwrap { display: grid; grid-template-columns: minmax(300px, 500px) 1fr; gap: 24px; align-items: start; }
+.bwrap { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(220px, 300px); gap: 22px; align-items: start; }
+@media (max-width: 820px) { .bwrap { grid-template-columns: 1fr; } }
 .bboard { padding: 10px; border-radius: 10px; margin: 8px 0; background: radial-gradient(ellipse at 30% 20%, rgba(150,170,90,0.35), transparent 60%), radial-gradient(ellipse at 80% 85%, rgba(60,80,30,0.5), transparent 55%), repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0 3px, transparent 3px 9px), linear-gradient(#5d7a3a, #48632c); box-shadow: inset 0 0 30px rgba(0,0,0,0.45), 0 3px 10px rgba(0,0,0,0.4); border: 3px solid #6b5432; }
 .bgrid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 96px; gap: 5px; }
+#intro { position: fixed; inset: 0; z-index: 1000; background: #0b1420; cursor: pointer; transition: opacity 0.42s ease; }
+#intro.out { opacity: 0; pointer-events: none; }
+#intro canvas.iscene { position: absolute; inset: 0; width: 100%; height: 100%; }
+#intro .iload { position: absolute; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 10px; color: #f4ead2; font: 600 16px Palatino, Georgia, serif; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+#intro .iskip { position: absolute; left: 24px; bottom: 18px; margin: 0; color: rgba(244,234,210,0.6); font: 13px "Segoe UI", sans-serif; }
+.raidbox { position: relative; display: inline-flex; align-items: baseline; gap: 10px; margin: 2px 0 4px; padding: 3px 12px 7px; border-radius: 6px; border: 1px solid #b9a67e; background: rgba(250, 244, 230, 0.95); color: #3a2a18; overflow: hidden; font: 14px "Segoe UI", sans-serif; }
+.raidbox b { font: 700 24px Palatino, Georgia, serif; min-width: 3.2em; }
+.raidbox.theirs b { color: #9a2a20; }
+.raidbox.mine b { color: #2f6b3a; }
+.raidbox i { position: absolute; left: 0; bottom: 0; height: 5px; background: #b0802e; transition: width 0.3s; }
 .bboard.scene { position: relative; padding: 46px 14px 14px; background: #4a6030; }
 .bboard.scene.behind-me { padding: 14px 14px 56px; }
 .bboard.scene canvas.bscene { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 8px; }
-.bboard.scene .bgrid { position: relative; z-index: 1; grid-auto-rows: 118px; }
+.bboard.scene .bgrid { position: relative; z-index: 1; grid-auto-rows: clamp(88px, calc((100vh - 400px) / 4), 180px); }
 .bboard.scene .bcell { background: rgba(0,0,0,0.03); border-color: rgba(255,250,220,0.16); align-items: flex-end; align-content: flex-end; padding-bottom: 3px; }
 .bboard.scene .bcell.home-mine { background: rgba(40,70,120,0.12); }
 .bboard.scene .bcell.home-theirs { background: rgba(120,40,30,0.12); }
@@ -269,7 +283,10 @@ ul.colony-list small { color: #5c5144; }
 .bu.sel { border-color: #ffd65a; box-shadow: 0 0 0 2px rgba(255, 214, 90, 0.55), 0 2px 3px rgba(0,0,0,0.4); transform: translateY(-2px); }
 .bu.reserve { width: 38px; height: 50px; }
 .bu.reserve svg { width: 24px; height: 26px; }
-.bres { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 56px; padding: 4px 6px; border: 1px dashed #3d5160; border-radius: 6px; }
+.bres { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 40px; padding: 3px 6px; border: 1px dashed #3d5160; border-radius: 6px; }
+.bres .bu.reserve { width: 34px; height: 40px; }
+.bres .bu.reserve svg { width: 20px; height: 20px; }
+.bres .bu.reserve span { font-size: 13px; }
 .bres > span { width: 100%; font: 12px "Segoe UI", sans-serif; color: #a9b8c4; }
 .bside h3 { margin-top: 0; }
 .blog { font: 12px/1.45 "Segoe UI", sans-serif; color: #d5dee4; padding-left: 16px; max-height: 60vh; overflow: auto; }
@@ -3439,7 +3456,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // of the town they carry off supplies and kill colonists.
   var BCOLS = 3,
     BROWS = 4,
-    BCAP = 3,
+    // A square holds six spaces: a company of foot takes one, a troop of
+    // horse or a gun and its team two. So 6 infantry, 3 dragoons or 3 guns,
+    // or a mix.
+    BCAP = 6,
     BMAXROUND = 12,
     UNIT_KINDS = {
       infantry: { name: "Infantry", short: "Inf", move: 1, ranged: !1, cls: "foot", aim: 3 },
@@ -3468,7 +3488,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       pos: null,
       moved: !1,
       acted: !1,
+      acts: 0,
+      fired: !1,
     };
+  }
+  function bSize(u) {
+    let c = UNIT_KINDS[u.kind] ? UNIT_KINDS[u.kind].cls : "foot";
+    return c === "foot" ? 1 : 2;
   }
   function battleNew(spec, seed) {
     let B = {
@@ -3494,8 +3520,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       fx: [],
     };
     for (let s of ["att", "def"]) B.sides[s].start = B.sides[s].units.reduce((a, u) => a + u.str, 0);
+    // Which kind of raid: on a village, warriors on a town, or soldiers on a town.
+    B.kind === "raid" &&
+      (B.plunder =
+        spec.plunder ||
+        (spec.def && spec.def.scene && spec.def.scene.kind === "village" ? "village" : B.sides.att.units.some((u) => u.kind === "brave" || u.kind === "rider") ? "native" : "colony"));
     bStartTurn(B);
     return B;
+  }
+  // The share of the stores the raiders have carried off so far, by the same
+  // rule that settles the raid when it ends.
+  function raidShare(B) {
+    if (B.kind !== "raid") return 0;
+    return B.plunder === "village"
+      ? Math.min(0.6, B.raidRounds * 0.12)
+      : B.plunder === "native"
+        ? Math.min(0.6, B.raidRounds * 0.07)
+        : 1 - Math.pow(0.9, Math.max(0, Math.min(B.round, BMAXROUND) - 2));
   }
   var bIdx = (c, r) => r * BCOLS + c,
     bHome = (side) => (side === "att" ? 0 : BROWS - 1),
@@ -3519,7 +3560,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let s = bAt(B, c, r);
     if (!s) return !1;
     if (s.includes(u)) return !0;
-    return !s.length || (s[0].side === u.side && s.length < BCAP);
+    return !s.length || (s[0].side === u.side && s.reduce((a, q) => a + bSize(q), 0) + bSize(u) <= BCAP);
   }
   function bAlive(B, side) {
     return B.sides[side].units.filter((u) => u.str > 0);
@@ -3532,7 +3573,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function bStartTurn(B) {
     let S = B.sides[B.turn];
     S.attacksLeft = bAttacks(B, B.turn);
-    for (let u of S.units) (u.moved = !1), (u.acted = !1);
+    for (let u of S.units) (u.moved = !1), (u.acted = !1), (u.acts = 0), (u.fired = !1);
   }
   function bPlace(B, u, c, r) {
     bRemove(B, u);
@@ -3552,7 +3593,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Squares a unit may move to this turn.
   function bMoves(B, u) {
-    if (u.side !== B.turn || u.moved || u.acted || u.str <= 0) return [];
+    // Horse get two actions a turn, each a step or an attack, but never two
+    // attacks; everyone else one.
+    if (u.side !== B.turn || u.acted || u.str <= 0) return [];
+    if (bHorse(u) ? (u.acts || 0) >= 2 : u.moved) return [];
     let home = bHome(u.side),
       out = [];
     if (!u.pos) {
@@ -3569,7 +3613,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let near0 = new Set(bFoeNear(B, u.side, c0, r0).map((q) => q.join())),
       seen = new Set([`${c0},${r0}`]),
       frontier = [[c0, r0]];
-    for (let step = 0; step < UNIT_KINDS[u.kind].move; step++) {
+    for (let step = 0; step < 1; step++) {
       let next = [];
       for (let [c, r] of frontier)
         for (let [nc, nr] of bNbr(c, r)) {
@@ -3591,7 +3635,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function bCanHit(B, u, tc, tr) {
     let S = B.sides[u.side];
     if (u.side !== B.turn || u.acted || u.str <= 0 || !u.pos || S.attacksLeft <= 0) return !1;
-    if (u.moved && !bHorse(u)) return !1;
+    if (bHorse(u) ? u.fired || (u.acts || 0) >= 2 : u.moved) return !1;
     if (bSideAt(B, tc, tr) !== bFoe(u.side)) return !1;
     let [c, r] = u.pos;
     return bCls(u) === "gun" ? c === tc : Math.abs(c - tc) + Math.abs(r - tr) === 1;
@@ -3645,7 +3689,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     S.attacksLeft -= 1;
     let fxShot = { t: "shot", side: group[0].side, to: [tc, tr], from: group.map((u) => ({ key: u.key, pos: u.pos.slice(), cls: bCls(u), charge: bHorse(u) && u.moved })), fell: [], hits: 0 };
     for (let u of group) {
-      u.acted = !0;
+      bHorse(u) ? ((u.fired = !0), (u.acts = (u.acts || 0) + 1), (u.acted = u.acts >= 2)) : (u.acted = !0);
       let t = bPickTarget(B, u, stack);
       if (!t) break;
       // Drilled soldiers and guns shoot straighter than militia or warriors.
@@ -3708,9 +3752,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       from = u.pos ? u.pos.slice() : null;
     bPlace(B, u, c, r), (u.moved = !0);
     B.fx && B.fx.push({ t: "move", key: u.key, from, to: [c, r] });
-    // Infantry and guns spend their turn moving; cavalry may still charge,
-    // except when just coming on from reserve.
-    (!bHorse(u) || !wasIn) && (u.acted = !0);
+    // Infantry and guns spend their turn moving; horse spend one of their
+    // two actions.
+    bHorse(u) ? ((u.acts = (u.acts || 0) + 1), (u.acted = u.acts >= 2)) : (u.acted = !0);
     bCheck(B);
     return !0;
   }
@@ -3764,7 +3808,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           charges = [];
         // Dragoons not yet in reach may ride up and charge.
         for (let u of bAlive(B, side)) {
-          if (group.includes(u) || !u.pos || !bHorse(u) || u.moved || u.acted) continue;
+          if (group.includes(u) || !u.pos || !bHorse(u) || u.acted || u.fired || (u.acts || 0) > 0) continue;
           let to = bMoves(B, u).find(([a, b]) => Math.abs(a - tc) + Math.abs(b - tr) === 1);
           to && charges.push([u, to]);
         }
@@ -3806,8 +3850,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (B.over) return;
     // Everyone else advances on the enemy flag; raiders hold once inside.
     let [fc, fr] = bFlag(foe);
+    for (let pass = 0; pass < 2; pass++)
     for (let u of bAlive(B, side)) {
-      if (!u.pos || u.moved || u.acted || bCls(u) === "gun") continue;
+      if (!u.pos || u.acted || u.fired || bCls(u) === "gun" || (pass ? !bHorse(u) : u.moved)) continue;
       if (B.kind === "raid" && side === "att" && u.pos[1] === bHome("def")) continue;
       if (bFoeNear(B, side, ...u.pos).length) continue;
       let opts = bMoves(B, u);
@@ -7891,6 +7936,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ci = (i0 + i1) / 2,
       cj = (j0 + j1) / 2,
       todo = [];
+    // A camera gone wrong (zoom near nothing, or not a number) must never
+    // send the tile loops off without end.
+    if (!(isFinite(i0) && isFinite(i1) && isFinite(j0) && isFinite(j1)) || (i1 - i0 + 1) * (j1 - j0 + 1) > 4000) return;
     staleAround(o, i.explored, a);
     rz !== zoomSeen && (zoomSeen != null && zoomSeen !== baseZoom && (prevZoom = zoomSeen), (zoomSeen = rz), (zoomSeenAt = now));
     let settling = now - zoomSeenAt < 120,
@@ -12386,7 +12434,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let v = villageAt(e, x, y);
     if (v) return { kind: "village", style: (nationOf(e, v) || {}).style || 0, size: v.size || 1 };
     let t = se(e, x, y);
-    return { kind: (t && t.terrain) || "plains" };
+    return { kind: (t && t.terrain) || "plains", river: !!(t && t.riverId) };
   }
   var SCENE_GROUND = {
     plains: ["#7d9a4e", "#5f7c38"],
@@ -12400,76 +12448,296 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     town: ["#9a8a62", "#7a6c4a"],
     village: ["#8a9a5a", "#68783e"],
   };
-  // The still picture behind the board, drawn once per battle.
-  // sc.bottom: the town or village stands behind the bottom line instead.
-  function sceneBackdrop(w, h, sc, rnd) {
+  // The still picture behind the board, drawn once per battle, matched to
+  // the place: a town's streets and wall, a village's lodges, or the open
+  // country of the square the fight is on. geo gives the rows and columns
+  // of the board on screen; sc.bottom puts the town behind the bottom line.
+  function sceneBackdrop(w, h, sc, rnd, geo) {
     let cv = $o(w, h),
       g = cv.getContext("2d"),
       k = sc.kind,
       [c0, c1] = SCENE_GROUND[k] || SCENE_GROUND.plains,
+      rows = (geo && geo.rows && geo.rows.length && geo.rows) || [0, 1, 2, 3].map((q) => ({ y: h * (0.1 + q * 0.2), h: h * 0.19 })),
+      cols = (geo && geo.cols && geo.cols.length && geo.cols) || [0, 1, 2].map((q) => ({ x: w * (0.04 + q * 0.31), w: w * 0.3 })),
+      s = Math.max(1, Math.min(2.2, h / 330)),
+      at = (x, y, sc2, fn) => (g.save(), g.translate(x, y), g.scale(sc2, sc2), fn(g), g.restore()),
+      R = (a, b) => a + rnd() * (b - a),
       gr = g.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, c1), gr.addColorStop(1, c0), (g.fillStyle = gr), g.fillRect(0, 0, w, h);
-    // speckled ground
-    for (let n = 0; n < (w * h) / 900; n++) (g.fillStyle = `rgba(${rnd() < 0.5 ? "255,255,230" : "20,30,10"},${0.05 + rnd() * 0.06})`), g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 1 + rnd() * 2);
-    let s = Math.max(1.2, h / 260),
-      at = (x, y, sc2, fn) => (g.save(), g.translate(x, y), g.scale(sc2, sc2), fn(g), g.restore()),
-      edgeTrees = (n, pine) => {
+    // broad patches of light and shade, then fine texture
+    for (let n = 0; n < 40; n++) disc(g, R(0, w), R(0, h), R(14, 40) * s, R(6, 16) * s, `rgba(${rnd() < 0.5 ? "255,250,210" : "20,30,10"},${R(0.03, 0.06)})`);
+    let tufts = (n, col) => {
         for (let q = 0; q < n; q++) {
-          let side = q % 3,
-            x = side === 0 ? rnd() * w : side === 1 ? rnd() * w * 0.07 : w - rnd() * w * 0.07,
-            y = side === 0 ? rnd() * h * 0.1 + 8 : rnd() * h;
-          at(x, y, s * (0.8 + rnd() * 0.5), (q2) => (rnd() < pine ? ((q2.fillStyle = "#26401f"), q2.beginPath(), q2.moveTo(0, -18), q2.lineTo(-7, 0), q2.lineTo(7, 0), q2.fill()) : (ln_(q2, 0, 0, 0, -6, "#3b2a18", 1.6), disc(q2, 0, -11, 7, 6.5, "#3f6a2c"), disc(q2, 2, -13, 4, 3.5, "#5a8a3a"))));
+          let x = R(0, w),
+            y = R(0, h);
+          for (let t = -1; t <= 1; t++) ln_(g, x + t * 1.5 * s, y, x + t * 2.6 * s, y - R(3, 6) * s, col || "rgba(40,60,20,0.35)", 1);
         }
+      },
+      tree = (x, y, sz, pine) =>
+        at(x, y, sz, (q2) => {
+          disc(q2, 3, 1, 9, 3, "rgba(0,0,0,0.22)");
+          pine
+            ? ((q2.fillStyle = "#24401f"), q2.beginPath(), q2.moveTo(0, -24), q2.lineTo(-9, 0), q2.lineTo(9, 0), q2.fill(), (q2.fillStyle = "#3a5e2c"), q2.beginPath(), q2.moveTo(0, -24), q2.lineTo(9, 0), q2.lineTo(2, 0), q2.fill())
+            : (ln_(q2, 0, 0, 0, -8, "#3b2a18", 2), disc(q2, 0, -14, 9, 8, "#3f6a2c"), disc(q2, -3, -17, 5, 4.5, "#4f7c36"), disc(q2, 3, -16, 4.5, 4, "#5f8c40"));
+        }),
+      rock = (x, y, sz) => at(x, y, sz, (q2) => (disc(q2, 2, 1, 9, 3, "rgba(0,0,0,0.22)"), (q2.fillStyle = "#8a8474"), q2.beginPath(), q2.moveTo(-8, 0), q2.lineTo(-6, -6), q2.lineTo(1, -9), q2.lineTo(8, -4), q2.lineTo(8, 0), q2.fill(), (q2.fillStyle = "#a8a290"), q2.beginPath(), q2.moveTo(-6, -6), q2.lineTo(1, -9), q2.lineTo(2, -4), q2.lineTo(-4, -3), q2.fill())),
+      fence = (x0, y0, x1, y1) => {
+        let n = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / (16 * s)));
+        for (let q = 0; q <= n; q++) {
+          let x = x0 + ((x1 - x0) * q) / n,
+            y = y0 + ((y1 - y0) * q) / n;
+          ln_(g, x, y, x, y - 8 * s, "#5a3e22", 1.6);
+        }
+        ln_(g, x0, y0 - 6 * s, x1, y1 - 6 * s, "#7a5a34", 1.3), ln_(g, x0, y0 - 3 * s, x1, y1 - 3 * s, "#7a5a34", 1.3);
+      },
+      field = (x, y, fw, fh, col) => {
+        (g.fillStyle = col), g.fillRect(x, y, fw, fh);
+        for (let yy = y + 3; yy < y + fh; yy += 5 * s) ln_(g, x + 2, yy, x + fw - 2, yy, "rgba(60,40,20,0.25)", 1);
+      },
+      // The far line of each side: where the town or village stands, and
+      // where the fight's two flanks meet the edge of the board.
+      top = rows[0].y,
+      bot = rows[rows.length - 1].y + rows[rows.length - 1].h,
+      left = cols[0].x,
+      right = cols[cols.length - 1].x + cols[cols.length - 1].w,
+      midX = cols[1] ? cols[1].x + cols[1].w / 2 : w / 2;
+    // A river crossing the middle of the field, with a ford.
+    let river = () => {
+      let ry = (rows[1].y + rows[1].h + rows[2].y) / 2,
+        pts = [];
+      for (let x = -20; x <= w + 20; x += w / 10) pts.push([x, ry + Math.sin(x / (w / 3) + R(0, 1)) * 10 * s]);
+      let path = (off, col, lw) => {
+        g.beginPath(), pts.forEach(([x, y], q) => (q ? g.lineTo(x, y + off) : g.moveTo(x, y + off))), (g.strokeStyle = col), (g.lineWidth = lw), (g.lineCap = "round"), g.stroke();
       };
-    if (k === "forest" || k === "woods") edgeTrees(k === "forest" ? 46 : 26, k === "forest" ? 0.6 : 0.25);
-    else if (k === "hills" || k === "mountains") {
-      for (let q = 0; q < 3; q++) {
-        (g.fillStyle = `rgba(${k === "mountains" ? "120,112,96" : "110,130,70"},${0.35 + q * 0.12})`), g.beginPath(), g.moveTo(0, h * (0.06 + q * 0.04));
-        for (let x = 0; x <= w; x += w / 8) g.quadraticCurveTo(x + w / 16, h * (k === "mountains" ? -0.02 : 0.0) + q * 10 * s - rnd() * 12 * s, x + w / 8, h * (0.07 + q * 0.04));
-        g.lineTo(w, 0), g.lineTo(0, 0), g.fill();
+      path(0, "rgba(120,100,60,0.5)", 30 * s), path(0, "#3d6f8a", 22 * s), path(-3 * s, "rgba(150,200,220,0.35)", 4 * s);
+      for (let q = 0; q < 5; q++) rock(midX + (q - 2) * 9 * s, ry + R(-3, 3) * s + 4 * s, 0.55 * s);
+    };
+    if (k === "town" || k === "village") {
+      let townTop = !sc.bottom,
+        home = townTop ? rows[0] : rows[rows.length - 1],
+        // the line between the town and the open ground before it
+        edgeY = townTop ? home.y + home.h + 3 : home.y - 3,
+        inTown = (y) => (townTop ? y < edgeY : y > edgeY),
+        L = Math.max(1, Math.min(4, sc.level || 1)),
+        big = !!sc.big;
+      // open ground: fields, a road to the gate, a fence or two
+      let oy0 = townTop ? edgeY + 6 : 0,
+        oy1 = townTop ? h : edgeY - 6;
+      (g.fillStyle = "rgba(90,120,50,0.35)"), g.fillRect(0, oy0, w, oy1 - oy0);
+      tufts(260);
+      if (k === "town")
+        for (let q = 0; q < 4; q++) {
+          let fx = q < 2 ? R(-10, left + cols[0].w * 0.4) : R(right - cols[2].w * 0.5, w - 20),
+            fy = R(oy0 + 10, oy1 - 50 * s);
+          field(fx, fy, R(50, 80) * s, R(28, 40) * s, ["rgba(170,140,70,0.55)", "rgba(120,90,50,0.5)", "rgba(150,160,70,0.5)"][q % 3]);
+        }
+      // the road
+      (g.fillStyle = "rgba(150,120,80,0.6)"), g.beginPath(), g.moveTo(midX - 14 * s, oy0), g.lineTo(midX + 14 * s, oy0), g.lineTo(midX + 22 * s, oy1), g.lineTo(midX - 22 * s, oy1), g.fill();
+      for (let q = 0; q < 30; q++) disc(g, midX + R(-12, 12) * s, R(oy0, oy1), 3 * s, 1.2 * s, "rgba(90,70,40,0.3)");
+      k === "town" && (fence(left - 30, townTop ? edgeY + 60 * s : edgeY - 60 * s, left + cols[0].w * 0.6, townTop ? edgeY + 70 * s : edgeY - 70 * s), fence(right - cols[2].w * 0.6, townTop ? edgeY + 70 * s : edgeY - 70 * s, right + 30, townTop ? edgeY + 60 * s : edgeY - 60 * s));
+      // the far edge of the open ground: trees
+      for (let q = 0; q < 12; q++) tree(R(0, w), townTop ? R(h - 16 * s, h + 6) : R(0, 14 * s), R(0.9, 1.3) * s, rnd() < 0.4);
+      // the town ground: packed earth or cobbles, with ruts and a well
+      let ty0 = townTop ? 0 : edgeY,
+        ty1 = townTop ? edgeY : h;
+      (g.fillStyle = big ? "rgba(200,170,120,0.55)" : L >= 3 ? "rgba(150,135,110,0.6)" : "rgba(130,105,70,0.55)"), g.fillRect(0, ty0, w, ty1 - ty0);
+      if (L >= 3 && !big && k === "town")
+        for (let y = ty0 + 4; y < ty1; y += 7 * s)
+          for (let x = ((y / (7 * s)) % 2) * 5 * s; x < w; x += 10 * s) disc(g, x, y, 4 * s, 2.4 * s, `rgba(${rnd() < 0.5 ? "180,170,150" : "120,110,95"},0.35)`);
+      else for (let q = 0; q < 40; q++) disc(g, R(0, w), R(ty0, ty1), R(4, 10) * s, R(1.5, 3) * s, "rgba(90,70,40,0.25)");
+      // buildings: a back row and a nearer row beyond the defenders' line,
+      // and a row down each side of the town ground
+      let behindY = townTop ? Math.max(14 * s, top - 6) : h - 6,
+        n = k === "village" ? 3 + (sc.size || 1) : big ? 4 + L * 2 : 3 + L * 2,
+        house = (x, y, z2, q) =>
+          k === "village"
+            ? at(x, y, z2 * 1.3, (q2) => villageSprite(q2, sc.style || 0, 1, q + 3, !0))
+            : big
+              ? at(x, y, z2 * 1.25, (q2) => (q % 5 === 2 ? ixStepped(q2, 0, 0, 14, 3, 4, IX.stone, IX.red) : rnd() < 0.55 ? ixHouse(q2, 0, 0, 12, 9, 7, !0) : ixHut(q2, 0, 0, 5, 5)))
+              : at(x, y, z2 * 1.2, (q2) =>
+                  L === 1
+                    ? gableHouse(q2, 0, 0, 10, 8, 7, jr("#8a6a44", Math.round(R(-12, 12))), "#5a4430", { detail: !0, door: !0 })
+                    : gableHouse(q2, 0, 0, 11, 9, 8 + (L >= 3 ? 2 : 0), jr(L >= 3 ? "#e0d4bc" : "#d8c49a", Math.round(R(-20, 20))), ["#7a3b2a", "#6b4a30", "#5a4a3c", "#4a5560"][q % 4], { detail: !0, door: !0, chimney: rnd() > 0.4 }),
+                );
+      for (let row = 0; row < 2; row++) {
+        // the far row first, then the nearer one
+        let yy = townTop ? behindY - (1 - row) * 12 * s : behindY - row * 14 * s,
+          m = n + (row ? 0 : 2);
+        for (let q = 0; q < m; q++) {
+          let x = ((q + 0.5) / m) * w + R(-8, 8);
+          // the church, temple or great lodge stands in the middle
+          if (row && q === Math.floor(m / 2) && k === "town") {
+            big
+              ? at(x, yy, s * 1.6, (q2) => ixStepped(q2, 0, 0, 18, 4, 5, IX.stone, IX.red))
+              : L >= 2
+                ? at(x, yy, s * 1.35, (q2) => (gableHouse(q2, 0, 0, 14, 12, 12, "#e6dccb", "#4a5560", { detail: !0, door: !0 }), steeple(q2, -3, -4, 2.4, 18 + L * 2, "#e6dccb", "#4a5560", !0, !0)))
+                : house(x, yy, s, q);
+            continue;
+          }
+          house(x, yy, s * (row ? 1 : 0.85), q + row * 7);
+        }
       }
-      if (k === "mountains") for (let q = 0; q < 6; q++) at(rnd() * w, h * 0.1, s * 1.6, (q2) => ((q2.fillStyle = "#8a8070"), q2.beginPath(), q2.moveTo(-14, 0), q2.lineTo(0, -22), q2.lineTo(14, 0), q2.fill(), (q2.fillStyle = "#f0f0ea"), q2.beginPath(), q2.moveTo(-4, -16), q2.lineTo(0, -22), q2.lineTo(4, -16), q2.fill()));
-      for (let q = 0; q < 14; q++) disc(g, rnd() * w, h * 0.15 + rnd() * h * 0.8, 6 * s, 3 * s, "rgba(90,84,70,0.35)");
-    } else if (k === "swamp") {
-      for (let q = 0; q < 12; q++) disc(g, rnd() * w, rnd() * h, (14 + rnd() * 20) * s, (5 + rnd() * 6) * s, "rgba(50,80,90,0.35)");
-      for (let q = 0; q < 50; q++) {
-        let x = rnd() * w,
-          y = rnd() * h;
-        for (let r2 = -2; r2 <= 2; r2++) ln_(g, x + r2 * 2, y, x + r2 * 3, y - (8 + rnd() * 6) * s, "rgba(70,90,40,0.7)", 1);
+      // houses down the sides of the town ground
+      let sideN = Math.max(1, Math.round(Math.abs(ty1 - ty0) / (30 * s)));
+      for (let q = 0; q < sideN; q++) {
+        let yy = ty0 + ((q + 0.8) / sideN) * (ty1 - ty0);
+        house(left - 6 * s, yy, s * 0.8, q + 20), house(right + 6 * s, yy, s * 0.8, q + 30);
       }
-    } else if (k === "desert" || k === "coast") {
-      for (let q = 0; q < 10; q++) at(rnd() * w, rnd() * h, s, (q2) => (ln_(q2, 0, 0, 0, -16, "#5a8a3a", 3.5), ln_(q2, 0, -8, 5, -12, "#5a8a3a", 2.5), ln_(q2, 0, -6, -5, -10, "#5a8a3a", 2.5)));
-    } else if (k === "town") {
-      // The town stands behind the defenders' line, bigger with its level.
-      let L = Math.max(1, Math.min(4, sc.level || 1)),
-        n = sc.big ? 4 + L * 2 : 3 + L * 2;
-      for (let q = 0; q < n; q++) {
-        let x = ((q + 0.5) / n) * w + (rnd() - 0.5) * 18,
-          y = sc.bottom ? h - 8 - rnd() * 6 : h * 0.09 + rnd() * 6;
-        sc.big
-          ? at(x, y, s * 1.3, (q2) => (q === Math.floor(n / 2) ? ixStepped(q2, 0, 0, 14, 3, 4, IX.stone, IX.red) : rnd() < 0.5 ? ixHouse(q2, 0, 0, 12, 9, 7, !0) : ixHut(q2, 0, 0, 5, 5)))
-          : at(x, y, s * 1.2, (q2) => (q === Math.floor(n / 2) && L >= 2 ? (gableHouse(q2, 0, 0, 14, 10, 10, "#c9a878", "#6b4a30", { detail: !0, door: !0 }), steeple(q2, -3, -4, 2.2, 16, "#e6dccb", "#4a5560", !0, !0)) : gableHouse(q2, 0, 0, 11, 9, 8, jr("#d8c49a", Math.round((rnd() - 0.5) * 30)), ["#7a3b2a", "#6b4a30", "#5a4a3c"][q % 3], { detail: !0, door: !0, chimney: rnd() > 0.5 })));
+      // smoke from chimneys
+      if (k === "town" && !big) for (let q = 0; q < 4; q++) for (let p2 = 0; p2 < 4; p2++) disc(g, R(0, w) + p2 * 3 * s, behindY - (townTop ? 20 : 34) * s - p2 * 7 * s, (3 + p2 * 2) * s, (2 + p2) * s, `rgba(225,222,215,${0.22 - p2 * 0.04})`);
+      // the wall between town and field, with a gate on the road
+      let gate = (x0, x1) => x1 < midX - 24 * s || x0 > midX + 24 * s;
+      if (k === "village") {
+        (sc.size || 1) >= 3 && (() => {
+          for (let x = 0; x < w; x += 5 * s) gate(x, x + 4 * s) && ((g.fillStyle = (x / (5 * s)) % 2 < 1 ? "#7a5634" : "#6a4628"), g.fillRect(x, edgeY - 10 * s, 3.6 * s, 12 * s));
+        })();
+        // the fire in the middle of the village
+        let fy = townTop ? home.y + home.h * 0.35 : home.y + home.h * 0.65;
+        disc(g, midX + cols[1].w * 0.3, fy, 9 * s, 4 * s, "rgba(40,30,20,0.6)"), disc(g, midX + cols[1].w * 0.3, fy - 3 * s, 5 * s, 6 * s, "rgba(255,150,40,0.85)"), disc(g, midX + cols[1].w * 0.3, fy - 5 * s, 2.5 * s, 4 * s, "rgba(255,230,120,0.9)");
+      } else if (big) {
+        for (let x = 0; x < w; x += 20 * s) gate(x, x + 20 * s) && ((g.fillStyle = "#c8b08a"), g.fillRect(x, edgeY - 9 * s, 20 * s, 9 * s), (g.fillStyle = IX.red), g.fillRect(x, edgeY - 9 * s, 20 * s, 2 * s));
+      } else if (L >= 3) {
+        for (let x = 0; x < w; x += 16 * s) {
+          if (!gate(x, x + 16 * s)) continue;
+          (g.fillStyle = "#8a8070"), g.fillRect(x, edgeY - 12 * s, 16 * s, 12 * s), (g.fillStyle = "#9e9482"), g.fillRect(x, edgeY - 16 * s, 9 * s, 4 * s), (g.fillStyle = "rgba(0,0,0,0.18)"), g.fillRect(x, edgeY - 2 * s, 16 * s, 2 * s);
+        }
+        // towers at the gate
+        for (let tx of [midX - 30 * s, midX + 22 * s]) (g.fillStyle = "#7e7464"), g.fillRect(tx, edgeY - 24 * s, 9 * s, 24 * s), (g.fillStyle = "#4a5560"), g.beginPath(), g.moveTo(tx - 2 * s, edgeY - 24 * s), g.lineTo(tx + 4.5 * s, edgeY - 33 * s), g.lineTo(tx + 11 * s, edgeY - 24 * s), g.fill();
+      } else {
+        for (let x = 0; x < w; x += 4 * s) gate(x, x + 4 * s) && ((g.fillStyle = (x / (4 * s)) % 2 < 1 ? "#7a5634" : "#6a4628"), g.fillRect(x, edgeY - 12 * s + ((x / (4 * s)) % 2) * 2 * s, 3.2 * s, 13 * s), (g.fillStyle = "#5a3e22"), g.beginPath(), g.moveTo(x, edgeY - 12 * s), g.lineTo(x + 1.6 * s, edgeY - 15 * s), g.lineTo(x + 3.2 * s, edgeY - 12 * s), g.fill());
+        for (let tx of [midX - 26 * s, midX + 22 * s]) (g.fillStyle = "#5a3e22"), g.fillRect(tx, edgeY - 20 * s, 4 * s, 20 * s);
       }
-      // walls: stakes for a young colony, stone for an old one, adobe for the empire
-      let wy = sc.bottom ? h - 24 * s : h * 0.17;
-      if (sc.big) (g.fillStyle = "#c8b08a"), g.fillRect(0, wy, w, 6 * s), (g.fillStyle = IX.red), g.fillRect(0, wy, w, 1.6 * s);
-      else if (L >= 3) {
-        (g.fillStyle = "#8a8070"), g.fillRect(0, wy, w, 8 * s);
-        for (let x = 0; x < w; x += 14 * s) (g.fillStyle = "#9a907e"), g.fillRect(x, wy - 4 * s, 8 * s, 4 * s);
-      } else for (let x = 0; x < w; x += 4 * s) (g.fillStyle = x % (8 * s) < 4 * s ? "#7a5634" : "#6a4628"), g.fillRect(x, wy - 6 * s + ((x / (4 * s)) % 2) * 2, 3.2 * s, 10 * s);
-      for (let q = 0; q < 20; q++) disc(g, rnd() * w, h * 0.1 + rnd() * h * 0.75, 8 * s, 3 * s, "rgba(120,100,70,0.25)");
-    } else if (k === "village") {
-      let n = 3 + (sc.size || 1);
-      for (let q = 0; q < n; q++) at(((q + 0.5) / n) * w, sc.bottom ? h - 10 : h * 0.1, s * 1.5, (q2) => villageSprite(q2, sc.style || 0, 1, q + 3, !0));
+      sc.river && river();
     } else {
-      // plains: a fence line, haystacks, a few bushes
-      for (let x = 0; x < w; x += 18 * s) ln_(g, x, h * 0.12, x, h * 0.12 - 8 * s, "#6a4a2a", 1.4), ln_(g, x, h * 0.12 - 5 * s, x + 18 * s, h * 0.12 - 5 * s, "#7a5a34", 1.2);
-      for (let q = 0; q < 4; q++) at(rnd() * w, h * 0.09, s, (q2) => haystack(q2, 0, 0, 5));
-      for (let q = 0; q < 10; q++) disc(g, rnd() * w, rnd() * h, 6 * s, 4 * s, "rgba(60,90,30,0.45)");
+      // open country. Features stand at the corners of the squares, where
+      // they frame the troops rather than cover them.
+      let pine = k === "forest" ? 0.6 : 0.25,
+        corners = [];
+      for (let rr = 0; rr <= rows.length; rr++)
+        for (let cc = 0; cc <= cols.length; cc++) {
+          let y = rr < rows.length ? rows[rr].y : bot,
+            x = cc < cols.length ? cols[cc].x : right;
+          corners.push([x, y]);
+        }
+      let nearCorner = (spread) => {
+          let [x, y] = corners[Math.floor(rnd() * corners.length)];
+          return [x + R(-spread, spread) * s, y + R(-spread * 0.5, spread * 0.6) * s];
+        },
+        frame = (n, fn) => {
+          for (let q = 0; q < n; q++) {
+            let side = q % 4,
+              x = side === 1 ? R(-8, left + 10 * s) : side === 2 ? R(right - 10 * s, w + 8) : R(-10, w + 10),
+              y = side === 0 ? R(-6, top + 8 * s) : side === 3 ? R(bot - 4 * s, h + 14) : R(0, h + 10);
+            fn(x, y);
+          }
+        };
+      if (k === "forest" || k === "woods") {
+        (g.fillStyle = "rgba(25,40,15,0.3)"), g.fillRect(0, 0, w, h);
+        tufts(260, "rgba(30,50,20,0.45)");
+        for (let q = 0; q < 140; q++) disc(g, R(0, w), R(0, h), 2.6 * s, 1.3 * s, ["rgba(150,95,40,0.4)", "rgba(110,120,40,0.35)"][q % 2]);
+        // ferns and fallen logs
+        for (let q = 0; q < 22; q++) at(...nearCorner(30), s * 1.3, (q2) => { for (let f2 = -2; f2 <= 2; f2++) ln_(q2, 0, 0, f2 * 5, -7 + Math.abs(f2), "#4f7a34", 1.6); });
+        for (let q = 0; q < 5; q++) at(...nearCorner(40), s * 1.4, (q2) => (disc(q2, 0, 2, 16, 3, "rgba(0,0,0,0.2)"), (q2.strokeStyle = "#5a3e22"), (q2.lineWidth = 5), (q2.lineCap = "round"), q2.beginPath(), q2.moveTo(-14, 0), q2.lineTo(14, -3), q2.stroke(), disc(q2, 14, -3, 2.4, 2.4, "#8a6a44")));
+        // dappled light
+        for (let q = 0; q < 9; q++) {
+          let x = R(left, right),
+            y = R(top, bot),
+            rg = g.createRadialGradient(x, y, 0, x, y, 60 * s);
+          rg.addColorStop(0, "rgba(255,245,190,0.18)"), rg.addColorStop(1, "rgba(255,245,190,0)"), (g.fillStyle = rg), g.fillRect(x - 60 * s, y - 60 * s, 120 * s, 120 * s);
+        }
+        // trees among the squares, and the wood crowding every edge
+        for (let q = 0; q < (k === "forest" ? 16 : 9); q++) tree(...nearCorner(18), R(1.6, 2.1) * s, rnd() < pine);
+        frame(k === "forest" ? 60 : 36, (x, y) => tree(x, y, R(1.8, 2.5) * s, rnd() < pine));
+      } else if (k === "hills" || k === "mountains") {
+        // slopes: contour lines curving across the field, light on one side
+        let lg = g.createLinearGradient(0, 0, w, 0);
+        lg.addColorStop(0, "rgba(255,250,220,0.1)"), lg.addColorStop(1, "rgba(20,20,0,0.14)"), (g.fillStyle = lg), g.fillRect(0, 0, w, h);
+        // rounded hillocks, lit from the upper left
+        for (let q = 0; q < 8; q++) {
+          let cx = R(-40, w + 40),
+            cy = R(0, h),
+            rx = R(90, 200) * s,
+            ry = rx * 0.45;
+          g.save(), g.translate(cx, cy), g.scale(1, ry / rx);
+          let hg = g.createRadialGradient(-rx * 0.3, -rx * 0.35, rx * 0.05, 0, 0, rx);
+          hg.addColorStop(0, "rgba(255,250,215,0.2)"), hg.addColorStop(0.55, "rgba(255,250,215,0.04)"), hg.addColorStop(0.85, "rgba(40,40,10,0.1)"), hg.addColorStop(1, "rgba(40,40,10,0)");
+          (g.fillStyle = hg), g.beginPath(), g.arc(0, 0, rx, 0, Math.PI * 2), g.fill(), g.restore();
+        }
+        tufts(k === "mountains" ? 100 : 240, k === "mountains" ? "rgba(70,70,50,0.4)" : null);
+        // a rocky ridge behind each line, boulders at the corners
+        for (let q = 0; q < 16; q++) rock(R(0, w), rnd() < 0.5 ? R(-4, top + 6 * s) : R(bot - 6 * s, h + 6), R(1.6, 2.4) * s);
+        for (let q = 0; q < (k === "mountains" ? 18 : 10); q++) rock(...nearCorner(26), R(1.2, 1.9) * s);
+        for (let q = 0; q < 10; q++) tree(rnd() < 0.5 ? R(-6, left + 10 * s) : R(right - 10 * s, w + 6), R(0, h), R(1.4, 1.9) * s, rnd() < 0.7);
+        if (k === "mountains")
+          for (let q = 0; q < 6; q++)
+            at(((q + 0.5) / 6) * w, top + 4 * s, s * R(2.4, 3.2), (q2) => ((q2.fillStyle = "#7a7464"), q2.beginPath(), q2.moveTo(-16, 0), q2.lineTo(0, -26), q2.lineTo(16, 0), q2.fill(), (q2.fillStyle = "#9a9484"), q2.beginPath(), q2.moveTo(0, -26), q2.lineTo(16, 0), q2.lineTo(4, 0), q2.fill(), (q2.fillStyle = "#f0f0ea"), q2.beginPath(), q2.moveTo(-5, -18), q2.lineTo(0, -26), q2.lineTo(5, -18), q2.fill()));
+      } else if (k === "swamp") {
+        tufts(160, "rgba(40,60,30,0.45)");
+        for (let q = 0; q < 14; q++) {
+          let [x, y] = nearCorner(40),
+            rx = R(30, 60) * s;
+          disc(g, x, y, rx, rx * 0.36, "rgba(46,78,84,0.6)"), disc(g, x - rx * 0.2, y - 2, rx * 0.5, rx * 0.1, "rgba(170,210,210,0.22)");
+          for (let p2 = 0; p2 < 4; p2++) disc(g, x + R(-rx, rx) * 0.6, y + R(-4, 4), 4 * s, 2 * s, "#4a7a3a");
+        }
+        for (let q = 0; q < 60; q++) {
+          let [x, y] = nearCorner(50);
+          for (let r2 = -2; r2 <= 2; r2++) ln_(g, x + r2 * 2.4 * s, y, x + r2 * 3.4 * s, y - R(12, 20) * s, "rgba(80,100,40,0.8)", 1.3);
+        }
+        for (let q = 0; q < 7; q++) at(...nearCorner(20), s * 1.7, (q2) => (disc(q2, 3, 1, 8, 2.5, "rgba(0,0,0,0.2)"), ln_(q2, 0, 0, 0, -24, "#4a3a2a", 3.4), ln_(q2, 0, -13, 8, -19, "#4a3a2a", 2.2), ln_(q2, 0, -17, -7, -23, "#4a3a2a", 1.8)));
+        frame(24, (x, y) => tree(x, y, R(1.5, 2) * s, !1));
+      } else if (k === "coast" || k === "desert") {
+        (g.fillStyle = k === "coast" ? "rgba(225,205,150,0.45)" : "rgba(230,200,140,0.4)"), g.fillRect(0, 0, w, h);
+        for (let q = 0; q < 160; q++) disc(g, R(0, w), R(0, h), R(2, 6) * s, R(1, 2.4) * s, "rgba(150,120,70,0.28)");
+        // ripples in the sand
+        for (let q = 0; q < 30; q++) {
+          let x = R(0, w),
+            y = R(0, h);
+          (g.strokeStyle = "rgba(170,140,90,0.35)"), (g.lineWidth = 1.2), g.beginPath(), g.arc(x, y + 30 * s, 32 * s, -2.2, -0.9), g.stroke();
+        }
+        if (k === "coast") {
+          // the sea down the right side, wet sand and surf where it meets the beach
+          let sx = right - cols[cols.length - 1].w * 0.18;
+          (g.fillStyle = "rgba(150,130,90,0.5)"), g.beginPath(), g.moveTo(sx - 18 * s, 0);
+          for (let y = 0; y <= h + 30; y += 30) g.lineTo(sx - 18 * s + Math.sin(y / 40) * 8 * s, y);
+          g.lineTo(w, h), g.lineTo(w, 0), g.fill();
+          let sea = g.createLinearGradient(sx, 0, w, 0);
+          sea.addColorStop(0, "#4f8aa0"), sea.addColorStop(1, "#2d5a74"), (g.fillStyle = sea), g.beginPath(), g.moveTo(sx, 0);
+          for (let y = 0; y <= h + 30; y += 30) g.lineTo(sx + Math.sin(y / 40) * 8 * s, y);
+          g.lineTo(w, h), g.lineTo(w, 0), g.fill();
+          for (let q = 0; q < 4; q++) {
+            g.beginPath();
+            for (let y = 0; y <= h + 20; y += 20) g.lineTo(sx + Math.sin(y / 40) * 8 * s + q * 10 * s, y);
+            (g.strokeStyle = `rgba(255,255,255,${0.55 - q * 0.12})`), (g.lineWidth = 2), g.stroke();
+          }
+          for (let q = 0; q < 7; q++) at(...nearCorner(30), s * 1.5, (q2) => ln_(q2, -12, 0, 12, -3, "#8a7050", 3.4));
+          for (let q = 0; q < 16; q++) at(R(0, sx - 30 * s), R(0, h), s * 1.4, (q2) => { for (let f2 = -2; f2 <= 2; f2++) ln_(q2, 0, 0, f2 * 3, -9, "#8a9a4a", 1.4); });
+          frame(10, (x, y) => x < sx - 20 * s && tree(x, y, R(1.5, 1.9) * s, !0));
+        } else {
+          for (let q = 0; q < 14; q++) rock(...nearCorner(30), R(1.2, 1.8) * s);
+          for (let q = 0; q < 10; q++) at(...nearCorner(30), s * 1.6, (q2) => (ln_(q2, 0, 0, 0, -16, "#5a8a3a", 3.5), ln_(q2, 0, -8, 5, -12, "#5a8a3a", 2.5), ln_(q2, 0, -6, -5, -10, "#5a8a3a", 2.5)));
+        }
+      } else {
+        // plains: grass and flowers, a wheat field, fences, haystacks, a
+        // farmhouse at the edge and a cart track across
+        tufts(460);
+        for (let q = 0; q < 160; q++) disc(g, R(0, w), R(0, h), 1.6 * s, 1.6 * s, ["rgba(240,220,90,0.75)", "rgba(240,240,240,0.65)", "rgba(200,120,200,0.6)"][q % 3]);
+        let fx = rnd() < 0.5 ? left - 20 * s : right - 120 * s;
+        field(fx, R(top, bot - 80 * s), 140 * s, 70 * s, "rgba(200,170,80,0.5)");
+        (g.strokeStyle = "rgba(140,115,75,0.5)"), (g.lineWidth = 12 * s), g.beginPath(), g.moveTo(-10, R(top, bot)), g.bezierCurveTo(w * 0.3, R(0, h), w * 0.7, R(0, h), w + 10, R(top, bot)), g.stroke();
+        for (let q = 0; q < 3; q++) {
+          let [x, y] = nearCorner(10);
+          fence(x - 40 * s, y, x + 40 * s, y + R(-6, 6) * s);
+        }
+        for (let q = 0; q < 6; q++) at(...nearCorner(26), s * 1.6, (q2) => haystack(q2, 0, 0, 6));
+        at(rnd() < 0.5 ? left + 10 * s : right - 10 * s, rnd() < 0.5 ? top + 10 * s : bot - 4 * s, s * 2.2, (q2) => gableHouse(q2, 0, 0, 12, 10, 9, "#d8c49a", "#7a3b2a", { detail: !0, door: !0, chimney: !0 }));
+        for (let q = 0; q < 7; q++) tree(...nearCorner(18), R(1.5, 2) * s, rnd() < 0.2);
+        frame(16, (x, y) => tree(x, y, R(1.6, 2.1) * s, rnd() < 0.25));
+      }
+      sc.river && river();
     }
     // a soft vignette
-    let vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
-    vg.addColorStop(0, "rgba(0,0,0,0)"), vg.addColorStop(1, "rgba(0,0,0,0.35)"), (g.fillStyle = vg), g.fillRect(0, 0, w, h);
+    let vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+    vg.addColorStop(0, "rgba(0,0,0,0)"), vg.addColorStop(1, "rgba(0,0,0,0.38)"), (g.fillStyle = vg), g.fillRect(0, 0, w, h);
     return cv;
   }
   // One unit as a figure: a man, a horseman, or a gun and its gunner.
@@ -13158,7 +13426,164 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       try {
         skip = localStorage.getItem("reconquest-hints") === "off";
       } catch (err) {}
-      t.year === $.startYear && !t.welcomed && !skip && setTimeout(welcomeCard, 350);
+      // A new game opens with a short scene while the map is made ready.
+      let fresh = t.year === $.startYear && !t.welcomed,
+        qs = new URLSearchParams(location.search),
+        intro = fresh && (!qs.has("test") || qs.has("intro"));
+      intro ? introPlay(V(t).nationId, () => !skip && setTimeout(welcomeCard, 150)) : fresh && !skip && setTimeout(welcomeCard, 350);
+    }
+    // The opening scene: dawn over the mountains, an explorer climbs onto a
+    // ledge and plants the flag at the sight of a great peak. About three
+    // seconds; a click or a key skips it. Meanwhile the map is painted
+    // underneath, and the zoom levels either side of it ahead of time.
+    function introPlay(natId, done) {
+      let ov = document.createElement("div");
+      ov.id = "intro";
+      ov.innerHTML = '<canvas class="iscene"></canvas><div class="iload"><canvas class="hg" width="40" height="56"></canvas><span>Loading map\u2026</span></div><p class="iskip">Click to skip</p>';
+      document.body.appendChild(ov);
+      let cv = ov.querySelector(".iscene"),
+        hg = ov.querySelector(".hg"),
+        t0 = performance.now(),
+        DUR = 3000,
+        over = !1,
+        L = lookOf(natId),
+        flagCol = (ee[natId] && ee[natId].color) || "#c0392b",
+        rnd = bn(4242),
+        ridge = (n, amp) => Array.from({ length: n + 1 }, (_, q) => [q / n, rnd() * amp]),
+        far = ridge(14, 0.08),
+        mid = ridge(9, 0.1),
+        birds = [0, 1, 2, 3].map((q) => ({ x: 0.15 + q * 0.07, y: 0.22 + (q % 2) * 0.03, s: 0.8 + q * 0.1 })),
+        off = document.createElement("canvas"),
+        warmZ = [1, 1.55, 0.8],
+        wi = 0,
+        keyOut = (ev) => finish(),
+        finish = () => {
+          if (over) return;
+          (over = !0), ov.classList.add("out"), window.removeEventListener("keydown", keyOut, !0);
+          setTimeout(() => ov.remove(), 450), pe(), done && done();
+        };
+      ov.onclick = finish;
+      window.addEventListener("keydown", keyOut, !0);
+      // paint other zoom levels around the same spot, offscreen, without
+      // disturbing what the visible map thinks it is showing
+      let warm = () => {
+        if (!t || !t.map) return;
+        try {
+          let k = J(),
+            g2 = Math.min(window.devicePixelRatio || 1, renderCap),
+            z2 = warmZ[wi++ % warmZ.length],
+            cx = (k.w / 2 - d.ox) / d.zoom,
+            cy = (k.h / 2 - d.oy) / d.zoom,
+            keep = [zoomSeen, zoomSeenAt, baseZoom, prevZoom];
+          (off.width = Math.max(1, Math.floor(k.w * g2))), (off.height = Math.max(1, Math.floor(k.h * g2)));
+          let c2 = off.getContext("2d");
+          c2.setTransform(g2, 0, 0, g2, 0, 0);
+          So(c2, { ctx: c2, w: k.w, h: k.h }, t, { ox: k.w / 2 - cx * z2, oy: k.h / 2 - cy * z2, zoom: z2 }, {});
+          [zoomSeen, zoomSeenAt, baseZoom, prevZoom] = keep;
+        } catch (err) {}
+      };
+      let draw = (ms) => {
+        let W = cv.clientWidth || window.innerWidth,
+          H = cv.clientHeight || window.innerHeight,
+          dpr = Math.min(2, window.devicePixelRatio || 1);
+        (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) && ((cv.width = Math.round(W * dpr)), (cv.height = Math.round(H * dpr)));
+        let g = cv.getContext("2d"),
+          u = Math.min(1, ms / DUR),
+          ease = (a, b) => Math.max(0, Math.min(1, (ms - a) / (b - a))),
+          sky = g.createLinearGradient(0, 0, 0, H);
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // dawn coming up
+        sky.addColorStop(0, `rgb(${20 + u * 40},${34 + u * 50},${66 + u * 60})`), sky.addColorStop(0.55, `rgb(${120 + u * 90},${90 + u * 70},${110 + u * 20})`), sky.addColorStop(1, `rgb(${230 + u * 20},${150 + u * 50},${90 + u * 30})`);
+        (g.fillStyle = sky), g.fillRect(0, 0, W, H);
+        let sunY = H * (0.66 - 0.16 * u),
+          sg = g.createRadialGradient(W * 0.64, sunY, 0, W * 0.64, sunY, H * 0.35);
+        sg.addColorStop(0, "rgba(255,240,190,0.95)"), sg.addColorStop(0.12, "rgba(255,220,150,0.6)"), sg.addColorStop(1, "rgba(255,200,120,0)"), (g.fillStyle = sg), g.fillRect(0, 0, W, H);
+        let range = (pts, base, col, shift) => {
+          (g.fillStyle = col), g.beginPath(), g.moveTo(0, H);
+          for (let [x, y] of pts) g.lineTo(x * W + shift, H * (base - y));
+          g.lineTo(W, H), g.fill();
+        };
+        range(far, 0.62, "rgba(70,80,110,0.85)", -ms * 0.004);
+        // the great peak, out of the mist
+        let px = W * 0.64,
+          py = H * 0.2,
+          pb = H * 0.66,
+          pw = W * 0.26;
+        (g.fillStyle = "#4a5068"), g.beginPath(), g.moveTo(px - pw, pb), g.lineTo(px - pw * 0.25, py + H * 0.08), g.lineTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw, pb), g.fill();
+        (g.fillStyle = "#5e6684"), g.beginPath(), g.moveTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw, pb), g.lineTo(px + pw * 0.1, pb), g.fill();
+        (g.fillStyle = "#f2f0ea"), g.beginPath(), g.moveTo(px - pw * 0.25, py + H * 0.08), g.lineTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw * 0.16, py + H * 0.12), g.lineTo(px + pw * 0.05, py + H * 0.085), g.lineTo(px - pw * 0.08, py + H * 0.12), g.fill();
+        (g.fillStyle = "rgba(255,226,180,0.35)"), g.beginPath(), g.moveTo(px, py), g.lineTo(px + pw * 0.3, py + H * 0.1), g.lineTo(px + pw * 0.16, py + H * 0.12), g.fill();
+        // mist across the mountain's foot, lifting
+        let mist = 1 - ease(300, 1900);
+        for (let q = 0; q < 9; q++) {
+          let mx2 = W * (0.3 + q * 0.07) + Math.sin(ms / 900 + q) * 24,
+            my2 = H * (0.47 + (q % 3) * 0.035) - ease(0, 3000) * 30,
+            rx2 = W * 0.16;
+          g.save(), g.translate(mx2, my2), g.scale(1, 0.22);
+          let mg = g.createRadialGradient(0, 0, 0, 0, 0, rx2);
+          mg.addColorStop(0, `rgba(240,232,232,${0.16 + mist * 0.42})`), mg.addColorStop(1, "rgba(240,232,232,0)");
+          (g.fillStyle = mg), g.beginPath(), g.arc(0, 0, rx2, 0, Math.PI * 2), g.fill(), g.restore();
+        }
+        range(mid, 0.72, "#2e3a3a", -ms * 0.01);
+        // birds
+        for (let b of birds) {
+          let bx = (b.x + ms / 9000) * W,
+            by = b.y * H + Math.sin(ms / 200 + b.x * 9) * 3,
+            f = Math.sin(ms / 120 + b.x * 20) * 4 * b.s;
+          (g.strokeStyle = "rgba(30,30,40,0.7)"), (g.lineWidth = 1.6), g.beginPath(), g.moveTo(bx - 8 * b.s, by - f), g.quadraticCurveTo(bx - 3 * b.s, by - 4 * b.s, bx, by), g.quadraticCurveTo(bx + 3 * b.s, by - 4 * b.s, bx + 8 * b.s, by - f), g.stroke();
+        }
+        // the near ledge the explorer climbs
+        (g.fillStyle = "#1f2a1c"), g.beginPath(), g.moveTo(0, H * 0.78), g.quadraticCurveTo(W * 0.18, H * 0.7, W * 0.36, H * 0.74), g.quadraticCurveTo(W * 0.44, H * 0.76, W * 0.46, H * 0.86), g.lineTo(W * 0.5, H), g.lineTo(0, H), g.fill();
+        (g.fillStyle = "rgba(255,220,160,0.18)"), g.beginPath(), g.moveTo(0, H * 0.78), g.quadraticCurveTo(W * 0.18, H * 0.7, W * 0.36, H * 0.74), g.lineTo(W * 0.36, H * 0.75), g.quadraticCurveTo(W * 0.18, H * 0.715, 0, H * 0.79), g.fill();
+        for (let q = 0; q < 5; q++) disc(g, W * (0.05 + q * 0.07), H * (0.77 - q * 0.008), 6 + q, 3, "rgba(60,80,40,0.8)");
+        // the explorer walks up, stops, and plants the flag
+        let walk = ease(0, 1700),
+          ex = W * (-0.04 + 0.34 * (1 - (1 - walk) * (1 - walk))),
+          ey = H * (0.775 - 0.04 * walk),
+          sc = Math.max(2.2, H / 190),
+          moving = walk < 1;
+        g.save(), g.translate(ex, ey), g.scale(sc, sc), $t(g, 0, "explorer", natId, moving ? ms / 110 : null), g.restore();
+        let plant = ease(1800, 2300);
+        if (plant > 0) {
+          let fx = ex + 14 * sc,
+            fy = ey + 2 * sc,
+            pole = 30 * sc * plant;
+          ln_(g, fx, fy, fx, fy - pole, "#3a2a18", Math.max(2, sc * 0.9));
+          if (plant >= 1) {
+            let wv = (k2) => Math.sin(ms / 160 + k2) * 2 * sc;
+            (g.fillStyle = flagCol), g.beginPath(), g.moveTo(fx, fy - pole), g.quadraticCurveTo(fx + 9 * sc, fy - pole + wv(0), fx + 18 * sc, fy - pole + 1 * sc + wv(1)), g.lineTo(fx + 18 * sc, fy - pole + 11 * sc + wv(1)), g.quadraticCurveTo(fx + 9 * sc, fy - pole + 10 * sc + wv(0), fx, fy - pole + 11 * sc), g.fill();
+          }
+        }
+        // the title
+        let ta = ease(900, 1700);
+        if (ta > 0) {
+          (g.globalAlpha = ta), (g.textAlign = "center"), (g.fillStyle = "#fff6e4"), (g.shadowColor = "rgba(0,0,0,0.5)"), (g.shadowBlur = 8);
+          (g.font = `600 ${Math.round(Math.min(64, W / 14))}px Palatino, Georgia, serif`), g.fillText("The New World", W * 0.5, H * 0.16);
+          (g.font = `${Math.round(Math.min(24, W / 40))}px Palatino, Georgia, serif`), g.fillText(`${$.startYear} \u00b7 ${(ee[natId] && ee[natId].name) || ""}`, W * 0.5, H * 0.16 + Math.min(40, W / 24));
+          (g.globalAlpha = 1), (g.shadowBlur = 0);
+        }
+        // the hourglass, sand running and the glass turning over
+        let h2 = hg.getContext("2d"),
+          cyc = (ms % 1500) / 1500,
+          turning = cyc > 0.85,
+          sand = Math.min(1, cyc / 0.85);
+        h2.clearRect(0, 0, 40, 56), h2.save(), h2.translate(20, 28), turning && h2.rotate(((cyc - 0.85) / 0.15) * Math.PI);
+        (h2.fillStyle = "#c8a656"), h2.fillRect(-14, -26, 28, 4), h2.fillRect(-14, 22, 28, 4);
+        (h2.strokeStyle = "rgba(240,232,210,0.9)"), (h2.lineWidth = 1.6), h2.beginPath(), h2.moveTo(-11, -22), h2.lineTo(11, -22), h2.lineTo(2, 0), h2.lineTo(11, 22), h2.lineTo(-11, 22), h2.lineTo(-2, 0), h2.closePath(), h2.stroke();
+        (h2.fillStyle = "#e8c070"), h2.beginPath();
+        let top = 1 - sand;
+        h2.moveTo(-9 * top, -2 - 18 * top), h2.lineTo(9 * top, -2 - 18 * top), h2.lineTo(1, -1), h2.lineTo(-1, -1), h2.fill();
+        h2.beginPath(), h2.moveTo(-10, 21), h2.lineTo(10, 21), h2.lineTo(10 * (1 - sand * 0.6), 21 - 14 * sand), h2.lineTo(-10 * (1 - sand * 0.6), 21 - 14 * sand), h2.fill();
+        sand < 1 && !turning && ln_(h2, 0, 0, 0, 21 - 14 * sand, "#e8c070", 1);
+        h2.restore();
+      };
+      let frame = () => {
+        if (over) return;
+        let ms = performance.now() - t0;
+        draw(ms), warm(), pe();
+        ms < DUR ? requestAnimationFrame(frame) : finish();
+      };
+      requestAnimationFrame(frame);
     }
     function _(f, g) {
       let k = J(),
@@ -13200,7 +13625,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let t0 = performance.now(),
         tick = (now) => {
           if (my !== camAnim || !t) return;
-          let p = Math.min(1, (now - t0) / 280),
+          // The frame's own timestamp can be earlier than the moment the
+          // glide began (after a long turn, say), so read the clock and keep
+          // the progress between 0 and 1.
+          let p = Math.max(0, Math.min(1, (performance.now() - t0) / 280)),
             e2 = 1 - Math.pow(1 - p, 3),
             z = z0 * Math.pow(z1 / z0, e2),
             wx = wx0 + (wx1 - wx0) * e2,
@@ -13275,7 +13703,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         panOn = !1;
         return;
       }
-      let dt = Math.min(0.05, (now - panLast) / 1e3),
+      let dt = Math.max(0, Math.min(0.05, (now - panLast) / 1e3)),
         v = (panShift ? 1700 : 750) * dt;
       panLast = now;
       panHeld.has("left") && (d.ox += v),
@@ -14382,7 +14810,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let tick = () => {
         // a newer zoom step or glide has taken over
         if (my !== camAnim) return;
-        let q = Math.min(1, (performance.now() - t0) / 140),
+        let q = Math.max(0, Math.min(1, (performance.now() - t0) / 140)),
           ez = 1 - (1 - q) * (1 - q);
         d.zoom = from * Math.pow(to / from, ez);
         let L1 = terracePx(t.map, tp.x, tp.y, d.zoom);
@@ -14676,13 +15104,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) && ((cv.width = Math.round(W * dpr)), (cv.height = Math.round(H * dpr)));
           let g = cv.getContext("2d");
           g.setTransform(dpr, 0, 0, dpr, 0, 0);
-          let key = `${W}x${H}`;
-          if (bdKey !== key) {
-            let seed = (spec.title || "").length * 97 + 13,
-              rnd = bn(seed);
-            (backdrop = sceneBackdrop(W, H, sceneSpec, rnd)), (bdKey = key);
-          }
-          g.clearRect(0, 0, W, H), g.drawImage(backdrop, 0, 0, W, H);
           // where each square is on screen
           let bb = board.getBoundingClientRect(),
             cells = new Map();
@@ -14690,6 +15111,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             let q = el.getBoundingClientRect();
             cells.set(`${el.dataset.c},${el.dataset.r}`, { x: q.left - bb.left, y: q.top - bb.top, w: q.width, h: q.height });
           });
+          let key = `${W}x${H}`;
+          if (bdKey !== key) {
+            let seed = (spec.title || "").length * 97 + 13,
+              rnd = bn(seed),
+              list = [...cells.values()],
+              uniq = (arr, f) => [...new Map(arr.map((c) => [Math.round(f(c)), c])).values()],
+              geo = {
+                rows: uniq(list, (c) => c.y).sort((p, q) => p.y - q.y).map((c) => ({ y: c.y, h: c.h })),
+                cols: uniq(list, (c) => c.x).sort((p, q) => p.x - q.x).map((c) => ({ x: c.x, w: c.w })),
+              };
+            (backdrop = sceneBackdrop(W, H, sceneSpec, rnd, geo)), (bdKey = key);
+          }
+          g.clearRect(0, 0, W, H), g.drawImage(backdrop, 0, 0, W, H);
           let edge = (side) => (side === mine ? H + 30 : -30);
           // play the next event when the last is done
           for (;;) {
@@ -14698,7 +15132,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             playing = { ev: queue.shift(), t0: playing ? playing.t0 + fxDur(playing.ev) : now };
           }
           let ev = playing && playing.ev,
-            p = ev ? Math.min(1, (now - playing.t0) / fxDur(ev)) : 1,
+            p = ev ? Math.max(0, Math.min(1, (now - playing.t0) / fxDur(ev))) : 1,
             // units not yet where the board shows them
             held = new Map(),
             ghosts = [];
@@ -14725,9 +15159,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             let u = unitByKey(gh.key);
             u && put(u, gh.at, { fall: gh.fall });
           }
+          // Up to three units abreast; more stand in a second rank in front.
           let posOf = (k, i, n) => {
             let c = cells.get(k);
-            return c ? { x: c.x + c.w * (0.5 + (i - (n - 1) / 2) * 0.3), y: c.y + c.h * 0.6, s: Math.max(1.1, c.h / 44) } : null;
+            if (!c) return null;
+            let two = n > 3,
+              per = two ? Math.ceil(n / 2) : n,
+              row = two && i >= per ? 1 : 0,
+              idx = row ? i - per : i,
+              cnt = row ? n - per : per;
+            return { x: c.x + c.w * (0.5 + (idx - (cnt - 1) / 2) * Math.min(0.3, 0.86 / Math.max(1, cnt))), y: c.y + c.h * (two ? (row ? 0.7 : 0.46) : 0.62), s: Math.max(0.9, Math.min(2.5, c.h / (two ? 60 : 48))) };
           };
           let where = new Map();
           for (let [k, list] of spots) list.forEach((it, i) => where.set(it.u.key, posOf(k, i, list.length)));
@@ -14767,8 +15208,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             }
             g.save(), g.translate(it.at.x + ldx, it.at.y + ldy), g.scale(it.at.s, it.at.s);
             if (it.fall) (g.globalAlpha = Math.max(0, 1 - it.fall)), g.rotate(face * Math.min(1, it.fall * 2) * 1.4);
-            (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(0, 1, 10, 3, 0, 0, Math.PI * 2), g.fill();
-            sceneUnit(g, u, lookFor(u.side), face, it.walk ? now / 90 : null, lean);
+            (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(0, 1, 13, 3.4, 0, 0, Math.PI * 2), g.fill();
+            // A unit shows as a few men, a pair of riders or a gun, thinning
+            // as it takes losses.
+            let cl = bCls(u),
+              frac = u.max ? u.str / u.max : 1,
+              men = cl === "gun" ? 1 : cl === "horse" ? (frac > 0.5 ? 2 : 1) : frac > 0.67 ? 3 : frac > 0.34 ? 2 : 1,
+              offs = men === 3 ? [[-7, -2], [7, -2], [0, 1]] : men === 2 ? [[-6, -1], [6, 1]] : [[0, 0]],
+              ph = it.walk ? now / 90 : null;
+            for (let [ox, oy] of offs) g.save(), g.translate(ox * (cl === "horse" ? 1.3 : 1), oy), men > 1 && g.scale(0.86, 0.86), sceneUnit(g, u, lookFor(u.side), face, ph, lean), g.restore();
             u.str > 0 && !it.fall && it.at && (g.globalAlpha = 1);
             g.restore();
           }
@@ -14852,13 +15300,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           <div class="bmain">
             <h1>${G(spec.title)}</h1>
             <p class="sub">Round ${Math.min(B.round, BMAXROUND)} of ${BMAXROUND}. ${B.over ? "" : myTurn ? `Your turn: ${S.attacksLeft} attack${S.attacksLeft === 1 ? "" : "s"} left${S.leader ? ` under ${G(S.leader.name)}` : ""}.` : "Their turn."}</p>
+            ${B.kind === "raid" ? (() => {
+              let pct = Math.round(raidShare(B) * 100);
+              return `<div class="raidbox ${mine === "att" ? "mine" : "theirs"}" title="${B.plunder === "colony" ? "Every round the raiders stay, they carry off more." : "The raiders carry off more for every round they hold part of the town."}"><b>${pct}%</b><span>${mine === "att" ? "of their stores carried off so far" : "of your stores carried off so far"}</span><i style="width:${pct}%"></i></div>`;
+            })() : ""}
+            <div class="row btop">
+              ${B.over ? '<button type="button" id="b-done" class="primary">Back to the map</button>' : `<button type="button" id="b-end" class="primary" ${myTurn ? "" : "disabled"}>End turn</button><button type="button" id="b-auto">Auto-finish</button><button type="button" id="b-flee" ${myTurn ? "" : "disabled"}>Retreat</button>`}
+            </div>
             <div class="bres theirs"><span>${G(B.sides[foe].name)}: reserves</span>${res(foe)}</div>
             <div class="bboard scene${(sceneSpec.kind === "town" || sceneSpec.kind === "village") && sceneSpec.bottom ? " behind-me" : ""}"><canvas class="bscene"></canvas><div class="bgrid">${rows.join("")}</div></div>
             <div class="bres mine"><span>Your reserves${myTurn ? " (click one, then a square on your home row)" : ""}</span>${res(mine)}</div>
-            <div class="row">
-              ${B.over ? '<button type="button" id="b-done" class="primary">Back to the map</button>' : `<button type="button" id="b-end" class="primary" ${myTurn ? "" : "disabled"}>End turn</button><button type="button" id="b-auto">Auto-finish</button><button type="button" id="b-flee" ${myTurn ? "" : "disabled"}>Retreat</button>`}
-            </div>
-            <p class="muted">Up to ${BCAP} units stand on a square. Pick units, then click a green square to move or a red one to attack. Everyone picked joins the attack: more kinds of unit and more squares attacking together hit harder. Infantry move or fire; dragoons move two, or one and charge; artillery stays on your home row and fires up its column. Take the enemy flag, or drive them from the field, to win.</p>
+            <p class="muted">A square holds 6 infantry, 3 dragoons or 3 guns, or a mix. Pick units, then click a green square to move or a red one to attack. Everyone picked joins the attack: more kinds of unit and more squares attacking together hit harder. Infantry move or fire. Dragoons get two actions: two moves, or a move and a charge, in either order. Artillery stays on your home row and fires up its column. Take the enemy flag, or drive them from the field, to win.</p>
           </div>
           <div class="bside">
             <h3>${B.over ? (B.over.winner === mine ? "Victory" : "Defeat") : "Battle log"}</h3>
