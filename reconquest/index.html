@@ -626,78 +626,67 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         id: "pacifist",
         name: "Pacifist",
         cost: 2,
-        stage: 3,
-        effect: "Cheaper defense research",
+        effect: "Defence research costs 40% less",
       },
       {
         id: "craftsman",
         name: "Craftsman",
         cost: 2,
-        stage: 5,
-        effect: "Better selling prices for goods",
+        effect: "Goods sell for a quarter more in Europe",
       },
       {
         id: "cartographer",
         name: "Cartographer",
         cost: 2,
-        stage: 1,
         effect: "Land units move farther",
       },
       {
         id: "navigator",
         name: "Navigator",
         cost: 2,
-        stage: 1,
         effect: "Ships move farther",
       },
       {
         id: "admiral",
         name: "Admiral",
         cost: 2,
-        stage: 3,
-        effect: "Stronger naval combat",
+        effect: "Your ships fight a level above their own",
       },
       {
         id: "conqueror",
         name: "Conqueror",
         cost: 2,
-        stage: 3,
-        effect: "Leaders can command more units",
+        effect: "Every leader commands two more men",
       },
       {
         id: "missionary",
         name: "Missionary",
         cost: 2,
-        stage: 6,
-        effect: "Churches slowly calm nearby natives",
+        effect: "Churches near native villages slowly win their goodwill",
       },
       {
         id: "merchant",
         name: "Merchant",
         cost: 2,
-        stage: 5,
-        effect: "Better prices at every market, not just Europe",
+        effect: "Europe pays more, and traders ask less",
       },
       {
         id: "smuggler",
         name: "Smuggler",
         cost: 2,
-        stage: 5,
-        effect: "Lower chance of being caught trading with rival Europeans",
+        effect: "A third of your gold slips past the crown's tax",
       },
       {
         id: "diplomat",
         name: "Diplomat",
         cost: 2,
-        stage: 5,
-        effect: "Treaties cost less and attitudes recover faster",
+        effect: "Goodwill with nations and tribes grows half again as fast",
       },
       {
         id: "spymaster",
         name: "Spymaster",
         cost: 2,
-        stage: 5,
-        effect: "Spies succeed more often and learn more",
+        effect: "Spies cost less and succeed more often",
       },
     ],
     Zn = Object.fromEntries(Xn.map((e) => [e.id, e])),
@@ -1205,8 +1194,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         rare: !0,
         color: "#b23a2e",
         terrain: ["hills", "forest", "plains"],
-        effect: "Your leaders command more troops and launch more attacks.",
-        stage: 3,
+        effect: "Your leaders command two more men and make one more attack.",
       },
       {
         id: "pyramid",
@@ -1215,8 +1203,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         rare: !0,
         color: "#d9c27a",
         terrain: ["plains", "hills"],
-        effect: "All your leaders gain leadership, combat skill, and movement.",
-        stage: 3,
+        effect: "Every leader of yours gains charisma, an attack, and a square of movement.",
       },
       {
         id: "fountain_of_youth",
@@ -1225,8 +1212,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         rare: !0,
         color: "#6fd0e8",
         terrain: ["forest", "plains"],
-        effect: "Your wounded troops recover faster.",
-        stage: 3,
+        effect: "Your wounded mend twice as fast at home, and slowly in the field too.",
       },
       {
         id: "lost_dutchman_mine",
@@ -1236,7 +1222,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#e8c24a",
         terrain: ["mountains", "hills"],
         effect: "Every gold mine you own produces 25% more gold.",
-        stage: 2,
         goldMines: 25,
       },
       {
@@ -1247,7 +1232,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#b9ad94",
         terrain: ["forest", "plains", "hills"],
         effect: "May hold one of several prizes.",
-        stage: 2,
       },
     ],
     ke = Object.fromEntries(An.map((e) => [e.id, e])),
@@ -2007,7 +1991,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     );
   }
-  // ---- Selling in Europe (a first, simple form of the stage 5 trade) ----
+  // ---- Selling in Europe ----
   // Fixed prices in gold per unit. A coastal colony's cargo sails out and the
   // gold comes back in two turns; an inland colony hauls to the coast first.
   // Deliberately a poor deal: Europe pays little for colonial raw goods. A
@@ -2039,7 +2023,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!(t > 0)) return { ok: !1, error: "Send at least 1." };
       if (s.stock[r] < t)
         return { ok: !1, error: `${s.name} has only ${s.stock[r]} ${Ne[r].toLowerCase()}.` };
-      let g = Math.floor(europeValue(r, t) * ((ce(e, s.owner) || {}).mother && ce(e, s.owner).mother.independent ? 1.6 : 1));
+      let own = ce(e, s.owner) || {},
+        g = Math.floor(europeValue(r, t) * (own.mother && own.mother.independent ? 1.6 : 1) * (r === "goods" && hasSkill(own, "craftsman") ? 1.25 : 1) * (hasSkill(own, "merchant") ? 1.15 : 1));
       if (g < 1)
         return { ok: !1, error: `That much ${Ne[r].toLowerCase()} is not worth a gold piece. Send at least ${Math.ceil(1 / EUROPE_PRICE[r])}.` };
       s.stock[r] -= t;
@@ -2523,6 +2508,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // square farther, and its runners two.
         isNatNation(n) && e.kind !== "ship" && (o += e.kind === "explorer" ? 2 : 1)),
       e.kind === "leader" && (o += e.v2 ? e.move || 0 : 1),
+      e.kind === "leader" && n && ownsFind(GS, n.id, "pyramid") && (o += 1),
       n && n.nationId === "portugal" && (o += 1),
       n && n.nationId === "spain" && e.kind === "explorer" && (o += 2),
       n && n.nationId === "england" && e.kind === "ship" && (o += 2),
@@ -3405,7 +3391,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // Rivals name what they reach first straight away.
     for (let it of e.pendingNames.filter((q) => q.ownerId === n)) Jo(e, it.kind, it.id, Vo(e, it.kind, n), n);
   }
-  // ---- Ancient Ruins (stage 2) --------------------------------------------
+  // ---- Ancient Ruins --------------------------------------------
   // Small finds, never a windfall: a few coins, old maps, a survivor, or one
   // of two lasting curiosities.
   function ruinsPrize(e, n, s) {
@@ -3919,12 +3905,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let k = Math.max(1, lvl || 1);
     return Object.assign(u, { lvl: k, attacks: 4 + k, charisma: k, cmd: 6 + 2 * k, move: move == null ? k : move, rep: 0, xp: 0, pts: 0, v2: 1 });
   }
+  // The game being played, for the few rules that need it but are not
+  // handed it (a leader's bonuses from skills and finds).
+  var GS = null;
+  function hasSkill(p, id) {
+    return !!(p && p.skills && p.skills.includes(id));
+  }
+  function ownsFind(e, pid, kind) {
+    return !!(e && e.map && (e.map.specials || []).some((s) => s.kind === kind && s.foundBy === pid));
+  }
   function leaderStats(u) {
     if (!u) return null;
     // Leaders from older saves are brought onto the new scale.
     u.v2 || freshLeader(u, u.lvl || 1, u.lvl || 1);
     u.pts == null && (u.pts = 0);
-    return { name: u.name, attacks: u.attacks, charisma: u.charisma, cmd: u.cmd, move: u.move || 0, rep: u.rep || 0 };
+    // Conqueror, the Temple of War and the Pyramid lift every leader you have.
+    let p = GS && u.owner != null && GS.players.find((q) => q.id === u.owner),
+      cmd = 0,
+      att = 0,
+      cha = 0;
+    p && (hasSkill(p, "conqueror") && (cmd += 2), ownsFind(GS, p.id, "temple_of_war") && ((cmd += 2), (att += 1)), ownsFind(GS, p.id, "pyramid") && ((cha += 1), (att += 1)));
+    return { name: u.name, attacks: u.attacks + att, charisma: u.charisma + cha, cmd: u.cmd + cmd, move: u.move || 0, rep: u.rep || 0 };
   }
   function leaderWon(e, u, won, B, side) {
     if (!u) return "";
@@ -4188,6 +4189,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return natives(e).nations.find((n) => n.id === v.nation);
   }
   function shiftAttitude(nat, pid, d) {
+    d > 0 && GS && hasSkill(ce(GS, pid), "diplomat") && (d *= 1.5);
     nat.att[pid] = Math.max(-100, Math.min(100, (nat.att[pid] || 0) + d));
   }
   // Native villages buy what they lack this year at their own price, some
@@ -4258,6 +4260,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         for (let c of e.colonies)
           c.owner === p.id && N.villages.some((v) => v.nation === nat.id && Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) <= 8) && (crowd += c.level || 1);
         crowd ? shiftAttitude(nat, p.id, -0.8 * crowd) : (nat.att[p.id] || 0) < base + (p.nationId === "france" ? 15 : 0) && shiftAttitude(nat, p.id, 0.5);
+        // Missionaries: churches near this nation's villages win them over.
+        if (hasSkill(p, "missionary")) {
+          let ch = 0;
+          for (let c of e.colonies)
+            c.owner === p.id && N.villages.some((v) => v.nation === nat.id && Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y)) <= 12) && c.buildings.forEach((b) => b.id === "church" && !b.building && (ch += b.level || 1));
+          ch && shiftAttitude(nat, p.id, Math.min(1.5, ch * 0.25));
+        }
       }
     }
     // Raiding parties on the way move on; those that arrive strike.
@@ -4614,6 +4623,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     pol(e).rel[a < b ? `${a}|${b}` : `${b}|${a}`] = Math.max(-100, Math.min(100, Math.round(v)));
   }
   function shiftRel(e, a, b, d) {
+    d > 0 && (hasSkill(ce(e, a), "diplomat") || hasSkill(ce(e, b), "diplomat")) && (d *= 1.5);
     setRel(e, a, b, relOf(e, a, b) + d);
   }
   function diploLevel(v) {
@@ -4698,7 +4708,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       crossed.length ? (m.resentment = (m.resentment || 0) + 3 * crossed.length) : (m.favor = Math.min(30, (m.favor || 0) + 1));
       m.resentment = Math.max(0, (m.resentment || 0) - 1);
-      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1),
+      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1),
         took = 0;
       for (let c of e.colonies)
         if (c.owner === me.id) {
@@ -4753,8 +4763,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function resLvl(p, cls, k) {
     return ((resOf(p)[cls] || {})[k]) || 0;
   }
-  function resCost(cls, lvl) {
-    return (cls === "lead" ? 60 : 40) * (lvl + 1);
+  function resCost(cls, lvl, p, k) {
+    return Math.round((cls === "lead" ? 60 : 40) * (lvl + 1) * (k === "def" && hasSkill(p, "pacifist") ? 0.6 : 1));
   }
   function collegeOf(e, pid) {
     return e.colonies.find((c) => c.owner === pid && !c.occupied && c.buildings.some((b) => b.id === "war_college" && !b.building)) || null;
@@ -4766,7 +4776,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!col) return B("Build a War College first.");
       let lv = resLvl(p, cls, k);
       if (lv >= RES_MAX) return B("That is as far as it goes.");
-      let cost = resCost(cls, lv);
+      let cost = resCost(cls, lv, p, k);
       if (col.stock.gold < cost) return B(`That costs ${cost} gold; ${col.name} has ${col.stock.gold}.`);
       col.stock.gold -= cost;
       let R = p.research || (p.research = {});
@@ -4782,7 +4792,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let opts = RESEARCH.filter(([c, k]) => resLvl(r, c, k) < RES_MAX && !(isNatNation(r) && c === "gun")).sort((a, b) => resLvl(r, a[0], a[1]) - resLvl(r, b[0], b[1]));
     let pick = opts[Math.floor(z(r.id, e.year, (e.seed >>> 0) + 4601) * Math.min(3, opts.length))];
     if (!pick) return;
-    let cost = resCost(pick[0], resLvl(r, pick[0], pick[1])),
+    let cost = resCost(pick[0], resLvl(r, pick[0], pick[1]), r, pick[1]),
       gain = () => (((r.research || (r.research = {}))[pick[0]] || (r.research[pick[0]] = {}))[pick[1]] = resLvl(r, pick[0], pick[1]) + 1);
     col.stock.gold >= cost * 2 ? ((col.stock.gold -= cost), gain()) : (e.year - $.startYear) % 9 === r.id % 9 && gain();
   }
@@ -4829,7 +4839,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // the last. A spy who is caught sours relations.
   function spyCost(p, e) {
     let n = p.spyYear === e.year ? p.spyCount || 0 : 0;
-    return 50 * 2 ** n;
+    return Math.round(50 * 2 ** n * (hasSkill(p, "spymaster") ? 0.6 : 1));
   }
   function sendSpy(e, pid, rid, kind) {
     return be(e, () => {
@@ -4841,8 +4851,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       purse.stock.gold -= cost;
       p.spyYear === e.year ? (p.spyCount = (p.spyCount || 0) + 1) : ((p.spyYear = e.year), (p.spyCount = 1));
       let roll = z(rid * 13 + (p.spyCount || 0), e.year, (e.seed >>> 0) + 4701),
-        ok = roll < (kind === "spy" ? 0.4 : 0.22),
-        caught = !ok && z(rid * 17 + (p.spyCount || 0), e.year, (e.seed >>> 0) + 4703) < 0.3,
+        sm = hasSkill(p, "spymaster"),
+        ok = roll < (kind === "spy" ? 0.4 : 0.22) + (sm ? 0.2 : 0),
+        caught = !ok && z(rid * 17 + (p.spyCount || 0), e.year, (e.seed >>> 0) + 4703) < (sm ? 0.15 : 0.3),
         msg;
       if (ok && kind === "spy") (((pol(e).intel || (pol(e).intel = {}))[rid] = e.year + 3), (msg = `Your spy reports on ${nationName(r)}: for three years you will see what their armies and garrisons are made of.`));
       else if (ok) {
@@ -4968,7 +4979,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return s.hull == null ? hullMax(s) : s.hull;
   }
   function seaPower(e, s) {
-    let adm = (e.players.find((p) => p.id === s.owner) || {}).nationId === "england" ? 1 : 0;
+    let own = e.players.find((p) => p.id === s.owner) || {},
+      adm = (own.nationId === "england" ? 1 : 0) + (hasSkill(own, "admiral") ? 1 : 0);
     return { lvl: (s.level || 1) + adm, hull: hullOf(s) + adm };
   }
   function boardStrength(e, s) {
@@ -5495,6 +5507,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let q = 0; q < opts.length && !want; q++) {
         let k = opts[(start + q) % opts.length],
           a2 = Math.max(1, Math.round((n * value[give] * fair) / value[k]));
+        hasSkill(hum, "merchant") && (a2 = Math.max(1, Math.round(a2 * 0.87)));
         most(k) >= a2 && ((want = k), (ask = a2));
       }
       if (!want) continue;
@@ -7019,8 +7032,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     difficulty: n,
     skills: o,
     seed: r,
-    rivals: i = 2,
-    length: GL = 150,
+    rivals: i = 5,
+    length: GL = 200,
   }) {
     let s = ee[e];
     if (!s) throw new Error("Pick a nation.");
@@ -7400,6 +7413,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
   }
   function be(e, n) {
+    GS = e;
     xi(e);
     let o = n();
     return o.ok ? to(e) : e.undo.pop(), o;
@@ -7655,6 +7669,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return r;
   }
   function Er(e) {
+    GS = e;
     e.undo = [];
     let n = Xo(e);
     if (!n.ok) return n;
@@ -7711,12 +7726,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
     // Dutch colony gold earns interest.
     for (let c of e.colonies) (e.players.find((q) => q.id === c.owner) || {}).nationId === "netherlands" && (c.stock.gold += Math.floor(c.stock.gold * 0.05));
-    // The wounded mend in their own colonies, a point a year.
-    for (let u of e.units)
-      u.maxStr &&
-        u.strength < u.maxStr &&
-        e.colonies.some((c) => c.owner === u.owner && c.x === u.x && c.y === u.y) &&
-        (u.strength += 1);
+    // The wounded mend in their own colonies, a point a year; with the
+    // Fountain of Youth two, and one a year even out in the field.
+    for (let u of e.units) {
+      if (!u.maxStr || u.strength >= u.maxStr) continue;
+      let home = e.colonies.some((c) => c.owner === u.owner && c.x === u.x && c.y === u.y),
+        fy = ownsFind(e, u.owner, "fountain_of_youth");
+      u.strength = Math.min(u.maxStr, u.strength + (home ? (fy ? 2 : 1) : fy ? 1 : 0));
+    }
     e.log.push(...e.governorNews), (e.lastTraces = []);
     for (let r of e.players)
       if (r.isHuman) {
@@ -13412,8 +13429,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           difficulty: "normal",
           skills: ["navigator", "cartographer"],
           seed: Math.floor(Math.random() * 999983),
-          length: 150,
-          rivals: 4,
+          length: 200,
+          rivals: 5,
         },
         g = () => {
           let k = f.skills.reduce((b, w) => b + Zn[w].cost, 0),
@@ -13430,14 +13447,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <h2>Difficulty</h2>
         <div class="row">${qo.map((b) => `<button type="button" class="choice ${f.difficulty === b.id ? "on" : ""}" data-diff="${b.id}">${b.label}</button>`).join("")}</div>
         <p class="sub">Rivals are always out for your land; harder settings give them bigger armies sooner.</p>
-        <h2>Length</h2>
-        <div class="row">${GAME_LENGTHS.map((b) => `<button type="button" class="choice ${f.length === b.turns ? "on" : ""}" data-len="${b.turns}">${b.turns} years</button>`).join("")}</div>
-        <p class="sub">The nation with the best score when the years run out wins.</p>
-        <h2>Rivals</h2>
-        <div class="row">${[2, 3, 4, 5].map((b) => `<button type="button" class="choice ${f.rivals === b ? "on" : ""}" data-riv="${b}">${b}</button>`).join("")}</div>
-        <p class="sub">Computer nations playing against you${f.nationId === "ixtal" ? "" : ", the Ixtal Empire among them"}.</p>
+        <p class="sub">Every game runs 200 years against all five other nations. The best score when the years run out wins.</p>
         <h2>Skills <span class="sub">${v} points left</span></h2>
-        <div class="skills">${Xn.map((b) => `<button type="button" class="skill ${f.skills.includes(b.id) ? "on" : ""}" data-skill="${b.id}"><b>${b.name}</b> \xB7 ${b.cost}<small>${b.effect}${b.stage > 1 ? ` (stage ${b.stage})` : ""}</small></button>`).join("")}</div>
+        <div class="skills">${Xn.map((b) => `<button type="button" class="skill ${f.skills.includes(b.id) ? "on" : ""}" data-skill="${b.id}"><b>${b.name}</b> \xB7 ${b.cost}<small>${b.effect}</small></button>`).join("")}</div>
         <h2>Map seed</h2>
         <div class="row"><input id="seed" type="number" value="${f.seed}"><button type="button" id="reseed" class="ghost">Another map</button></div>
         <div class="row">
@@ -13502,7 +13514,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (n.hidden = !1), (o.hidden = !0), (r.hidden = !0), g();
     }
     function N(f) {
-      (t = f), (h = ""), (n.hidden = !0), (r.hidden = !0), (o.hidden = !1);
+      (GS = f), (t = f), (h = ""), (n.hidden = !0), (r.hidden = !0), (o.hidden = !1);
       let me_ = V(t).id,
         g = t.units.find((k) => k.kind === "ship" && k.owner === me_) || t.units.find((k) => k.kind === "leader" && k.owner === me_ && !k.aboard),
         // A game with colonies opens on the largest of them; a new one on
@@ -14580,7 +14592,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p>${G(qn(k))}${k.rare ? "" : ". Build there to take advantage of it"}${k.rare && /[.!]$/.test(qn(k)) ? "" : "."}</p>
         ${g.prize ? `<p class="find-stat">${G(g.prize)}</p>` : ""}
         ${finderLine(f) ? `<p class="find-stat">${G(finderLine(f))}</p>` : ""}
-        <p class="muted">${k.rare ? (k.stage > 2 ? `Its effect starts once stage ${k.stage} of the game is built.` : g.prize ? "Yours to keep." : "Its effect is already yours.") : "You found it, so it counts for you. Point at it on the map to see how far it reaches."}</p>
+        <p class="muted">${k.rare ? (g.prize ? "Yours to keep." : "Its effect is already yours.") : "You found it, so it counts for you. Point at it on the map to see how far it reaches."}</p>
         <div class="row">
           <button type="button" id="goto-find" class="primary">Go to it</button>
           <button type="button" id="close-find">Carry on</button>
@@ -14725,7 +14737,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function ve() {
       (n.hidden = !0), (o.hidden = !0), (r.hidden = !1);
-      let f = "A practice roll. The battle itself is stage 3.",
+      let f = "A practice roll of the dice.",
         g = () => {
           let k = [];
           for (let v = 0; v < Ie.grid.rows; v++)
@@ -15885,7 +15897,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return `<h3 class="side-sub">Research</h3><table class="lead-stats">${RESEARCH.filter(([c]) => !(f.big && c === "gun"))
         .map(([c, k, label]) => {
           let lv = resLvl(me, c, k),
-            cost = resCost(c, lv);
+            cost = resCost(c, lv, me, k);
           return `<tr><th>${label}</th><td class="num">${lv} / ${RES_MAX}</td><td>${lv < RES_MAX ? `<button type="button" class="train" data-study="${c}:${k}" ${f.stock.gold >= cost ? "" : "disabled"}>+1 \u00b7 ${cost} gold</button>` : ""}</td></tr>`;
         })
         .join("")}</table><p class="muted">Paid from this colony's gold. Attack makes that arm hit more often; defence makes it harder to hit; leadership gives new leaders two more points each level. Militia use your research too.</p>`;
@@ -16500,7 +16512,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ? (N(
           ho({
             nationId: Ue.get("nation") || "england",
-            rivals: Number(Ue.get("rivals")) || 4,
+            rivals: Number(Ue.get("rivals")) || 5,
             difficulty: "normal",
             skills: ["navigator", "cartographer"],
             seed: Number(Ue.get("seed")) || 42,
