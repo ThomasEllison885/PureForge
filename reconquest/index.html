@@ -519,7 +519,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.06";
+    "1.07";
   var on = [
       {
         id: "spain",
@@ -1030,7 +1030,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 120,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "silver_vein",
@@ -1040,7 +1040,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 80,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "copper",
@@ -1050,7 +1050,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "mine",
         bonus: 60,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "tin",
@@ -1060,7 +1060,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "mine",
         bonus: 50,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "iron",
@@ -1070,7 +1070,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "mine",
         bonus: 80,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "diamonds",
@@ -1080,7 +1080,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 100,
-        radius: 4,
+        radius: 5,
       },
       {
         id: "emeralds",
@@ -1090,7 +1090,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 80,
-        radius: 4,
+        radius: 5,
       },
       {
         id: "rubies",
@@ -1100,7 +1100,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 80,
-        radius: 4,
+        radius: 5,
       },
       {
         id: "sapphires",
@@ -1110,7 +1110,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 70,
-        radius: 4,
+        radius: 5,
       },
       {
         id: "topaz",
@@ -1120,7 +1120,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["hills", "mountains"],
         building: "gold_mine",
         bonus: 50,
-        radius: 4,
+        radius: 5,
       },
       {
         id: "oak",
@@ -1130,7 +1130,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "woods"],
         building: "mill",
         bonus: 50,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "cherry",
@@ -1140,7 +1140,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "woods"],
         building: "mill",
         bonus: 40,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "redwood",
@@ -1150,7 +1150,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "woods"],
         building: "mill",
         bonus: 70,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "teak",
@@ -1160,7 +1160,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "woods"],
         building: "mill",
         bonus: 60,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "maple",
@@ -1170,7 +1170,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "woods"],
         building: "mill",
         bonus: 40,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "herbs",
@@ -1180,7 +1180,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["forest", "plains", "swamp", "woods"],
         building: "church",
         bonus: 50,
-        radius: 5,
+        radius: 6,
       },
       {
         id: "rice",
@@ -1190,8 +1190,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         terrain: ["plains", "swamp"],
         river: !0,
         building: "farm",
-        bonus: 70,
-        radius: 5,
+        bonus: 35,
+        radius: 6,
       },
       {
         id: "wheat",
@@ -1200,8 +1200,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#e2bf5a",
         terrain: ["plains"],
         building: "farm",
-        bonus: 60,
-        radius: 5,
+        bonus: 30,
+        radius: 6,
       },
       {
         id: "barley",
@@ -1210,8 +1210,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#d6c27a",
         terrain: ["plains"],
         building: "farm",
-        bonus: 50,
-        radius: 5,
+        bonus: 25,
+        radius: 6,
       },
       {
         id: "corn",
@@ -1220,8 +1220,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#f1d240",
         terrain: ["plains"],
         building: "farm",
-        bonus: 60,
-        radius: 5,
+        bonus: 30,
+        radius: 6,
       },
       {
         id: "oats",
@@ -1230,8 +1230,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         color: "#cdb98a",
         terrain: ["plains"],
         building: "farm",
-        bonus: 40,
-        radius: 5,
+        bonus: 20,
+        radius: 6,
       },
       {
         id: "temple_of_war",
@@ -1306,9 +1306,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       startStock: { food: 30, wood: 25, metal: 10, goods: 4, gold: 10 },
       housing: { center: 60, house: 40, farm: 40 },
       produce: {
-        farm: { food: 10 },
-        mill: { wood: 5 },
-        mine: { metal: 4 },
+        farm: { food: 8 },
+        mill: { wood: 4 },
+        mine: { metal: 3 },
         gold_mine: { gold: 3 },
       },
       eatPer: 10,
@@ -1585,17 +1585,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       colonySpacing: 16,
       buildReach: { 1: 3, 2: 4, 3: 5, 4: 6 },
       yield: {
+        // Percent added per nearby square (halved in 1.07).
         farm: {
           pad: 1,
           base: 0,
-          tile: { plains: 4, forest: -1, hills: -2, river: 8, woods: 1, swamp: -3, desert: -4 },
+          tile: { plains: 2, forest: -0.5, hills: -1, river: 4, woods: 0.5, swamp: -1.5, desert: -2 },
         },
-        mill: { pad: 2, base: 0, tile: { forest: 4, plains: 1, river: 8, woods: 2, swamp: 1 } },
-        mine: { pad: 3, base: 0, tile: { hills: 3, mountains: 4, river: 6, desert: 1 } },
+        mill: { pad: 2, base: 0, tile: { forest: 2, plains: 0.5, river: 4, woods: 1, swamp: 0.5 } },
+        mine: { pad: 3, base: 0, tile: { hills: 1.5, mountains: 2, river: 3, desert: 0.5 } },
         gold_mine: {
           pad: 3,
           base: -100,
-          tile: { hills: 2, mountains: 4, river: 8, gold: 60, desert: 1 },
+          tile: { hills: 1, mountains: 2, river: 4, gold: 30, desert: 0.5 },
         },
       },
       landCost: 2,
@@ -4895,8 +4896,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let w = europeAt(e, me, rival);
     return w === "none" ? "none" : w === "war" ? "war" : "peace";
   }
-  // Important news (a war on you, an army at your gates) opens the year's
-  // summary by itself; the rest waits under the This year button.
+  // Urgent news (a war on you, an army at your gates) is marked; the year's summary opens after every turn that has news.
   var EVENT_URGENT = /declares war on you|marching on|has reached|lands to retake|declare their independence|Independence is won|commonwealth is agreed|Peace with the crown|has taken|burned .* to the ground|Raiders/;
   function pushEvent(e, text, x, y) {
     let P = pol(e);
@@ -8036,7 +8036,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let { report: i, traces: s } = cr(e, r.id);
         e.log.push(...i), e.lastTraces.push(...s);
       }
-    return tr(e), gameEndCheck(e), (pol(e).showSummary = pol(e).events.some((q) => q.urgent)), n;
+    return tr(e), gameEndCheck(e), (pol(e).showSummary = pol(e).events.length > 0), n;
   }
   function yo(e) {
     let n = e.undo.pop();
@@ -14872,9 +14872,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           H !== rdNow.key && ((H = rdNow.key), rdNow.run());
           return;
         }
+        // The settlers' arrival is told before the year's moves play.
+        let setl = O.paused && !p && !(m && t.paper) && (t.announce || []).find((q) => q.kind === "settlers");
         O.paused && m && t.paper
           ? de(t.paper)
-          : p || ((a.hidden = !0), (H = null));
+          : setl
+            ? H !== `announce:settlers:${t.year}` && ((H = `announce:settlers:${t.year}`), announceCard(setl))
+            : p || ((a.hidden = !0), (H = null));
         return;
       }
       if (rdNow && m && t.paper) {
@@ -15402,6 +15406,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     i.addEventListener("pointerdown", (f) => {
       if (f.button > 0) return;
       camStop();
+      // The year's moves start with the press itself, so the same click can
+      // also pick up a unit or drag the map.
+      t && O && O.paused && !p && He();
       (c = { x: f.clientX, y: f.clientY, ox: d.ox, oy: d.oy, moved: !1 }),
         (P = null);
       // Units can be picked up while other moves play; only one still on
