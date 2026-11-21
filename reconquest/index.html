@@ -263,6 +263,23 @@ ul.colony-list small { color: #5c5144; }
 .outcome .ob-text { position: relative; font: 700 clamp(64px, 12vw, 150px)/1 Palatino, Georgia, serif; letter-spacing: 0.08em; text-transform: uppercase; transform: rotate(-3deg); animation: obSlam 0.55s cubic-bezier(.2,.8,.2,1) 0.12s both; }
 .outcome.win .ob-text { background: linear-gradient(180deg, #fff3c4 0%, #f0c04a 45%, #a8741e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(60, 36, 8, 0.7); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
 .outcome.lose .ob-text { color: #e8ddd0; -webkit-text-stroke: 2px rgba(60, 8, 4, 0.8); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7)); }
+.outcome.loot .ob-band { background: linear-gradient(180deg, rgba(58, 40, 8, 0.95), rgba(30, 20, 2, 0.95)); box-shadow: 0 0 70px rgba(255, 200, 60, 0.35); }
+.outcome.loot .ob-text { background: linear-gradient(180deg, #fffbe0 0%, #ffd84a 40%, #c88a10 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(70, 40, 0, 0.75); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
+.outcome.raided .ob-band { background: linear-gradient(180deg, rgba(120, 66, 14, 0.94), rgba(60, 30, 6, 0.94)); }
+.outcome.raided .ob-text { color: #f6e2c0; -webkit-text-stroke: 2px rgba(70, 30, 4, 0.8); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7)); }
+.outcome .ob-coins { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.outcome .ob-coins i { position: absolute; top: -30px; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6c0, #f0c040 45%, #9a6a10); box-shadow: 0 0 0 2px rgba(90, 56, 6, 0.6); animation: obCoin 1.6s cubic-bezier(.4,0,.8,.6) both; }
+.outcome.raided .ob-coins i { animation-name: obCoinUp; top: auto; bottom: 30%; }
+@keyframes obCoin { from { transform: translateY(0) rotateY(0); opacity: 1; } to { transform: translateY(70vh) rotateY(720deg); opacity: 0.9; } }
+@keyframes obCoinUp { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-40vh) translateX(30vw); opacity: 0; } }
+.bsum .find-kicker { font-weight: 700; letter-spacing: 0.12em; }
+.bsum.win .find-kicker, .bsum.loot .find-kicker { color: #a8741e; }
+.bsum.lose .find-kicker { color: #a0281c; }
+.bsum.raided .find-kicker { color: #9a5a14; }
+.bsum-t { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 14px; }
+.bsum-t td { padding: 4px 6px; border-bottom: 1px solid rgba(80, 60, 30, 0.15); }
+.bsum-t td:last-child { text-align: right; font-weight: 600; }
+.bsum-news { margin: 0 0 10px; padding-left: 18px; font-size: 13.5px; line-height: 1.45; max-height: 180px; overflow: auto; }
 .outcome .ob-line { position: relative; margin-top: 22px; max-width: min(80vw, 720px); text-align: center; color: #f4ead2; font: italic 20px Palatino, Georgia, serif; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); transform: rotate(-3deg); animation: obFade 0.5s ease 0.55s both; }
 @keyframes obWipe { from { transform: rotate(-3deg) scaleX(0); } to { transform: rotate(-3deg) scaleX(1); } }
 @keyframes obSlam { from { opacity: 0; transform: rotate(-3deg) scale(1.7); filter: blur(10px); } to { opacity: 1; transform: rotate(-3deg) scale(1); } }
@@ -502,7 +519,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.03";
+    "1.04";
   var on = [
       {
         id: "spain",
@@ -3640,7 +3657,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ? Math.min(0.6, B.raidRounds * 0.12)
       : B.plunder === "native"
         ? Math.min(0.6, B.raidRounds * 0.07)
-        : 1 - Math.pow(0.9, Math.max(0, Math.min(B.round, BMAXROUND) - 2));
+        : // beat the defenders and the whole town is yours to strip
+          Math.max(B.over && B.over.winner === "att" ? 0.5 : 0, 1 - Math.pow(0.9, B.raidRounds));
   }
   var bIdx = (c, r) => r * BCOLS + c,
     bHome = (side) => (side === "att" ? 0 : BROWS - 1),
@@ -3891,13 +3909,26 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     B.turn = bFoe(B.turn);
     B.over || bStartTurn(B);
   }
-  // Leave the field. The enemy gets one parting shot first.
+  // Leave the field. Every enemy unit within reach gets a parting shot
+  // at the men pulling back.
   function bRetreat(B, side) {
     if (B.over) return;
     let foe = bFoe(side);
-    B.log.push(`${B.sides[side].name || "They"} retreat from the field.`);
+    B.log.push(`${B.sides[side].name || "They"} retreat from the field. The enemy fires on them as they go.`);
     let was = B.turn;
-    (B.turn = foe), bStartTurn(B), (B.sides[foe].attacksLeft = 1), bAiAttacks(B), (B.turn = was);
+    (B.turn = foe), bStartTurn(B), (B.sides[foe].attacksLeft = 99);
+    for (let u of B.sides[foe].units) (u.moved = !1), (u.acts = 0);
+    // no charging after them: only men already in reach fire
+    for (let g = 0; g < 30 && !B.over; g++) {
+      let best = null;
+      for (let tr = 0; tr < BROWS && !best; tr++)
+        for (let tc = 0; tc < BCOLS && !best; tc++) {
+          let grp = bAlive(B, foe).filter((u) => bCanHit(B, u, tc, tr));
+          grp.length && (best = [grp, tc, tr]);
+        }
+      if (!best || !bAttack(B, ...best)) break;
+    }
+    B.turn = was;
     B.over || (B.over = { winner: foe, why: "retreat" });
   }
   // ---- Battle AI: used for the enemy, for auto-resolve, and for the odds.
@@ -5573,15 +5604,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // the fifth, a building level a round goes down. Raiders who win the
   // battle burn the colony to the ground.
   function raidSpoils(e, col, B, pid) {
-    let rounds = Math.min(B.round, BMAXROUND),
-      share = 1 - Math.pow(0.9, Math.max(0, rounds - 2)),
+    // Only rounds spent inside the town count: raiders who never get past
+    // the defenders carry nothing off.
+    let rounds = B.raidRounds,
+      share = raidShare(B),
       took = [];
     for (let k of ["food", "wood", "goods", "metal", "gold"]) {
       if (col.stock[k] == null) continue;
       let n = Math.floor(col.stock[k] * share);
       n > 0 && ((col.stock[k] -= n), bankLoot(e, pid, col.x, col.y, k, n), took.push(`${n} ${Ne[k].toLowerCase()}`));
     }
-    let wrecked = wreckBuildings(e, col, Math.max(0, rounds - 4), e.year * 3 + col.id),
+    let wrecked = wreckBuildings(e, col, Math.max(0, rounds - 2), e.year * 3 + col.id),
       burned = B.over.winner === "att";
     if (burned) {
       e.colonies = e.colonies.filter((c) => c !== col);
@@ -15729,15 +15762,62 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     // VICTORY or DEFEAT painted across the screen as a battle ends. A click
     // clears it; it fades by itself in a few seconds.
-    function showOutcome(win, line) {
+    // How a fight ended, in one word and a look. A raid is about what was
+    // carried off, so it gets its own words: getting away with plunder is
+    // no defeat.
+    function outcomeOf(B, mine) {
+      let w = B.over.winner === mine;
+      if (B.kind !== "raid") return { cls: w ? "win" : "lose", word: w ? "Victory" : "Defeat" };
+      let took = raidShare(B) > 0,
+        sacked = B.over.winner === "att";
+      if (mine === "att") return sacked ? { cls: "loot", word: "Sacked" } : took ? { cls: "loot", word: "Plundered" } : w ? { cls: "win", word: "Victory" } : { cls: "lose", word: "Beaten back" };
+      return sacked ? { cls: "lose", word: "Sacked" } : took ? { cls: "raided", word: "Raided" } : w ? { cls: "win", word: "Town held" } : { cls: "lose", word: "Defeat" };
+    }
+    function showOutcome(win, line, look) {
+      look || (look = { cls: win ? "win" : "lose", word: win ? "Victory" : "Defeat" });
       let el = document.createElement("div");
-      el.className = `outcome ${win ? "win" : "lose"}`;
-      el.innerHTML = `<div class="ob-band"></div><div class="ob-text">${win ? "Victory" : "Defeat"}</div>${line ? `<div class="ob-line">${G(line)}</div>` : ""}`;
+      el.className = `outcome ${look.cls}`;
+      let coins = look.cls === "loot" || look.cls === "raided" ? `<div class="ob-coins">${Array.from({ length: 14 }, (_, k) => `<i style="left:${(8 + ((k * 37) % 84)).toFixed(0)}%;animation-delay:${(0.15 + (k % 7) * 0.12).toFixed(2)}s"></i>`).join("")}</div>` : "";
+      el.innerHTML = `<div class="ob-band"></div>${coins}<div class="ob-text">${G(look.word)}</div>${line ? `<div class="ob-line">${G(line)}</div>` : ""}`;
       document.body.appendChild(el);
       let gone = () => (el.classList.contains("out") || (el.classList.add("out"), setTimeout(() => el.remove(), 500)));
       (el.onclick = gone), setTimeout(gone, 2800);
     }
-    function preBattle(spec, mine, done) {
+    // After the fight, a card sums it up: how it ended, who fell, and what
+    // came of it (plunder, colonists lost, a leader's promotion).
+    function battleSummary(B, spec, mine, news) {
+      let look = outcomeOf(B, mine),
+        t_ = battleTally(B),
+        yours = mine === "att" ? t_.attLost : t_.defLost,
+        theirs = mine === "att" ? t_.defLost : t_.attLost,
+        pct = B.kind === "raid" ? Math.round(raidShare(B) * 100) : null;
+      (p = !0), (a.hidden = !1);
+      a.innerHTML = `
+      <div class="card bsum ${look.cls}">
+        <p class="find-kicker">${G(look.word)}</p>
+        <h2>${G(spec.title)}</h2>
+        <p class="find-stat">${G(overText(B, mine))}</p>
+        <table class="bsum-t">
+          <tr><td>Rounds fought</td><td>${t_.rounds}</td></tr>
+          <tr><td>Your men killed</td><td>${G(yours)}</td></tr>
+          <tr><td>Their men killed</td><td>${G(theirs)}</td></tr>
+          <tr><td>Your strength left</td><td>${bStrength(B, mine)} of ${B.sides[mine].start}</td></tr>
+          <tr><td>Their strength left</td><td>${bStrength(B, bFoe(mine))} of ${B.sides[bFoe(mine)].start}</td></tr>
+          ${pct != null ? `<tr><td>${mine === "att" ? "Their stores carried off" : "Your stores carried off"}</td><td>${pct}%</td></tr>` : ""}
+        </table>
+        ${news.length ? `<ul class="bsum-news">${news.map((q) => `<li>${G(q)}</li>`).join("")}</ul>` : ""}
+        <div class="row"><button type="button" class="primary" id="bsum-ok">Carry on</button></div>
+      </div>`;
+      a.querySelector("#bsum-ok").onclick = () => ((p = !1), (a.hidden = !0), (a.innerHTML = ""), (H = null), R());
+    }
+    function preBattle(spec, mine, done0) {
+      let done = (B) => {
+        let n0 = t.log.length;
+        done0(B);
+        if (!t || !B || !B.over || window.__test && window.__test.noSummary) return;
+        let news = t.log.slice(n0);
+        (h = ""), battleSummary(B, spec, mine, news);
+      };
       p = !0;
       (a.hidden = !1),
         (a.innerHTML = `
@@ -15756,7 +15836,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (a.querySelector("#b-auto").onclick = () => {
           (p = !1), (a.hidden = !0);
           let B = bAutoFinish(battleNew(spec, (Date.now() >>> 0) ^ 0x9e37));
-          showOutcome(B.over.winner === mine, overText(B, mine)), done(B);
+          showOutcome(B.over.winner === mine, overText(B, mine), outcomeOf(B, mine)), done(B);
         }),
         (a.querySelector("#b-grid").onclick = () => {
           (p = !1), (a.hidden = !0), gridBattle(spec, mine, done);
@@ -15979,7 +16059,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         live = () => [...sel].filter((u) => u.str > 0 && (bMoves(B, u).length || bTargets(B, u).length)),
         told = !1,
         draw = () => {
-          B.over && !told && ((told = !0), setTimeout(() => showOutcome(B.over.winner === mine, overText(B, mine)), 250));
+          B.over && !told && ((told = !0), setTimeout(() => showOutcome(B.over.winner === mine, overText(B, mine), outcomeOf(B, mine)), 250));
           for (let u of [...sel]) (u.str <= 0 || (!bMoves(B, u).length && !bTargets(B, u).length)) && sel.delete(u);
           let S = B.sides[mine],
             myTurn = B.turn === mine && !B.over,
@@ -16029,7 +16109,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             <p class="sub">Round ${Math.min(B.round, BMAXROUND)} of ${BMAXROUND}. ${B.over ? "" : myTurn ? `Your turn: <b class="acts-left">${S.attacksLeft} action${S.attacksLeft === 1 ? "" : "s"} left</b>${S.leader ? ` under ${G(S.leader.name)}` : ""}.` : "Their turn."}</p>
             ${B.kind === "raid" ? (() => {
               let pct = Math.round(raidShare(B) * 100);
-              return `<div class="raidbox ${mine === "att" ? "mine" : "theirs"}" title="${B.plunder === "colony" ? "Every round the raiders stay, they carry off more." : "The raiders carry off more for every round they hold part of the town."}"><b>${pct}%</b><span>${mine === "att" ? "of their stores carried off so far" : "of your stores carried off so far"}</span><i style="width:${pct}%"></i></div>`;
+              return `<div class="raidbox ${mine === "att" ? "mine" : "theirs"}" title="The raiders carry off more for every round they hold part of the town: its home row."><b>${pct}%</b><span>${mine === "att" ? "of their stores carried off so far" : "of your stores carried off so far"}</span><i style="width:${pct}%"></i></div>`;
             })() : ""}
             <div class="row btop">
               ${B.over ? '<button type="button" id="b-done" class="primary">Back to the map</button>' : `<button type="button" id="b-end" class="primary${myTurn && !readyList.length ? " nudge" : ""}" ${myTurn ? "" : "disabled"}>End turn</button><button type="button" id="b-auto">Auto-finish</button><button type="button" id="b-flee" ${myTurn ? "" : "disabled"}>Retreat</button>`}
@@ -16108,6 +16188,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         t = battleTally(B),
         yours = mine === "att" ? t.attLost : t.defLost,
         theirs = mine === "att" ? t.defLost : t.attLost;
+      if (B.kind === "raid") {
+        let pct = Math.round(raidShare(B) * 100),
+          sacked = B.over.winner === "att",
+          loot = sacked ? (mine === "att" ? `You broke the defence and sacked the town, carrying off ${pct}% of its stores.` : `They broke your defence and sacked the town, carrying off ${pct}% of its stores.`) : pct ? (mine === "att" ? `You got away with ${pct}% of their stores.` : `They got away with ${pct}% of your stores.`) : mine === "att" ? "You carried nothing off." : "They carried nothing off.";
+        return `${loot} You lost ${yours}; they lost ${theirs}.`;
+      }
       return `${w ? "You won" : "You lost"}: ${why}. You lost ${yours}; they lost ${theirs}.`;
     }
     // A raid on one of your colonies arrives: choose how to fight it.
@@ -16340,7 +16426,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       let mine = t.colonies.filter((c) => c.owner === me.id),
         payDef = mine.slice().sort((x1, x2) => (x2.stock[of.want] || 0) - (x1.stock[of.want] || 0))[0],
-        opts = (sel) => mine.map((c) => `<option value="${c.id}" ${c === sel ? "selected" : ""}>${G(c.name)} (${c.stock[of.want] || 0} ${Ne[of.want].toLowerCase()}, ${c.stock[of.give] || 0} ${Ne[of.give].toLowerCase()})</option>`).join("");
+        // each colony with what it holds against what its stores can take
+        amt = (c, k) => {
+          let cap = storeCap(c, k);
+          return `${c.stock[k] || 0}${isFinite(cap) ? `/${cap}` : ""} ${Ne[k].toLowerCase()}`;
+        },
+        opts = (sel) => mine.map((c) => `<option value="${c.id}" ${c === sel ? "selected" : ""}>${G(c.name)} (${amt(c, of.want)}, ${amt(c, of.give)})</option>`).join("");
       a.innerHTML = `
       <div class="card">
         <p class="find-kicker">Trade offer · ${G(diploLevel(relOf(t, me.id, r.id)).name)}</p>
@@ -16580,7 +16671,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         `${col.name}, a ${nationAdj(owner)} colony`,
         `Defended by ${bLabel(def.units.map((q) => ({ name: q.name || UNIT_KINDS[q.kind].name })))}${def.leader ? ` under ${def.leader.name}` : ""}.`,
         [
-          { id: "raid", label: "Raid", hint: "From the third round on you carry off a tenth of what is left each round; from the fifth, wreck a building a round. Retreat whenever you like and keep what you took. Win and the colony is burned." },
+          { id: "raid", label: "Raid", hint: "Fight your way into the town (their home row). Every round you hold part of it you carry off a tenth of what is left; from the third such round you also wreck a building a round. Retreat whenever you like and keep what you took, but the defenders get a shot at you as you go. Take their flag and the colony is burned." },
           ...(isNatNation(owner) !== isNatNation(V(t)) ? [] : [{ id: "capture", label: "Capture", hint: "Win the battle and the colony is yours, with some damage. Lose, and nothing changes hands." }]),
         ],
         (opt) => {
