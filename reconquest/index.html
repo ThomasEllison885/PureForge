@@ -8253,6 +8253,175 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (g.fillStyle = "rgba(0,0,0,0.18)"), g.beginPath(), g.ellipse(px + s * 0.3, py - s * 0.2, s * 0.6, s * 0.45, 0, 0, Math.PI * 2), g.fill();
       }
   }
+  // ---- Relief: one height field for the whole map, so ranges join up ----
+  // Heights are sampled at the corners of small facets; a corner is shared
+  // by every square that touches it, so neighbouring squares meet exactly.
+  var reliefCache = new WeakMap();
+  function reliefField(map) {
+    let F = reliefCache.get(map);
+    if (F) return F;
+    let w = map.width,
+      h = map.height,
+      n = w * h,
+      mt = new Float32Array(n),
+      ht = new Float32Array(n),
+      rv = new Float32Array(n),
+      pk = new Float32Array(n),
+      deep = new Float32Array(n),
+      wet = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      let t = map.tiles[i];
+      (mt[i] = t.terrain === "mountains" ? 1 : 0), (ht[i] = t.terrain === "hills" ? 1 : 0), (rv[i] = t.riverId ? 1 : 0), (pk[i] = t.peakId ? 1 : 0), (wet[i] = t.terrain === "ocean" || t.terrain === "coast" ? 1 : 0);
+    }
+    // how deep inside a range each square sits
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        if (!mt[y * w + x]) continue;
+        let s = 0;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            let xx = x + dx,
+              yy = y + dy;
+            xx >= 0 && yy >= 0 && xx < w && yy < h && (s += mt[yy * w + xx]);
+          }
+        deep[y * w + x] = s / 25;
+      }
+    // mountains spread a little past their own squares, as foothills
+    let mtb = new Float32Array(n);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let s = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            let xx = x + dx,
+              yy = y + dy;
+            xx >= 0 && yy >= 0 && xx < w && yy < h && (s += mt[yy * w + xx] * (dx || dy ? 1 : 2));
+          }
+        mtb[y * w + x] = s / 10;
+      }
+    F = { w, h, mt, mtb, ht, rv, pk, deep, wet, memo: new Map(), hmemo: new Map(), seed: map.seed >>> 0 };
+    reliefCache.set(map, F);
+    return F;
+  }
+  // Mountain height in pixels at zoom 1, at a map point (square centres on
+  // whole numbers).
+  function reliefH(map, px, py) {
+    let F = reliefField(map),
+      key = Math.round(px * 6) * 65536 + Math.round(py * 6),
+      v = F.memo.get(key);
+    if (v != null) return v;
+    let m = Math.min(1, wo(F.mtb, F.w, F.h, px, py) * 1.25);
+    if (m <= 0.002) return F.memo.set(key, 0), 0;
+    let s = F.seed,
+      dp = wo(F.deep, F.w, F.h, px, py),
+      rv = wo(F.rv, F.w, F.h, px, py),
+      pk = wo(F.pk, F.w, F.h, px, py),
+      rg = 0,
+      amp = 0.62,
+      f = 0.36;
+    // ridged noise: crests and summits, softer valleys between
+    for (let k = 0; k < 3; k++) {
+      let e = 1 - Math.abs(Ee(px * f, py * f, s + 701 + k) * 2 - 1);
+      (rg += e * e * amp), (amp *= 0.45), (f *= 2.2);
+    }
+    let shape = m * m * (3 - 2 * m);
+    v = shape * (3 + 8 * dp + 40 * Math.pow(rg, 1.4) * (0.45 + 0.55 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 22 * shape;
+    return F.memo.set(key, v), v;
+  }
+  // Gentle rolling height for hill country.
+  function hillH(map, px, py) {
+    let F = reliefField(map),
+      key = Math.round(px * 6) * 65536 + Math.round(py * 6),
+      v = F.hmemo.get(key);
+    if (v != null) return v;
+    let m = wo(F.ht, F.w, F.h, px, py);
+    v = m <= 0.002 ? 0 : m * m * (3 - 2 * m) * (5 + 12 * Ee(px * 0.75, py * 0.75, F.seed + 741) + 5 * Ee(px * 1.9, py * 1.9, F.seed + 743));
+    return F.hmemo.set(key, v), v;
+  }
+  // Does a square need relief drawn: high ground on it or right beside it.
+  function reliefNear(map, x, y, field) {
+    let F = reliefField(map),
+      A = F[field],
+      R = field === "mt" ? 2 : 1;
+    if (F.wet[y * F.w + x]) return !1;
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) {
+        let xx = x + dx,
+          yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < F.w && yy < F.h && A[yy * F.w + xx]) return !0;
+      }
+    return !1;
+  }
+  var RLIGHT = (() => {
+    let v = [-0.62, -0.28, 0.73],
+      l = Math.hypot(...v);
+    return v.map((q) => q / l);
+  })();
+  // Draw one square's share of the relief as small lit facets, back to
+  // front, around the square's centre (zoom 1 units). raised: mountains
+  // stand up off the ground; otherwise only light and shade are laid on.
+  function reliefMesh(g, map, x, y, hf, raised) {
+    let n = 3,
+      P = [],
+      top = 0;
+    for (let j = 0; j <= n; j++)
+      for (let i = 0; i <= n; i++) {
+        let px = x - 0.5 + i / n,
+          py = y - 0.5 + j / n,
+          H = hf(map, px, py);
+        top = Math.max(top, H);
+        P.push({ sx: (px - x - (py - y)) * 32, sy: (px - x + py - y) * 16 - (raised ? H : 0), H, px, py });
+      }
+    if (top < 0.6) return;
+    let tri = (a, b, c) => {
+      let hm = Math.max(a.H, b.H, c.H);
+      if (hm < 0.5) return;
+      let ux = (b.px - a.px) * 40,
+        uy = (b.py - a.py) * 40,
+        uz = b.H - a.H,
+        vx = (c.px - a.px) * 40,
+        vy = (c.py - a.py) * 40,
+        vz = c.H - a.H,
+        nx = uy * vz - uz * vy,
+        ny = uz * vx - ux * vz,
+        nz = ux * vy - uy * vx;
+      nz < 0 && ((nx = -nx), (ny = -ny), (nz = -nz));
+      let nl = Math.hypot(nx, ny, nz) || 1,
+        lit = Math.max(0, (nx * RLIGHT[0] + ny * RLIGHT[1] + nz * RLIGHT[2]) / nl),
+        flat = nz / nl,
+        ha = (a.H + b.H + c.H) / 3;
+      g.beginPath(), g.moveTo(a.sx, a.sy), g.lineTo(b.sx, b.sy), g.lineTo(c.sx, c.sy), g.closePath();
+      if (raised) {
+        // green low down, bare rock higher, snow on the tops
+        let gr = Math.max(0, Math.min(1, (ha - 4) / 18)),
+          sn = Math.max(0, Math.min(1, (ha - 34) / 7)) * (flat > 0.5 ? 1 : 0.6),
+          r = 116 + (138 - 116) * gr,
+          gg = 110 + (124 - 110) * gr,
+          bb = 70 + (102 - 70) * gr;
+        (r += (238 - r) * sn), (gg += (240 - gg) * sn), (bb += (236 - bb) * sn);
+        let k = 0.64 + 0.52 * lit,
+          al = Math.max(0, Math.min(1, (ha - 1) / 5));
+        g.fillStyle = g.strokeStyle = `rgba(${Math.round(r * k)},${Math.round(gg * k)},${Math.round(bb * k)},${al.toFixed(3)})`;
+        (g.lineWidth = 0.7), g.fill(), al > 0.95 && g.stroke();
+      } else {
+        // hills: sunlit and shadowed sides laid over the grass
+        let d = lit - 0.72,
+          al = Math.min(0.32, Math.abs(d) * 0.9) * Math.min(1, hm / 4);
+        g.fillStyle = d > 0 ? `rgba(255,244,205,${al.toFixed(3)})` : `rgba(24,30,12,${al.toFixed(3)})`;
+        g.fill();
+      }
+    };
+    for (let k = 0; k <= 2 * (n - 1); k++)
+      for (let i = 0; i < n; i++) {
+        let j = k - i;
+        if (j < 0 || j >= n) continue;
+        let A = P[j * (n + 1) + i],
+          B2 = P[j * (n + 1) + i + 1],
+          C2 = P[(j + 1) * (n + 1) + i + 1],
+          D = P[(j + 1) * (n + 1) + i];
+        tri(A, B2, C2), tri(A, C2, D);
+      }
+  }
   function mtnNear(map, x, y) {
     let w = map.width,
       hh = map.height,
@@ -9235,6 +9404,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           hm = Hm[p],
           v =
             y[p] * 0.5 +
+            // a gentle roll to all land, so plains are not dead flat
+            (Ee(J * 0.32, _ * 0.32, s + 241) - 0.5) * 0.07 +
+            (Ee(J * 0.9, _ * 0.9, s + 243) - 0.5) * 0.035 +
             (Ee(J * 2.4, _ * 2.4, s + 211) - 0.5) * 0.025 +
             (Ee(J * 6, _ * 6, s + 213) - 0.5) * 0.008;
         if (mm > 0.002) {
@@ -9418,7 +9590,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               0.707,
             cv = Math.max(-0.22, Math.min(0.12, (Rh[H] - RL.B[H]) * 4.5)),
             pn =
-              Math.max(0.42, Math.min(1.42, 1 + (Jn - 1) * 0.9 + cv)) +
+              Math.max(0.42, Math.min(1.45, 1 + (Jn - 1) * 1.1 + cv)) +
               (y[H] - 0.62) * 0.3 +
               Bn;
           (oe *= pn), (re *= pn), (x *= pn);
@@ -10230,20 +10402,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         lm && finds.push([p, lm, !0]);
         continue;
       }
+      // High ground first, so what grows or stands on it is drawn over it.
+      seen && reliefNear(n.map, c, h, "ht") && Ye(e, p.x, p.y, d, (M) => reliefMesh(M, n.map, c, h, hillH, !1));
+      seen && reliefNear(n.map, c, h, "mt") && Ye(e, p.x, p.y, d, (M) => reliefMesh(M, n.map, c, h, reliefH, !0));
       m.terrain === "forest" &&
         d >= Vi &&
         Ye(e, p.x, p.y, d, (M) => st(M, c, h, u, !!m.riverId, wetSides(n.map, c, h)));
       m.terrain === "woods" && d >= Vi && Ye(e, p.x, p.y, d, (M) => woodsTile(M, c, h, u, wetSides(n.map, c, h), !!m.riverId));
       m.terrain === "swamp" && d >= Vi && Ye(e, p.x, p.y, d, (M) => swampTile(M, c, h, u));
       m.terrain === "desert" && d >= Ji && Ye(e, p.x, p.y, d, (M) => desertTile(M, c, h, u));
-      // peaks stand tall enough to show above the fog, so they wait too
-      m.terrain === "mountains" &&
-        !m.riverId &&
-        seen &&
-        Ye(e, p.x, p.y, d, (M) => mtnTile(M, n.map, c, h, u, m));
-      m.terrain === "hills" &&
-        d >= Ji &&
-        Ye(e, p.x, p.y, d, (M) => hillTile(M, c, h, u));
+
       lm && seen && finds.push([p, lm, !1]);
     }
     // Discoveries go on last so a mountain peak in front can never hide one.
