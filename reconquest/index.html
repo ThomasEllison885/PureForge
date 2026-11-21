@@ -3014,7 +3014,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let a = (
       n === "river" ? e.map.rivers : n === "peak" ? e.map.peaks : e.map.regions
     ).find((l) => l.id === o);
-    if (!a) return B("Nothing there to name.");
+    if (!a) return (e.pendingNames = e.pendingNames.filter((l) => !(l.kind === n && l.id === o))), B("Nothing there to name.");
     let t = String(r || "")
       .trim()
       .slice(0, 40);
@@ -14176,7 +14176,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let it = O.hold.item;
           if (holdOpen(it)) {
             let w = it.kind ? `${it.kind}:${it.id}` : `special:${it.id}`;
-            H !== w && ((H = w), it.kind ? Te(it) : en(it));
+            // wait for any other open card (a trade, say) to be closed first
+            !p && H !== w && ((H = w), it.kind ? Te(it) : en(it));
             return;
           }
           (H = null), resumeAnim();
@@ -14204,10 +14205,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         rd = !v && !b && (t.pendingRaids || [])[0];
       if (v) {
         let w = `${v.kind}:${v.id}`;
-        H !== w && ((H = w), Te(v));
+        !p && H !== w && ((H = w), Te(v));
       } else if (b) {
         let w = `special:${b.id}`;
-        H !== w && ((H = w), en(b));
+        !p && H !== w && ((H = w), en(b));
       } else if (rdNow) {
         H !== rdNow.key && ((H = rdNow.key), rdNow.run());
       } else if (!p && t.politics && t.politics.over && !t.politics.over.seen) {
@@ -14507,11 +14508,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           <button type="button" id="close-find">Carry on</button>
         </div>
       </div>`),
+        (p = !0),
         (a.querySelector("#goto-find").onclick = () => {
-          Yn(t, f.id), (H = null), glide(g.x, g.y), (u = { x: g.x, y: g.y }), R();
+          (p = !1), Yn(t, f.id), (H = null), glide(g.x, g.y), (u = { x: g.x, y: g.y }), R();
         }),
         (a.querySelector("#close-find").onclick = () => {
-          Yn(t, f.id), (H = null), R();
+          (p = !1), Yn(t, f.id), (H = null), R();
         });
     }
     // Size of a river, peak, or region, in the units an explorer's journal would use.
@@ -14568,6 +14570,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       };
       a.querySelector("#name-cancel").onclick = () => close(cur);
     }
+    // Is this river, peak or region still waiting for its name?
+    function holdOpenName(f) {
+      return t.pendingNames.some((q) => q.kind === f.kind && q.id === f.id);
+    }
     function Te(f) {
       let g =
         f.kind === "river" ? "river" : f.kind === "peak" ? "peak" : "region";
@@ -14581,12 +14587,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <input name="title" maxlength="40" placeholder="Name" required autofocus value="${G(Vo(t, f.kind, f.ownerId))}">
         <div class="row"><button class="primary" type="submit">Record the name</button></div>
       </form>`);
+      p = !0;
       let k = a.querySelector("form");
       k.title.select(),
         (k.onsubmit = (v) => {
           v.preventDefault();
           let b = $r(t, f.kind, f.id, k.title.value, f.ownerId);
-          x(b), R();
+          // once named the card is done; otherwise it stays to try again
+          (b.ok || !holdOpenName(f)) && (p = !1), x(b), R();
         });
     }
     function de(f) {
