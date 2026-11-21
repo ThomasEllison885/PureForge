@@ -13405,8 +13405,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (g.fillStyle = `rgba(255,220,160,${0.5 - q * 0.011})`), g.fillRect(sx - w2 / 2 + R(-6, 6), y, w2, 1.4);
       }
       // the forested coast down the left
-      let coast = (pts, col) => ((g.fillStyle = col), g.beginPath(), pts.forEach(([x, y], q) => (q ? g.lineTo(x, y) : g.moveTo(x, y))), g.fill());
-      coast([[-10, hz - H * 0.02], [W * 0.1, hz - H * 0.05], [W * 0.2, hz - H * 0.02], [W * 0.3, hz + H * 0.01], [W * 0.26, hz + H * 0.12], [W * 0.16, hz + H * 0.24], [W * 0.1, H * 0.94], [-10, H + 10]], "#2a3e28");
+      let coast = (pts, col) => ((g.fillStyle = col), g.beginPath(), pts.forEach(([x, y], q) => (q ? g.lineTo(x, y) : g.moveTo(x, y))), g.fill()),
+        landPts = [[-10, hz - H * 0.02], [W * 0.1, hz - H * 0.05], [W * 0.2, hz - H * 0.02], [W * 0.3, hz + H * 0.01], [W * 0.26, hz + H * 0.12], [W * 0.16, hz + H * 0.24], [W * 0.1, H * 0.94], [-10, H + 10]],
+        land = new Path2D();
+      landPts.forEach(([x, y], q) => (q ? land.lineTo(x, y) : land.moveTo(x, y))), land.closePath();
+      // trees only where there is land under them (the test point is in
+      // device pixels, the path in page units)
+      let onLand = (x, y) => g.isPointInPath(land, x * dpr, y * dpr);
+      coast(landPts, "#2a3e28");
       coast([[-10, hz + H * 0.02], [W * 0.18, hz + H * 0.03], [W * 0.24, hz + H * 0.1], [W * 0.14, hz + H * 0.24], [W * 0.06, H + 10], [-10, H + 10]], "#22341f");
       // surf along that shore
       (g.strokeStyle = "rgba(230,240,240,0.55)"), (g.lineWidth = 2), g.beginPath(), g.moveTo(W * 0.3, hz + H * 0.012), g.quadraticCurveTo(W * 0.285, hz + H * 0.08, W * 0.265, hz + H * 0.122), g.quadraticCurveTo(W * 0.2, hz + H * 0.19, W * 0.165, hz + H * 0.245), g.stroke();
@@ -13421,8 +13427,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           x1 = W * (0.28 - row * 0.02),
           sz = 12 + row * 6;
         for (let x = -10; x < x1; x += sz * 0.55) {
-          let y = y0 + R(-4, 4);
-          rnd() < 0.45
+          let y = y0 + R(-4, 4),
+            pick = rnd();
+          if (!onLand(x, y) || !onLand(x + sz * 0.45, y) || !onLand(x - sz * 0.45, y)) continue;
+          pick < 0.45
             ? pine(x, y, sz * 1.5, row % 2 ? "#1c2c1a" : "#24361f")
             : (disc(g, x, y - sz * 0.6, sz * 0.55, sz * 0.5, row % 2 ? "#26401f" : "#2e4a26"), disc(g, x - sz * 0.15, y - sz * 0.8, sz * 0.3, sz * 0.26, "rgba(120,160,80,0.35)"));
         }
