@@ -178,6 +178,18 @@ footer.bar { border-bottom: 0; border-top: 1px solid #1e3342; height: 92px; alig
 .layout aside#side { position: absolute; top: 10px; right: 10px; width: 340px; max-height: calc(100% - 230px); min-height: 0; border: 1px solid #b9a67e; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); z-index: 6; padding-top: 10px; }
 .layout aside#side.closed { display: none; }
 .layout aside#side.colony { max-height: calc(100% - 20px); right: 240px; }
+.troops .tcols { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.troops .tcol { flex: 1 1 130px; min-width: 120px; border: 1px solid #b9a67e; border-radius: 6px; background: rgba(140, 106, 47, 0.08); padding: 5px 6px; display: flex; flex-direction: column; gap: 4px; }
+.troops .tcol.target { border-style: dashed; cursor: pointer; }
+.troops .tcol.over { background: rgba(140, 106, 47, 0.22); border-color: #8c6a2f; }
+.troops .thead { display: flex; flex-direction: column; line-height: 1.2; }
+.troops .thead small, .troops .tfoot { font-size: 0.8em; color: #6b5a3a; }
+.troops .tlist { display: flex; flex-wrap: wrap; gap: 3px; min-height: 24px; }
+.troops .tchip { font-size: 0.82em; padding: 2px 6px; border-radius: 4px; cursor: grab; }
+.troops .tchip.on { outline: 2px solid #8c6a2f; background: #f3e4bf; }
+.troops .tfoot { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.troops .tlist .muted { font-size: 0.82em; }
+.troops .tdef { color: #7a5a10; font-weight: 600; }
 .town-leaders { margin: 8px 0; padding: 6px 8px; border: 1px solid #b9a67e; border-radius: 6px; background: rgba(140, 106, 47, 0.08); }
 .town-leaders .row { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
 .town-leaders .row .muted { flex: 1; }
@@ -545,7 +557,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.19";
+    "1.20";
   var on = [
       {
         id: "spain",
@@ -1711,15 +1723,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let o = (ae[e] && ae[e].cost) || {};
     return Object.fromEntries(Object.entries(o).map(([r, i]) => [r, i * n]));
   }
-  // Every building a colony already has makes the next one, or the next
-  // level, a little dearer, so a colony has to choose what it builds.
+  // Each building of the same kind a colony already has makes the next one,
+  // or the next level, a little dearer: a gentle inflation on repeats.
+  var COPY_RISE = 1.1;
   function colCost(c, id, lvl = 1, up) {
     let base = ge(id, lvl);
     // The late buildings keep their own price: a big colony is meant to have them.
     if (id === "center" || !c || (ae[id] && ae[id].minLevel)) return base;
-    let k = c.buildings.filter((b) => b.id !== "center").length - (up ? 1 : 0),
-      m = Math.pow(1.05, Math.max(0, k));
-    return Object.fromEntries(Object.entries(base).map(([r, v]) => [r, Math.ceil(v * m)]));
+    let k = c.buildings.filter((b) => b.id === id).length - (up ? 1 : 0),
+      m = Math.pow(COPY_RISE, Math.max(0, k));
+    return Object.fromEntries(Object.entries(base).map(([r, v]) => [r, Math.max(v ? 1 : 0, Math.round(v * m))]));
+  }
+  // What tearing a building down gives back: half of what it would cost to
+  // put up again today, every level it has (or is being raised to) included.
+  function tearRefund(c, b) {
+    let top = (b.level || 1) + (b.building === "upgrade" ? 1 : 0),
+      out = {};
+    for (let L = 1; L <= top; L++)
+      for (let [r, v] of Object.entries(colCost(c, b.id, L, 1))) out[r] = (out[r] || 0) + v;
+    for (let r in out) out[r] = Math.floor(out[r] / 2);
+    for (let r in out) out[r] || delete out[r];
+    return out;
   }
   // What a colony's storehouses hold. Food also keeps a few years' eating.
   // Storehouses hold any amount (no cap since 1.18). What a colony likes
@@ -4316,7 +4340,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function colonyDefence(e, col, exceptNation) {
     let units = [],
       here = e.units.filter((u) => u.owner === col.owner && inColony(col, u)),
-      leader = here.find((u) => u.kind === "leader") || null;
+      // the leader the player chose to command the defence, else the first one
+      leader = (col.defender != null && here.find((u) => u.kind === "leader" && u.id === col.defender)) || here.find((u) => u.kind === "leader") || null;
     let n = MILITIA_BY_LEVEL[Math.min(4, col.level || 1)] || 2;
     for (let k = 0; k < n; k++) units.push({ id: `m${k}`, kind: "militia", str: 2, militia: !0, name: "Militia" });
     for (let b of col.buildings)
@@ -6893,6 +6918,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             )
           : !0,
       )
+      // A university mostly pays off through cheaper research, which needs a
+      // war college, so the governor waits until the nation has one going.
+      .filter((a) => a !== "university" || e.colonies.some((t) => t.owner === n.owner && t.buildings.some((l) => l.id === "war_college")))
       .map((a) => ({ id: a, gap: (o[a] / i) * s - (r[a] || 0) }))
       .sort((a, t) => t.gap - a.gap)
       .map((a) => a.id);
@@ -8435,6 +8463,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // without counting against the men he commands.
   function escort(k) {
     return k === "settler" || k === "explorer";
+  }
+  // Inside a town: move a soldier to a leader there, or back to the town's
+  // own garrison (no leader).
+  function assignMan(e, uid, lid) {
+    return be(e, () => {
+      let o = j(e, uid),
+        col = o && colonyOf(e, o.x, o.y);
+      if (!o || !arm(o.kind) || !col || !inColony(col, o)) return B("Only soldiers in the town can be moved here.");
+      if (lid == null) return (o.leaderId = null), { ok: !0, discoveries: [], note: `${o.name} join${/s$/.test(o.name) ? "" : "s"} the town garrison.` };
+      let L = j(e, lid);
+      if (!L || L.kind !== "leader" || L.owner !== o.owner || !inColony(col, L)) return B("That leader is not in this town.");
+      if (o.leaderId === L.id && o.x === L.x && o.y === L.y) return { ok: !0, discoveries: [] };
+      let cap = leaderStats(L).cmd,
+        has = e.units.filter((q) => q.leaderId === L.id && arm(q.kind) && !q.aboard && q.x === L.x && q.y === L.y).length;
+      if (has >= cap) return B(`${L.name} already commands all the men he can (${cap}).`);
+      return (o.x = L.x), (o.y = L.y), (o.leaderId = L.id), { ok: !0, discoveries: [], note: `${o.name} join${/s$/.test(o.name) ? "" : "s"} ${L.name}.` };
+    });
+  }
+  function setDefender(e, cid, lid) {
+    return be(e, () => {
+      let c = e.colonies.find((q) => q.id === cid);
+      if (!c) return B("No such colony.");
+      return (c.defender = lid), { ok: !0, discoveries: [] };
+    });
   }
   function detachMan(e, n) {
     return be(e, () => {
@@ -11884,6 +11936,61 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     (g.fillStyle = c), g.fillRect(x - 0.8, y - 3.2, 1.6, 3.2);
     (g.fillStyle = "#e0b890"), g.beginPath(), g.arc(x, y - 4, 0.9, 0, Math.PI * 2), g.fill();
   }
+  // A small canvas tent: a ridge along x on two triangle ends.
+  function tent(g, x, y, s, cloth) {
+    let P = (a, b, z) => isoP(x, y, a, b, z),
+      ink = "rgba(30,22,16,0.5)";
+    bshadow(g, x, y, s * 1.3, s * 0.6);
+    bpoly(g, [P(-s, s * 0.8, 0), P(s, s * 0.8, 0), P(s, 0, s * 1.1), P(-s, 0, s * 1.1)], cloth, ink, 0.5);
+    bpoly(g, [P(s, s * 0.8, 0), P(s, -s * 0.8, 0), P(s, 0, s * 1.1)], jr(cloth, -40), ink, 0.5);
+  }
+  function campfire(g, x, y, detail) {
+    (g.fillStyle = "#3a2a1a"), g.beginPath(), g.ellipse(x, y, 2.2, 1.1, 0, 0, Math.PI * 2), g.fill();
+    (g.fillStyle = "#e8822a"), g.beginPath(), g.moveTo(x - 1.2, y), g.quadraticCurveTo(x, y - 4.5, x + 1.2, y), g.fill();
+    if (detail) {
+      g.fillStyle = "rgba(220,220,215,0.3)";
+      for (let k = 0; k < 3; k++) g.beginPath(), g.arc(x + k * 1.6, y - 6 - k * 3, 1.3 + k * 0.6, 0, Math.PI * 2), g.fill();
+    }
+  }
+  // A timber watchtower: four legs, a boarded platform and a peaked roof.
+  function watchTower(g, x, y, detail) {
+    let P = (a, b, z) => isoP(x, y, a, b, z),
+      s = 2.4,
+      h = 13,
+      ink = "rgba(30,22,16,0.55)";
+    (g.strokeStyle = "#5e4228"), (g.lineWidth = 1.1), g.beginPath();
+    for (let [a, b] of [[-s, -s], [s, -s], [-s, s], [s, s]]) {
+      let p0 = P(a, b, 0), p1 = P(a, b, h);
+      g.moveTo(p0[0], p0[1]), g.lineTo(p1[0], p1[1]);
+    }
+    if (detail) {
+      let a0 = P(-s, s, 0), a1 = P(s, s, h - 3), b0 = P(s, s, 0), b1 = P(-s, s, h - 3);
+      g.moveTo(a0[0], a0[1]), g.lineTo(a1[0], a1[1]), g.moveTo(b0[0], b0[1]), g.lineTo(b1[0], b1[1]);
+    }
+    g.stroke();
+    bpoly(g, [P(-s - 0.5, s + 0.5, h - 2.5), P(s + 0.5, s + 0.5, h - 2.5), P(s + 0.5, s + 0.5, h), P(-s - 0.5, s + 0.5, h)], "#8a6440", ink, 0.5);
+    bpoly(g, [P(s + 0.5, s + 0.5, h - 2.5), P(s + 0.5, -s - 0.5, h - 2.5), P(s + 0.5, -s - 0.5, h), P(s + 0.5, s + 0.5, h)], "#6a4a2e", ink, 0.5);
+    bpoly(g, [P(-s - 1, s + 1, h + 2.5), P(s + 1, s + 1, h + 2.5), P(0, 0, h + 7)], "#9a7a48", ink, 0.5);
+    bpoly(g, [P(s + 1, s + 1, h + 2.5), P(s + 1, -s - 1, h + 2.5), P(0, 0, h + 7)], "#7a5e36", ink, 0.5);
+  }
+  // Battlements along wall tops: each run is [[a0, b0], [a1, b1]].
+  function crenels(g, r0, r1, h, color) {
+    for (let [p0, p1] of [r0, r1]) {
+      let len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]),
+        n = Math.floor(len / 3);
+      for (let k = 0; k < n; k += 2) {
+        let t0 = k / n, t1 = (k + 1) / n,
+          a0 = p0[0] + (p1[0] - p0[0]) * t0, b0 = p0[1] + (p1[1] - p0[1]) * t0,
+          a1 = p0[0] + (p1[0] - p0[0]) * t1, b1 = p0[1] + (p1[1] - p0[1]) * t1;
+        bpoly(g, [isoP(0, 0, a0, b0, h), isoP(0, 0, a1, b1, h), isoP(0, 0, a1, b1, h + 1.6), isoP(0, 0, a0, b0, h + 1.6)], color, "rgba(30,22,16,0.4)", 0.4);
+      }
+    }
+  }
+  function fountain(g, x, y) {
+    (g.fillStyle = "#9a907e"), g.beginPath(), g.ellipse(x, y, 3, 1.5, 0, 0, Math.PI * 2), g.fill();
+    (g.fillStyle = "#6a9ab8"), g.beginPath(), g.ellipse(x, y - 0.4, 2.2, 1, 0, 0, Math.PI * 2), g.fill();
+    (g.strokeStyle = "#cfe4f0"), (g.lineWidth = 0.6), g.beginPath(), g.moveTo(x, y - 0.4), g.lineTo(x, y - 3.4), g.stroke();
+  }
   function barrel(g, x, y) {
     (g.fillStyle = "#7a5228"), g.beginPath(), g.ellipse(x, y - 1.6, 1.5, 2, 0, 0, Math.PI * 2), g.fill();
     (g.strokeStyle = "#3a2812"), (g.lineWidth = 0.4), g.beginPath(), g.moveTo(x - 1.5, y - 2.2), g.lineTo(x + 1.5, y - 2.2), g.moveTo(x - 1.5, y - 0.9), g.lineTo(x + 1.5, y - 0.9), g.stroke();
@@ -12134,53 +12241,105 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let rnd = (k) => z(seed * 7 + k, seed * 3 - k, 977);
     switch (id) {
       case "center": {
-        // The colony itself. It grows with the colony's level.
+        // The colony itself. Each level reads differently at a glance:
+        // 1 a small stockaded camp of log huts and tents,
+        // 2 a full stockade, a timbered hall, houses and a watchtower,
+        // 3 a stone wall with corner towers and a church,
+        // 4 a high-walled city of whitewashed, red-tiled houses round a
+        //   bell-towered hall and a plaza.
         let L = Math.max(1, Math.min(4, town || 1)),
-          wallH = L >= 3 ? 6 : 5,
-          pal = palisade(g, 0, 0, 30, 30, wallH, !0, detail);
-        if (L >= 3) {
-          // stone curtain wall replaces the stakes
-          let P = (a, b, zz) => isoP(0, 0, a, b, zz);
-          bpoly(g, [P(-15, -15, 0), P(-15, 15, 0), P(-15, 15, 6), P(-15, -15, 6)], "#8a8070");
-          bpoly(g, [P(-15, -15, 0), P(15, -15, 0), P(15, -15, 6), P(-15, -15, 6)], "#7a7062");
-        } else pal.back();
-        let wall = "#d8c49a",
-          roofs = ["#7a3b2a", "#6b4a30", "#8a4a2a", "#5a4a3c"],
-          spots = [
-            [-7, -7, 9, 7, 7, 0],
-            [8, -5, 7, 6, 6, 1],
-            [-8, 6, 7, 7, 6, 1],
-            [7, 8, 8, 6, 6, 0],
-            [0, -11, 6, 6, 5, 1],
-          ];
-        // The hall at the middle, then more houses as the colony grows.
-        let houses = L === 1 ? [] : spots.slice(0, L === 2 ? 2 : L === 3 ? 4 : 5);
-        houses.sort((p, q) => p[0] + p[1] - (q[0] + q[1]));
+          P = (a, b, zz) => isoP(0, 0, a, b, zz),
+          ink = "rgba(30,22,16,0.5)";
+        if (L === 1) {
+          let pal = palisade(g, 0, 0, 22, 22, 4, !0, detail);
+          pal.back();
+          tent(g, -6, -4, 3.4, "#c8b890");
+          gableHouse(g, 4, -2, 9, 7, 5, "#7a5434", "#b0904e", { detail, door: !0, chimney: !0, smoke: !0, ridgeY: !1, win: 1, roofH: 4.5 });
+          tent(g, -6, 5, 3, "#bfae86");
+          campfire(g, 2, 6, detail);
+          if (detail) crate(g, 7, 6, 1.2), bperson(g, 0, 8, "#5a3a24"), bperson(g, -2, 9, "#3a4a6a");
+          pal.front();
+          bflag(g, -2, -8, flag, 12);
+          return;
+        }
+        if (L === 2) {
+          let pal = palisade(g, 0, 0, 30, 30, 5, !0, detail);
+          pal.back();
+          watchTower(g, ...P(-13, -13, 0), detail);
+          let hall = () => gableHouse(g, 0, 0, 12, 9, 8, "#c9a878", "#6b4a30", { detail, door: !0, timber: !0, chimney: !0, smoke: !0 });
+          gableHouse(g, ...P(-8, 5, 0), 9, 7, 6, "#bfa47a", "#8a6a40", { detail, door: !0, chimney: !0, smoke: !0, timber: !0 });
+          gableHouse(g, ...P(8, -5, 0), 7, 6, 6, "#cdb48a", "#7a5a38", { detail, door: !0, ridgeY: !0 });
+          hall();
+          if (detail) bperson(g, 3, 11, "#5a3a24"), bperson(g, -5, 12, "#3a4a6a"), barrel(g, 11, 2), crate(g, -12, 3, 1.4);
+          pal.front();
+          bflag(g, -1, -20, flag, 12);
+          return;
+        }
+        // Stone walls from level 3; higher and with bigger towers at level 4.
+        let big = L === 4,
+          wh = big ? 7 : 6,
+          R = 15,
+          stone = big ? ["#a49a88", "#948a78", "#7e7464", "#b2a894"] : ["#8a8070", "#7a7062", "#6e6658", "#9a907e"],
+          tw = big ? 3 : 2,
+          th = big ? 13 : 8,
+          cap = big ? "#8a3a26" : "#5a4a3c";
+        bpoly(g, [P(-R, -R, 0), P(-R, R, 0), P(-R, R, wh), P(-R, -R, wh)], stone[0], ink);
+        bpoly(g, [P(-R, -R, 0), P(R, -R, 0), P(R, -R, wh), P(-R, -R, wh)], stone[1], ink);
+        if (big) crenels(g, [[-R, -R], [R, -R]], [[-R, -R], [-R, R]], wh, stone[1]);
+        steeple(g, ...P(-R, -R, 0), tw, th, stone[3], cap, detail);
+        let wall = big ? "#ece4d2" : "#d8c49a",
+          roofs = big ? ["#a8452a", "#b85a34", "#9a3e26", "#c06a3c"] : ["#7a3b2a", "#6b4a30", "#8a4a2a", "#5a4a3c"],
+          spots = big
+            ? [
+                [-8, -8, 9, 7, 9, 0],
+                [8, -7, 8, 6, 10, 1],
+                [0, -12, 7, 5, 8, 0],
+                [-9, 5, 7, 7, 9, 1],
+                [8, 7, 8, 6, 8, 0],
+              ]
+            : [
+                [-7, -7, 9, 7, 7, 0],
+                [8, -5, 7, 6, 6, 1],
+                [-8, 6, 7, 7, 6, 1],
+                [7, 8, 8, 6, 6, 0],
+              ];
+        spots.sort((p, q) => p[0] + p[1] - (q[0] + q[1]));
         let hallDrawn = !1,
           hall = () => {
-            gableHouse(g, 0, 0, 12, 9, 9, "#c9a878", L >= 3 ? "#4a5560" : "#6b4a30", { detail, door: !0, timber: !0, chimney: !0, smoke: !0, ridgeY: !1 });
-            L >= 3 && steeple(g, -4, -3, 2.2, 15, "#e6dccb", "#4a5560", detail, !0);
+            if (big) {
+              // a two-storey town hall with a tall bell tower, on a paved plaza
+              bpoly(g, [P(-6, 10, 0.1), P(10, 10, 0.1), P(10, -6, 0.1), P(-6, -6, 0.1)], "rgba(200,190,170,0.55)");
+              gableHouse(g, 1, 1, 14, 10, 13, "#f0e8d6", "#8a3a26", { detail, door: !0, chimney: !0, smoke: !0 });
+              steeple(g, -6, -4, 2.8, 24, "#f0e8d6", "#4a5560", detail, !0);
+              detail && fountain(g, 6, 9);
+            } else {
+              gableHouse(g, 0, 0, 12, 9, 9, "#c9a878", "#4a5560", { detail, door: !0, timber: !0, chimney: !0, smoke: !0 });
+              steeple(g, -4, -3, 2.2, 15, "#e6dccb", "#4a5560", detail, !0);
+            }
           };
-        for (let [a, b, w, d, h, ry] of houses) {
+        for (let [a, b, w, d, h, ry] of spots) {
           !hallDrawn && a + b > 0 && (hall(), (hallDrawn = !0));
-          let [px, py] = isoP(0, 0, a, b, 0);
-          gableHouse(g, px, py, w, d, h, jr(wall, Math.round((rnd(a) - 0.5) * 30)), roofs[(a + 40) % roofs.length], { detail, door: !0, chimney: rnd(b) > 0.4, smoke: rnd(b + 9) > 0.5, ridgeY: !!ry, timber: rnd(a + b) > 0.5 });
+          let [px, py] = P(a, b, 0);
+          gableHouse(g, px, py, w, d, h, jr(wall, Math.round((rnd(a) - 0.5) * (big ? 14 : 30))), roofs[(a + 40) % roofs.length], { detail, door: !0, chimney: rnd(b) > 0.4, smoke: rnd(b + 9) > 0.5, ridgeY: !!ry, timber: !big && rnd(a + b) > 0.5 });
         }
         hallDrawn || hall();
         if (detail) {
-          bperson(g, 3, 11, "#5a3a24"), bperson(g, -5, 12, "#3a4a6a");
-          L >= 2 && (barrel(g, 11, 2), crate(g, -12, 3, 1.4));
+          bperson(g, 3, 12, "#5a3a24"), bperson(g, -5, 13, "#3a4a6a");
+          big ? (bperson(g, 9, 13, "#7a2a2a"), bperson(g, -1, 14, "#2a4a3a"), barrel(g, 12, 4), crate(g, -12, 5, 1.4)) : (barrel(g, 11, 2), crate(g, -12, 3, 1.4));
         }
-        L >= 3 ||
-          pal.front();
-        if (L >= 3) {
-          let P = (a, b, zz) => isoP(0, 0, a, b, zz);
-          bpoly(g, [P(15, -15, 0), P(15, 15, 0), P(15, 15, 6), P(15, -15, 6)], "#6e6658", "rgba(30,22,16,0.5)");
-          bpoly(g, [P(-15, 15, 0), P(-3, 15, 0), P(-3, 15, 6), P(-15, 15, 6)], "#9a907e", "rgba(30,22,16,0.5)");
-          bpoly(g, [P(3, 15, 0), P(15, 15, 0), P(15, 15, 6), P(3, 15, 6)], "#9a907e", "rgba(30,22,16,0.5)");
-          for (let c of [[15, 15], [-15, 15], [15, -15]]) steeple(g, ...isoP(0, 0, c[0], c[1], 0), 2, 8, "#9a907e", "#5a4a3c", detail);
+        // the front walls, the gate, and the towers on the near corners
+        bpoly(g, [P(R, -R, 0), P(R, R, 0), P(R, R, wh), P(R, -R, wh)], stone[2], ink);
+        bpoly(g, [P(-R, R, 0), P(-3, R, 0), P(-3, R, wh), P(-R, R, wh)], stone[3], ink);
+        bpoly(g, [P(3, R, 0), P(R, R, 0), P(R, R, wh), P(3, R, wh)], stone[3], ink);
+        if (big) {
+          crenels(g, [[R, -R], [R, R]], [[-R, R], [R, R]], wh, stone[2]);
+          // a gatehouse over the opening
+          bpoly(g, [P(-4, R + 1, wh), P(4, R + 1, wh), P(4, R + 1, wh + 4), P(-4, R + 1, wh + 4)], stone[3], ink);
+          bpoly(g, [P(-3, R + 1, 0), P(3, R + 1, 0), P(3, R + 1, wh), P(-3, R + 1, wh)], "#3a2e22");
         }
-        bflag(g, -1, -20 - (L >= 3 ? 8 : 0), flag, 12);
+        for (let c of [[R, -R], [-R, R], [R, R]]) steeple(g, ...P(c[0], c[1], 0), tw, th, stone[3], cap, detail);
+        if (big) for (let c of [[R, R], [-R, R]]) { let t = P(c[0], c[1], th + tw * 4.2); bflag(g, t[0], t[1], flag, 6); }
+        bflag(g, -1, big ? -40 : -28, flag, 12);
         return;
       }
       case "house":
@@ -14344,6 +14503,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // The unit whose card is open. Picking a unit does not open it; a
       // second click on the picked unit does.
       cardFor = null,
+      troopPick = null,
       // true while handling a click that missed every unit's figure
       offUnitClick = !1,
       // the last press stopped a unit mid-walk (that click only picks it)
@@ -16527,6 +16687,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         if (w && w.colony.owner !== k.id && seen) return np({ kind: "colony", id: w.colony.id });
         if (vg) return np({ kind: "village", id: vg.id });
         if (ar && (ar.seen || seen || ar.owner === k.id)) return np({ kind: "army", id: ar.id });
+        {
+          let ru = seen && t.units.filter((q) => !q.aboard && q.owner !== k.id && q.x === f && q.y === g);
+          if (ru && ru.length) return np({ kind: "rival", id: (ru.find((q) => q.kind === "leader") || ru[0]).id });
+        }
         if (sp && sp.foundBy != null) return np({ kind: "special", id: sp.id });
       }
       pin = null;
@@ -16585,6 +16749,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (pin.kind === "colony") return t.colonies.find((q) => q.id === pin.id) || null;
       if (pin.kind === "army") return ((t.politics && t.politics.armies) || []).find((q) => q.id === pin.id) || null;
       if (pin.kind === "raid") return (t.natives ? t.natives.raids : []).find((q) => q.id === pin.id) || null;
+      if (pin.kind === "rival") return t.units.find((q) => q.id === pin.id && !q.aboard) || null;
       return null;
     }
     // The pinned thing's reach, drawn as a ring on the map.
@@ -16595,6 +16760,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (pin.kind === "village") return null;
       if (pin.kind === "colony") return { x: P.x, y: P.y, radius: reachOf(P) || 1, color: ee[(t.players.find((q) => q.id === P.owner) || {}).nationId || "england"].color };
       return null;
+    }
+    // Peace or war with that nation, in a sentence.
+    function standWith(ow) {
+      let me_ = V(t);
+      if (!ow || ow.id === me_.id) return "";
+      return atWar(t, me_.id, ow.id) ? "<b>At war with you.</b>" : `At peace with you. Relations: ${G(diploLevel(relOf(t, me_.id, ow.id)).name)}.`;
     }
     function pinCard() {
       let P = pinned();
@@ -16641,11 +16812,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p class="muted">Drag soldiers within two squares onto the town to ${canCap ? "raid or capture" : "raid"} it.${war ? "" : " That means war, and the crown may not approve."}</p>
         <div class="row">${go}</div>`;
       }
+      if (pin.kind === "rival") {
+        let ow = t.players.find((q) => q.id === P.owner),
+          with_ = t.units.filter((q) => !q.aboard && q.owner === P.owner && q.x === P.x && q.y === P.y && q.id !== P.id);
+        return `<h2>${P.kind === "leader" ? G(P.name) : `${G(nationAdj(ow))} ${G(P.name.toLowerCase())}`}</h2>
+        <p>${P.kind === "leader" ? `${/^[AEIOU]/.test(nationAdj(ow)) ? "An" : "A"} ${G(nationAdj(ow))} leader${with_.length ? `, with ${G(bLabel(with_))}` : ""}.` : with_.length ? `With ${G(bLabel(with_))}.` : ""} ${standWith(ow)}</p>
+        <div class="row">${go}</div>`;
+      }
       if (pin.kind === "army") {
         let ow = t.players.find((q) => q.id === P.owner),
           tg = t.colonies.find((c) => c.id === P.target);
         return `<h2>${G(nationAdj(ow))} army</h2>
-        <p>Under ${G(P.leader.name)}, about ${P.troops.length} men. What kind of men, and how good, you cannot tell from here.</p>
+        <p>Under ${G(P.leader.name)}, about ${P.troops.length} men. ${ow.id === me_.id ? "" : standWith(ow)}</p>
+        <p class="muted">What kind of men, and how good, you cannot tell from here.</p>
         <p class="muted">${tg ? `It is marching on ${G(tg.name)}.` : ""} Drag soldiers within two squares onto it to attack.</p>
         <div class="row">${go}</div>`;
       }
@@ -17899,7 +18078,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ${qa(t, f, U)}
           ${U.id === "war_college" && !U.building ? researchPanel(f) : ""}
           ${U.building ? "<p>Under construction. Ready next turn.</p>" : (U.level || 1) >= 4 ? '<p class="muted">At the top level.</p>' : `<button type="button" id="up-building" ${Me(f.stock, nn) ? "" : "disabled"}>Raise to level ${$e}<small>${qe(nn)}</small></button>`}
-          <button type="button" id="tear-down" class="${tearArm === `${U.x},${U.y}` ? "danger" : ""}">${tearArm === `${U.x},${U.y}` ? "Click again to tear it down. Nothing is refunded." : U.building ? "Abandon construction" : "Tear down"}</button>
+          <button type="button" id="tear-down" class="${tearArm === `${U.x},${U.y}` ? "danger" : ""}">${tearArm === `${U.x},${U.y}` ? `Click again to tear it down. Half its cost comes back${Object.keys(tearRefund(f, U)).length ? `: ${qe(tearRefund(f, U))}` : ""}.` : U.building ? "Abandon construction" : "Tear down"}</button>
         </div>`;
       }
       let I = t.colonies.filter((E) => E.owner === k.id && E.id !== f.id),
@@ -17927,8 +18106,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           loose = t.units.filter((q) => q.owner === me_.id && !q.aboard && arm(q.kind) && !(lead && q.leaderId === lead.id && q.x === lead.x && q.y === lead.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (reachOf(f) || 3) + 2);
         let lds = inTown.filter((q) => q.kind === "leader"),
           men = inTown.filter((q) => q.kind !== "leader");
-        return `${men.length ? `<p class="muted">Soldiers in the town: ${men.length}${men.some((q) => !q.leaderId) ? `, ${men.filter((q) => !q.leaderId).length} without a leader` : ""}.</p>` : ""}
-        <div class="row">${lead && loose.length ? `<button type="button" id="town-gather" data-l="${lead.id}">${G(lead.name)}: gather the men (${loose.length} nearby)</button>` : ""}
+        return `<div class="row">${lead && loose.length ? `<button type="button" id="town-gather" data-l="${lead.id}">${G(lead.name)}: gather the men (${loose.length} nearby)</button>` : ""}
         ${outside.map((q) => `<button type="button" class="town-call" data-u="${q.id}">Call ${G(q.name)} in (${Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y))} squares)</button>`).join("")}</div>`;
       })()}
       <button type="button" class="recruit" id="recruit-leader" ${f.stock.gold >= LEADER_COST[Math.min(4, f.level || 1)] ? "" : "disabled"}>Commission a leader, level ${Math.min(4, f.level || 1)}<small>${LEADER_COST[Math.min(4, f.level || 1)]} gold. Bigger colonies train better leaders: more actions a turn, more charisma, more men under command.</small></button>`,
@@ -17989,18 +18167,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
       ${!T && te ? `${te}<div class="row"><button type="button" id="pick-done">Back to the town</button></div>` : ""}
       <div class="town-rest"${!T && te ? " hidden" : ""}>
-      ${(() => {
-        // Leaders in the town, each with one button to lead his men out.
-        let lds = t.units.filter((q) => q.owner === V(t).id && q.kind === "leader" && !q.aboard && inColony(f, q));
-        return lds.length
-          ? `<div class="town-leaders">${lds
-              .map((q) => {
-                let n = Math.min(leaderStats(q).cmd, t.units.filter((w) => w.leaderId === q.id && w.x === q.x && w.y === q.y).length);
-                return `<div class="row"><b>${G(q.name)}</b><span class="muted">${n} m${n === 1 ? "a" : "e"}n</span><button type="button" class="primary lead-out" data-u="${q.id}" ${q.mp > 0 ? "" : "disabled title=\"He has no movement left this turn.\""}>Lead out</button></div>`;
-              })
-              .join("")}</div>`
-          : "";
-      })()}
+      ${troopsBox(f)}
       <div class="auto ${Ae ? "on" : ""}">
         <button type="button" id="auto-toggle" class="${Ae ? "primary" : ""}">Auto Colony: ${Ae ? "On" : "Off"}</button>
         <div class="goals">${Object.entries(Ze)
@@ -18046,14 +18213,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             return;
           }
           tearArm = null;
-          let nm = ae[U.id].name.toLowerCase();
+          let nm = ae[U.id].name.toLowerCase(),
+            back0 = tearRefund(f, U);
           x(
             be(t, () => {
+              let back = tearRefund(f, U);
+              for (let [r, v] of Object.entries(back)) f.stock[r] = (f.stock[r] || 0) + v;
               f.buildings = f.buildings.filter((q) => q !== U);
               return { ok: !0, discoveries: [], note: `${f.name}'s ${nm} was torn down.` };
             }),
           ),
-            (h = `${f.name}'s ${nm} was torn down.`),
+            (h = `${f.name}'s ${nm} was torn down${Object.keys(back0).length ? `; ${qe(back0)} came back` : ""}.`),
             (S = null),
             R();
         });
@@ -18098,6 +18268,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         });
       let pd_ = s.querySelector("#pick-done");
       pd_ && (pd_.onclick = () => ((S = null), (tearArm = null), R()));
+      wireTroops();
       s.querySelectorAll(".lead-out").forEach((E) => {
         E.onclick = () => {
           let id = +E.dataset.u;
@@ -18220,6 +18391,65 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     // A leader in a town marches his column to the nearest open square
     // outside it, and stays picked so he can be dragged on from there.
+    // The town's troops: its own garrison and each leader's men, side by
+    // side. Drag a soldier (or click him, then click a column) to move him.
+    function troopsBox(f) {
+      let me_ = V(t),
+        lds = t.units.filter((q) => q.owner === me_.id && q.kind === "leader" && !q.aboard && inColony(f, q)),
+        men = t.units.filter((q) => q.owner === me_.id && arm(q.kind) && !q.aboard && inColony(f, q));
+      if (!lds.length && !men.length) return "";
+      let withL = (L) => men.filter((q) => q.leaderId === L.id && q.x === L.x && q.y === L.y),
+        loose = men.filter((q) => !lds.some((L) => q.leaderId === L.id && q.x === L.x && q.y === L.y)),
+        def = colonyDefence(t, f).leaderId,
+        chip = (q) => `<button type="button" class="tchip${troopPick === q.id ? " on" : ""}" draggable="true" data-m="${q.id}" title="Strength ${Math.round(q.strength || 0)} of ${q.maxStr || q.strength}, level ${q.level || 1}">${G(q.name)} <small>${Math.round(q.strength || 0)}/${q.maxStr || q.strength}</small></button>`,
+        col = (lid, head, list, extra) => `<div class="tcol${troopPick != null ? " target" : ""}" data-to="${lid == null ? "" : lid}"><div class="thead">${head}</div><div class="tlist">${list.length ? list.map(chip).join("") : '<span class="muted">No one</span>'}</div>${extra || ""}</div>`;
+      return `<div class="troops">
+        <h3 class="side-sub">Troops in town</h3>
+        <p class="muted">Drag a soldier to another column, or click him and then the column. Everyone here fights if the town is attacked; one leader commands.</p>
+        <div class="tcols">
+        ${col(null, `<b>Town garrison</b><small>${loose.length} without a leader</small>`, loose)}
+        ${lds
+          .map((L) => {
+            let n = withL(L).length,
+              cap = leaderStats(L).cmd;
+            return col(
+              L.id,
+              `<b>${G(L.name)}</b><small>${n} of ${cap} men</small>`,
+              withL(L),
+              `<div class="tfoot">${lds.length > 1 ? (def === L.id ? '<span class="tdef">\u2605 Commands the defence</span>' : `<button type="button" class="find-link t-def" data-l="${L.id}">Make him command the defence</button>`) : ""}<button type="button" class="primary lead-out" data-u="${L.id}" ${L.mp > 0 ? "" : 'disabled title="He has no movement left this turn."'}>Lead out</button></div>`,
+            );
+          })
+          .join("")}
+        </div></div>`;
+    }
+    function wireTroops() {
+      let move = (mid, to) => {
+        troopPick = null;
+        x(assignMan(t, mid, to === "" ? null : +to)), R();
+      };
+      s.querySelectorAll(".tchip").forEach((E) => {
+        E.ondragstart = (ev) => (ev.dataTransfer.setData("text/plain", E.dataset.m), (ev.dataTransfer.effectAllowed = "move"));
+        E.onclick = (ev) => {
+          ev.stopPropagation();
+          let id = +E.dataset.m;
+          (troopPick = troopPick === id ? null : id), R();
+        };
+      });
+      s.querySelectorAll(".tcol").forEach((E) => {
+        E.ondragover = (ev) => (ev.preventDefault(), E.classList.add("over"));
+        E.ondragleave = () => E.classList.remove("over");
+        E.ondrop = (ev) => {
+          ev.preventDefault();
+          let mid = +ev.dataTransfer.getData("text/plain");
+          mid && move(mid, E.dataset.to);
+        };
+        E.onclick = (ev) => {
+          if (troopPick == null || ev.target.closest("button")) return;
+          move(troopPick, E.dataset.to);
+        };
+      });
+      s.querySelectorAll(".t-def").forEach((E) => (E.onclick = () => (x(setDefender(t, y, +E.dataset.l)), R())));
+    }
     function marchOut(id) {
       let reach = kn(t, id),
         best = null;
@@ -18387,6 +18617,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         : A();
     Ue.get("test") === "1" &&
           (window.__test = {
+            sprite: bldgSprite,
             state: () => t,
             anim: () => O,
             cam: d,
