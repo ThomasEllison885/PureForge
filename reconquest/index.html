@@ -519,7 +519,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.08";
+    "1.09";
   var on = [
       {
         id: "spain",
@@ -923,6 +923,55 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         cost: { wood: 30, metal: 30, goods: 10 },
         workers: 20,
       },
+      // Late buildings: a colony must reach level 3 before it can raise them.
+      {
+        id: "university",
+        name: "University",
+        short: "Univ.",
+        squares: 4,
+        color: "#8a7a5a",
+        produces: "Research costs a third less, and new leaders start with 2 more points. Only one needed. Level 3 colony.",
+        bonusTerrain: [],
+        cost: { wood: 15, metal: 30, goods: 15 },
+        workers: 20,
+        minLevel: 3,
+      },
+      {
+        id: "arsenal",
+        name: "Arsenal",
+        short: "Arsenal",
+        squares: 1,
+        color: "#4a4a52",
+        produces: "Troops trained here cost a quarter less, and its guns help defend the colony. Level 3 colony.",
+        bonusTerrain: [],
+        cost: { wood: 5, metal: 25, goods: 5 },
+        workers: 10,
+        minLevel: 3,
+      },
+      {
+        id: "cathedral",
+        name: "Cathedral",
+        short: "Cathedral",
+        squares: 4,
+        color: "#e8e2d4",
+        produces: "Faster growth, and the king's anger cools each year. Level 3 colony.",
+        bonusTerrain: [],
+        cost: { wood: 10, metal: 30, goods: 10 },
+        workers: 10,
+        minLevel: 3,
+      },
+      {
+        id: "customs",
+        name: "Customs House",
+        short: "Customs",
+        squares: 1,
+        color: "#7a5a3a",
+        produces: "Each year sells in Europe whatever fills the storehouses past three quarters. Coastal level 3 colony.",
+        bonusTerrain: [],
+        cost: { wood: 8, metal: 15, goods: 5 },
+        workers: 10,
+        minLevel: 3,
+      },
     ],
     ae = Object.fromEntries(Qn.map((e) => [e.id, e])),
     Lo = {
@@ -983,7 +1032,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   var NAT_CHEAP = { settler: 0.7, infantry: 0.7, cavalry: 0.7 },
     NAT_NAMES = { infantry: "Warriors", cavalry: "Riders", explorer: "Scout" };
   // What the empire calls its buildings.
-  var IX_NAMES = { center: "Temple", house: "Adobe houses", farm: "Maize fields", mill: "Woodcutters' yard", mine: "Stone mine", gold_mine: "Gold diggings", church: "Shrine", commerce: "Market", tavern: "Runners' lodge", dock: "Canoe landing", fort: "Warriors' house", war_college: "Eagle house" };
+  var IX_NAMES = { center: "Temple", house: "Adobe houses", farm: "Maize fields", mill: "Woodcutters' yard", mine: "Stone mine", gold_mine: "Gold diggings", church: "Shrine", commerce: "Market", tavern: "Runners' lodge", dock: "Canoe landing", fort: "Warriors' house", war_college: "Eagle house", university: "House of learning", arsenal: "Obsidian works", cathedral: "Great temple", customs: "Trading hall" };
   function bName(id, col) {
     return (col && col.big && IX_NAMES[id]) || (id === "center" ? "Colony center" : (ae[id] || ye(id) || {}).name || id);
   }
@@ -1638,7 +1687,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // level, a little dearer, so a colony has to choose what it builds.
   function colCost(c, id, lvl = 1, up) {
     let base = ge(id, lvl);
-    if (id === "center" || !c) return base;
+    // The late buildings keep their own price: a big colony is meant to have them.
+    if (id === "center" || !c || (ae[id] && ae[id].minLevel)) return base;
     let k = c.buildings.filter((b) => b.id !== "center").length - (up ? 1 : 0),
       m = Math.pow(1.05, Math.max(0, k));
     return Object.fromEntries(Object.entries(base).map(([r, v]) => [r, Math.ceil(v * m)]));
@@ -1890,6 +1940,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return B(`The taverns here keep ${eu(a)} explorers.`);
     let u = rc(i, d, a.big);
     if (!u) return B("That recruit is not available.");
+    // An arsenal in the colony makes soldiers a quarter cheaper.
+    t.id === "fort" && bldLevels(a, "arsenal") && (u = { ...u, stock: Object.fromEntries(Object.entries(u.stock).map(([k, v]) => [k, Math.max(0, Math.round(v * 0.75))])) });
     if ((a.population || 0) - u.people < 1)
       return B(`Keep at least one person home. This takes ${u.people}.`);
     if (!Me(a.stock, u.stock)) return B(`Needs ${qe(u.stock)}.`);
@@ -1968,6 +2020,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
       let i = yn(e, r);
       for (let s of Ce) r.stock[s] = Math.max(0, r.stock[s] + i.net[s]);
+      // A customs house sells what fills the storehouses past three
+      // quarters, at Europe's prices, unless the ports are blockaded.
+      let cu = bldLevels(r, "customs");
+      if (cu && !europeBlocked(e, r)) {
+        let sold = 0,
+          ind = ((ce(e, r.owner) || {}).mother || {}).independent ? 1.6 : 1;
+        for (let s of ["goods", "metal", "wood", "food"]) {
+          let over = r.stock[s] - Math.floor(storeCap(r, s) * 0.75),
+            g = over > 0 ? Math.floor(over * EUROPE_PRICE[s] * (1 + 0.15 * (cu - 1)) * ind) : 0;
+          g >= 1 && ((r.stock[s] -= over), (sold += g));
+        }
+        sold && ((r.stock.gold += sold), o.push(`${r.name}'s customs house sold its surplus in Europe for ${sold} gold.`));
+      }
       // Whatever the storehouses cannot hold goes to waste.
       let lost = 0;
       for (let s of Ce) {
@@ -1986,7 +2051,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let s = 0;
         for (let l of r.buildings)
           gn(l) && l.id === "church" && (s += l.level || 1);
-        let a = we.growth + s * we.churchGrowth,
+        let a = we.growth + s * we.churchGrowth + bldLevels(r, "cathedral") * 0.03,
           t = Math.min(
             i.housing - r.population,
             Math.max(1, Math.round(r.population * a)),
@@ -2092,6 +2157,58 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       );
     });
   }
+  // Does this nation have a finished building of this kind in a colony it holds?
+  function hasBld(e, pid, id) {
+    return e.colonies.some((c) => c.owner === pid && !c.occupied && c.buildings.some((b) => b.id === id && !b.building));
+  }
+  function bldLevels(c, id) {
+    return c.buildings.reduce((a, b) => a + (b.id === id && !b.building ? b.level || 1 : 0), 0);
+  }
+  // ---- Buying from Europe ----
+  // Europe sells dear: three times what it pays. Mercenaries are hired with
+  // gold and come over on the next ship to a colony on the coast.
+  var EUROPE_BUY = { goods: 3 / 2, metal: 1 / 2, wood: 1 / 4, food: 3 / 20 },
+    MERC_COST = { infantry: 30, cavalry: 45, artillery: 60 },
+    MERC_NAME = { infantry: "Mercenary soldiers", cavalry: "Mercenary dragoons", artillery: "Mercenary guns" };
+  function europeBlocked(e, c) {
+    if (c.big) return "The empire has no trade across the ocean.";
+    let mo = (ce(e, c.owner) || {}).mother || {};
+    if (mo.rebel) return "The crown's ships blockade your ports. Win your independence first.";
+    return "";
+  }
+  function buyEurope(e, n, r, i) {
+    return be(e, () => {
+      let c = e.colonies.find((d) => d.id === n);
+      if (!c) return { ok: !1, error: "No such colony." };
+      let no = europeBlocked(e, c);
+      if (no) return { ok: !1, error: no };
+      if (!EUROPE_BUY[r]) return { ok: !1, error: "Europe does not sell that." };
+      let t = Math.floor(Number(i));
+      if (!(t > 0)) return { ok: !1, error: "Buy at least 1." };
+      let cost = Math.max(1, Math.ceil(t * EUROPE_BUY[r]));
+      if (c.stock.gold < cost) return { ok: !1, error: `${t} ${Ne[r].toLowerCase()} costs ${cost} gold; ${c.name} has ${c.stock.gold}.` };
+      c.stock.gold -= cost;
+      let l = europeTurns(e, c);
+      (e.shipments || (e.shipments = [])).push({ from: "europe", to: c.id, resource: r, amount: t, arrives: e.year + l });
+      return { ok: !0, discoveries: [], note: `Bought ${t} ${Ne[r].toLowerCase()} for ${cost} gold. It reaches ${c.name} in ${l} turns.` };
+    });
+  }
+  function hireMerc(e, n, kind) {
+    return be(e, () => {
+      let c = e.colonies.find((d) => d.id === n);
+      if (!c) return { ok: !1, error: "No such colony." };
+      let no = europeBlocked(e, c);
+      if (no) return { ok: !1, error: no };
+      if (!MERC_COST[kind]) return { ok: !1, error: "No such hire." };
+      if (!coastalColony(e, c)) return { ok: !1, error: "Mercenaries land at a colony on the coast." };
+      if (c.mercYear === e.year) return { ok: !1, error: `${c.name} has sent for mercenaries this year already.` };
+      let cost = MERC_COST[kind];
+      if (c.stock.gold < cost) return { ok: !1, error: `${MERC_NAME[kind]} cost ${cost} gold; ${c.name} has ${c.stock.gold}.` };
+      (c.stock.gold -= cost), (c.mercYear = e.year);
+      (e.shipments || (e.shipments = [])).push({ from: "europe", to: c.id, unit: kind, arrives: e.year + 1 });
+      return { ok: !0, discoveries: [], note: `${MERC_NAME[kind]} hired for ${cost} gold. They land at ${c.name} next year.` };
+    });
+  }
   function Do(e) {
     let n = [],
       o = [];
@@ -2108,6 +2225,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         continue;
       }
       let i = e.colonies.find((s) => s.id === r.to);
+      if (i && r.unit) {
+        // Hired men land at the colony, seasoned soldiers ready to march.
+        let pl = ce(e, i.owner),
+          u = pl && Le(e, pl, r.unit, i.x, i.y, MERC_NAME[r.unit]);
+        u && ((u.level = 2), (u.home = i.id), (u.strength = unitStrength(r.unit, 2)), (u.maxStr = u.strength), (u.mp = 0), (u.leaderId = null), n.push(`${MERC_NAME[r.unit]} landed at ${i.name}.`));
+        continue;
+      }
       i &&
         ((i.stock[r.resource] += r.amount),
         n.push(
@@ -3009,6 +3133,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       )
     )
       return B("One war college is enough.");
+    if (o === "university" && e.colonies.some((d) => d.owner === s.owner && d.buildings.some((u) => u.id === "university"))) return B("One university is enough.");
+    let late = ae[o] && ae[o].minLevel;
+    if (late && (s.level || 1) < late) return B(`A ${ae[o].name.toLowerCase()} needs a level ${late} colony.`);
+    if (late && s.buildings.some((d) => d.id === o)) return B(`${s.name} already has a ${ae[o].name.toLowerCase()}. Raise its level instead.`);
+    if (o === "customs" && s.big) return B("The empire has no trade across the ocean.");
+    if (o === "customs" && !coastalColony(e, s)) return B("A customs house needs a colony on the coast.");
     for (let l = 0; l < a.h; l++)
       for (let d = 0; d < a.w; d++) {
         let u = r + d,
@@ -4118,6 +4248,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let b of col.buildings)
       if (b.id === "fort" && !b.building)
         for (let k = 0; k < (b.level || 1); k++) units.push({ id: `f${b.x},${b.y},${k}`, kind: "artillery", str: 3, name: "Fort guns" });
+    for (let k = 0; k < bldLevels(col, "arsenal"); k++) units.push({ id: `g${k}`, kind: "artillery", str: 4, name: "Arsenal guns" });
     for (let u of here)
       arm(u.kind) && units.push({ id: u.id, kind: u.kind, str: u.strength || 3, max: u.maxStr || u.strength || 3, name: u.name });
     // Rival crowns keep regulars in their colonies, since their governors
@@ -4972,7 +5103,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         wish === "peace" && war && (pol(e).blame || {})[r.id] !== "them" && crossed.push(`The king wants peace with ${nationName(r)}.`);
       }
       crossed.length ? (m.resentment = (m.resentment || 0) + 3 * crossed.length) : (m.favor = Math.min(30, (m.favor || 0) + 1));
-      m.resentment = Math.max(0, (m.resentment || 0) - 1);
+      // Each cathedral level cools the court a little more.
+      let cath = e.colonies.reduce((a, c) => a + (c.owner === me.id ? bldLevels(c, "cathedral") : 0), 0);
+      m.resentment = Math.max(0, (m.resentment || 0) - 1 - cath);
       let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1),
         took = 0;
       for (let c of e.colonies)
@@ -5028,8 +5161,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function resLvl(p, cls, k) {
     return ((resOf(p)[cls] || {})[k]) || 0;
   }
-  function resCost(cls, lvl, p, k) {
-    return Math.round((cls === "lead" ? 60 : 40) * (lvl + 1) * (k === "def" && hasSkill(p, "pacifist") ? 0.6 : 1));
+  function resCost(cls, lvl, p, k, e) {
+    let uni = e && p && hasBld(e, p.id, "university") ? 2 / 3 : 1;
+    return Math.round((cls === "lead" ? 60 : 40) * (lvl + 1) * (k === "def" && hasSkill(p, "pacifist") ? 0.6 : 1) * uni);
   }
   function collegeOf(e, pid) {
     return e.colonies.find((c) => c.owner === pid && !c.occupied && c.buildings.some((b) => b.id === "war_college" && !b.building)) || null;
@@ -5041,7 +5175,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!col) return B("Build a War College first.");
       let lv = resLvl(p, cls, k);
       if (lv >= RES_MAX) return B("That is as far as it goes.");
-      let cost = resCost(cls, lv, p, k);
+      let cost = resCost(cls, lv, p, k, e);
       if (col.stock.gold < cost) return B(`That costs ${cost} gold; ${col.name} has ${col.stock.gold}.`);
       col.stock.gold -= cost;
       let R = p.research || (p.research = {});
@@ -5057,7 +5191,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let opts = RESEARCH.filter(([c, k]) => resLvl(r, c, k) < RES_MAX && !(isNatNation(r) && c === "gun")).sort((a, b) => resLvl(r, a[0], a[1]) - resLvl(r, b[0], b[1]));
     let pick = opts[Math.floor(z(r.id, e.year, (e.seed >>> 0) + 4601) * Math.min(3, opts.length))];
     if (!pick) return;
-    let cost = resCost(pick[0], resLvl(r, pick[0], pick[1]), r, pick[1]),
+    let cost = resCost(pick[0], resLvl(r, pick[0], pick[1]), r, pick[1], e),
       gain = () => (((r.research || (r.research = {}))[pick[0]] || (r.research[pick[0]] = {}))[pick[1]] = resLvl(r, pick[0], pick[1]) + 1);
     col.stock.gold >= cost * 2 ? ((col.stock.gold -= cost), gain()) : (e.year - $.startYear) % 9 === r.id % 9 && gain();
   }
@@ -5950,7 +6084,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nm = names[(p.nextLeader || 1) % names.length];
     p.nextLeader = (p.nextLeader || 1) + 1;
     let u = Le(e, p, "leader", col.x, col.y, nm);
-    freshLeader(u, lvl), (u.mp = 0), p.nationId === "spain" && (u.pts += 2), (u.pts += 2 * resLvl(p, "lead", "lvl"));
+    freshLeader(u, lvl), (u.mp = 0), p.nationId === "spain" && (u.pts += 2), (u.pts += 2 * resLvl(p, "lead", "lvl")), hasBld(e, p.id, "university") && (u.pts += 2);
     return { ok: !0, note: `${nm} takes command at ${col.name}: ${u.attacks} actions a battle turn, charisma ${u.charisma}, organization ${u.cmd} men, movement +${u.move}.` };
   }
   // ---- The end of the game ----
@@ -6224,18 +6358,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       growth: {
         name: "Grow population",
         blurb: "Housing, churches, and the farms to feed them.",
-        mix: { house: 4, church: 2, farm: 3, mill: 1 },
+        mix: { house: 4, church: 2, farm: 3, mill: 1, cathedral: 1 },
       },
       resources: {
         name: "Grow resources",
         blurb: "Mills, mines, and farms on the best ground, then commerce.",
-        mix: { mill: 3, mine: 3, farm: 3, gold_mine: 1, commerce: 2, house: 2 },
+        mix: { mill: 3, mine: 3, farm: 3, gold_mine: 1, commerce: 2, house: 2, customs: 1 },
       },
       military: {
         name: "Military",
         blurb:
           "Forts first, a war college, and enough housing and food to man them.",
-        mix: { fort: 3, war_college: 1, house: 2, farm: 2, mine: 1 },
+        mix: { fort: 3, war_college: 1, house: 2, farm: 2, mine: 1, arsenal: 1, university: 1 },
       },
       balanced: {
         name: "Balanced",
@@ -6248,10 +6382,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           church: 1,
           commerce: 1,
           fort: 1,
+          customs: 1,
+          cathedral: 1,
+          university: 1,
         },
       },
     },
-    di = new Set(["war_college"]);
+    di = new Set(["war_college", "university"]);
   function er(e, n) {
     let o = [];
     for (let r of e.colonies)
@@ -6305,6 +6442,46 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ...i.filter((d) => !n.buildings.some((u) => u.id === d && u.building)),
         ...t.filter((d) => !i.includes(d)),
       ].filter((d) => (!glut[d] || (n.stock[glut[d]] || 0) + 3 * Math.max(0, r.net[glut[d]]) < storeCap(n, glut[d])) && !(d === "house" && r.net.food <= 0));
+    // Once a colony is big enough, its first new ground goes to a late
+    // building it lacks, before the mills and mines take it all.
+    {
+      let late = l.filter((d) => ae[d] && ae[d].minLevel && (n.level || 1) >= ae[d].minLevel && !n.buildings.some((b) => b.id === d));
+      late.length && (l = [...l.filter((d) => i.includes(d)), ...late, ...l.filter((d) => !i.includes(d) && !late.includes(d))]);
+    }
+    // A full colony makes room: its weakest mill, mine or house (or a farm
+    // it can spare, for the larger buildings) gives way to the late building.
+    for (let d of l) {
+      if (!(ae[d] && ae[d].minLevel) || (n.level || 1) < ae[d].minLevel || n.buildings.some((b) => b.id === d) || fi(e, n, d)) continue;
+      if (!Me(n.stock, colCost(n, d))) continue;
+      let sz = ye(d),
+        farmSpare = r.net.food > 12,
+        cand = n.buildings
+          .filter((b) => !b.building && !b.recruit && (b.w || 1) === sz.w && (b.h || 1) === sz.h && (sz.w > 1 ? b.id === "farm" && farmSpare : ["mill", "mine", "house"].includes(b.id)))
+          .sort((p, q) => (p.level || 1) - (q.level || 1));
+      for (let v of cand.slice(0, 4)) {
+        let at = n.buildings.indexOf(v);
+        n.buildings.splice(at, 1);
+        if (jn(e, n.id, d, v.x, v.y).ok) return `${n.name}'s governor pulled down a ${ae[v.id].name.toLowerCase()} to build a ${ae[d].name.toLowerCase()}.`;
+        n.buildings.splice(at, 0, v);
+      }
+      // A larger building can also take a block of small workshops.
+      if (sz.w > 1) {
+        let R = reachOf(n) || 1,
+          small = (x, y) => n.buildings.find((b) => !b.building && !b.recruit && (b.w || 1) === 1 && (b.h || 1) === 1 && b.x === x && b.y === y && ["mill", "mine", "house"].includes(b.id));
+        for (let y = n.y - R; y < n.y + R; y++)
+          for (let x = n.x - R; x < n.x + R; x++) {
+            let sq = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]],
+              gone = [];
+            if (!sq.every(([a2, b2]) => small(a2, b2) || !ln(e, a2, b2))) continue;
+            for (let [a2, b2] of sq) {
+              let v = small(a2, b2);
+              v && (gone.push(v), n.buildings.splice(n.buildings.indexOf(v), 1));
+            }
+            if (gone.length && jn(e, n.id, d, x, y).ok) return `${n.name}'s governor cleared ${gone.length} small buildings to raise a ${ae[d].name.toLowerCase()}.`;
+            n.buildings.push(...gone);
+          }
+      }
+    }
     let miss = govMiss.get(n);
     (!miss || miss.y !== e.year) && govMiss.set(n, (miss = { y: e.year, s: new Set() }));
     for (let d of l) {
@@ -11499,6 +11676,35 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         detail && (bperson(g, -6, 20, "#e8e0cc"), bperson(g, 4, 21, "#e8e0cc"));
         return;
       }
+      case "university": {
+        // The house of learning: a low platform with a long hall of scribes.
+        let s2 = ixStepped(g, 0, 0, 24, 1, 4, IX.stone, IX.teal),
+          top = isoP(0, 0, 0, 0, s2.z);
+        ixHouse(g, top[0], top[1], 30, 16, 8, detail, IX.gold);
+        detail && (bperson(g, -8, 20, "#e8e0cc"), bperson(g, 0, 22, "#e8e0cc"));
+        ixBanner(g, top[0] + 14, top[1] + 2, 14, IX.gold);
+        return;
+      }
+      case "arsenal": {
+        // Obsidian works: a walled yard, a workshop, and a pile of black stone.
+        ixHouse(g, 0, -2, 14, 10, 7, detail, IX.red);
+        g.fillStyle = "#1e1a22";
+        for (let [a, b] of [[-8, 8], [-6, 9], [-7, 6.8], [-9.5, 9.5]]) {
+          let q = isoP(0, 0, a, b, 0);
+          g.beginPath(), g.moveTo(q[0] - 1.6, q[1]), g.lineTo(q[0], q[1] - 2.6), g.lineTo(q[0] + 1.6, q[1]), g.closePath(), g.fill();
+        }
+        detail && bperson(g, 8, 8, "#e8e0cc");
+        return;
+      }
+      case "cathedral": {
+        // The great temple: a tall stepped pyramid with a shrine on top.
+        let s2 = ixStepped(g, 0, 0, 26, 4, 5, IX.stone, IX.red),
+          top = isoP(0, 0, 0, 0, s2.z);
+        ixHouse(g, top[0], top[1], s2.w * 1.1, s2.w * 0.9, 7, detail, IX.gold);
+        ixBanner(g, top[0], top[1] - 6, 14, IX.teal);
+        detail && ixSmoke(g, top[0] + 6, top[1] - 10);
+        return;
+      }
     }
     bldgSprite(g, id, color, flag, lvl, town, detail, seed);
   }
@@ -11720,6 +11926,55 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         steeple(g, -26, -20, 3, 22, "#d8cfc0", "#4a4f5a", detail);
         if (detail) for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) bperson(g, -14 + k * 4 + r * 2, 14 + r * 3 - k * 0.5, "#2a3a6a");
         bflag(g, -2, -40, flag, 14);
+        return;
+      }
+      case "university": {
+        // A stone quadrangle: a long hall, a wing, and a domed tower.
+        gableHouse(g, -8, -12, 36, 12, 13, "#e2d6bc", "#5a3a2c", { detail, door: !0, win: 6 });
+        gableHouse(g, 16, 6, 12, 26, 11, "#d8ccb2", "#5a3a2c", { detail, ridgeY: !0, win: 3 });
+        let t0 = isoP(0, 0, -6, 6, 0);
+        steeple(g, t0[0], t0[1], 4, 20, "#e8dcc2", "#7a6a3a", detail);
+        if (detail) for (let k = 0; k < 4; k++) bperson(g, -12 + k * 5, 18 - k, k % 2 ? "#2a2a2a" : "#4a2a3a");
+        bflag(g, -20, -28, flag, 12);
+        return;
+      }
+      case "arsenal": {
+        // A squat stone magazine with a gun and shot piled at the door.
+        gableHouse(g, 0, -2, 16, 12, 10, "#9a948a", "#3a3a42", { detail, door: !0, win: 1, roofH: 4 });
+        let c = isoP(0, 0, 4, 9, 0);
+        (g.fillStyle = "#2a2a2a"), g.fillRect(c[0] - 5, c[1] - 3, 9, 2.4);
+        (g.fillStyle = "#5a3a1e"), g.beginPath(), g.arc(c[0] - 2, c[1] - 0.4, 1.8, 0, Math.PI * 2), g.arc(c[0] + 2.5, c[1] - 0.4, 1.8, 0, Math.PI * 2), g.fill();
+        if (detail) {
+          g.fillStyle = "#3a3a3a";
+          for (let [a, b] of [[-9, 9], [-7, 9], [-8, 7.6], [-11, 10.5], [-9, 10.5]]) {
+            let q = isoP(0, 0, a, b, 0);
+            g.beginPath(), g.arc(q[0], q[1] - 1, 1, 0, Math.PI * 2), g.fill();
+          }
+          bperson(g, 10, 8, "#3a3a4a");
+        }
+        return;
+      }
+      case "cathedral": {
+        // A long nave with twin towers at its west front.
+        gableHouse(g, 4, 0, 34, 16, 16, "#ece4d2", "#5a5048", { detail, win: 5, roofH: 10 });
+        let a = isoP(0, 0, -16, -6, 0),
+          b = isoP(0, 0, -16, 8, 0);
+        steeple(g, a[0], a[1], 4, 26, "#f2eada", "#4a4a52", detail, !0);
+        steeple(g, b[0], b[1], 4, 26, "#f2eada", "#4a4a52", detail, !0);
+        if (detail) {
+          let r = isoP(0, 0, -12, 1, 12);
+          (g.fillStyle = "#6a8ab8"), g.beginPath(), g.arc(r[0], r[1], 2.2, 0, Math.PI * 2), g.fill();
+          (g.strokeStyle = "#3a3a42"), (g.lineWidth = 0.5), g.stroke();
+          bperson(g, -6, 16, "#3a2a2a"), bperson(g, -2, 18, "#6a4a2a");
+        }
+        return;
+      }
+      case "customs": {
+        // A two-storey brick house on the quay, cargo stacked outside.
+        gableHouse(g, 0, -2, 14, 12, 15, "#a85a3a", "#3a2a24", { detail, door: !0, win: 2, chimney: !0 });
+        crate(g, 9, 8, 1.8), crate(g, 12, 6, 1.6), barrel(g, -9, 9), barrel(g, -6.5, 10.5);
+        detail && bperson(g, 4, 11, "#2a3a5a");
+        bflag(g, 0, -26, flag, 12);
         return;
       }
       default:
@@ -12041,6 +12296,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     dock: [12, 2, 11, 9, 10],
     fort: [0, -4, 18, 16, 14],
     war_college: [-12, -14, 34, 14, 16],
+    university: [-8, -12, 36, 12, 15],
+    arsenal: [0, -2, 16, 12, 12],
+    cathedral: [4, 0, 34, 16, 18],
+    customs: [0, -2, 14, 12, 17],
   };
   function upgradeScaffold(g, id, detail) {
     let f = UPFRAME[id] || [0, 0, 14, 11, 11];
@@ -16736,7 +16995,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       return `<h3 class="side-sub">Research</h3><table class="lead-stats">${RESEARCH.filter(([c]) => !(f.big && c === "gun"))
         .map(([c, k, label]) => {
           let lv = resLvl(me, c, k),
-            cost = resCost(c, lv, me, k);
+            cost = resCost(c, lv, me, k, t);
           return `<tr><th>${label}</th><td class="num">${lv} / ${RES_MAX}</td><td>${lv < RES_MAX ? `<button type="button" class="train" data-study="${c}:${k}" ${f.stock.gold >= cost ? "" : "disabled"}>+1 \u00b7 ${cost} gold</button>` : ""}</td></tr>`;
         })
         .join("")}</table><p class="muted">Paid from this colony's gold. Attack makes that arm hit more often; defence makes it harder to hit; leadership gives new leaders two more points each level. Militia use your research too.</p>`;
@@ -16929,11 +17188,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     function pn(f) {
       let g = yn(t, f),
         k = V(t),
-        v = Qn.map((E) => {
+        v = Qn.filter((E) => !(E.id === "customs" && f.big)).map((E) => {
           let nn = ye(E.id).squares === 4 ? "2 by 2" : "1 square",
             Eo = colCost(f, E.id),
-            zr = Me(f.stock, Eo);
-          return `<button type="button" class="build${T === E.id ? " on" : ""}${zr ? "" : " short"}" data-tool="${E.id}" title="${G(E.produces)}">${G(bName(E.id, f))}<small>${qe(Eo)} \xB7 ${nn}</small></button>`;
+            low = E.minLevel && (f.level || 1) < E.minLevel,
+            zr = Me(f.stock, Eo) && !low;
+          return `<button type="button" class="build${T === E.id ? " on" : ""}${zr ? "" : " short"}" data-tool="${E.id}" title="${G(E.produces)}">${G(bName(E.id, f))}<small>${low ? `needs level ${E.minLevel}` : `${qe(Eo)} \xB7 ${nn}`}</small></button>`;
         }).join(""),
         b = Ce.map((E) => {
           let $e = g.net[E],
@@ -17028,7 +17288,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <button type="button" id="sell-send">Ship</button>
       </div>
       <p class="muted">Europe drives a hard bargain: 1 gold per 2 goods, 6 metal, 12 wood, or 20 crops. The gold comes back in ${eu} turns${eu > 2 ? ", since it is hauled to the coast first" : ""}.</p>
-      ${onWay.length ? `<ul class="underway">${onWay.map((E) => `<li>${E.amount} ${Ne[E.resource].toLowerCase()} at sea: ${E.gold} gold due in ${E.arrives - t.year} turn${E.arrives - t.year === 1 ? "" : "s"}</li>`).join("")}</ul>` : ""}`;
+      ${onWay.length ? `<ul class="underway">${onWay.map((E) => `<li>${E.amount} ${Ne[E.resource].toLowerCase()} at sea: ${E.gold} gold due in ${E.arrives - t.year} turn${E.arrives - t.year === 1 ? "" : "s"}</li>`).join("")}</ul>` : ""}
+      <h3 class="side-sub">Buy from Europe</h3>
+      <div class="transfer">
+        <select id="buy-what">${Object.keys(EUROPE_BUY)
+          .map((E) => `<option value="${E}">${Ne[E]}</option>`)
+          .join("")}</select>
+        <input id="buy-amount" type="number" min="1" value="10">
+        <button type="button" id="buy-send">Buy</button>
+      </div>
+      <p class="muted">Europe sells dear: 3 gold for 2 goods, 1 gold for 2 metal, 4 wood, or about 7 crops. Paid from this colony's gold; it arrives in ${eu} turns.</p>
+      ${coastalColony(t, f) ? `<h3 class="side-sub">Hire mercenaries</h3>
+      <div class="row merc">${Object.keys(MERC_COST).map((E) => `<button type="button" class="merc-hire" data-k="${E}" ${f.stock.gold >= MERC_COST[E] && f.mercYear !== t.year ? "" : "disabled"}>${MERC_NAME[E].replace("Mercenary ", "").replace(/^./, (c) => c.toUpperCase())} \xB7 ${MERC_COST[E]} gold</button>`).join("")}</div>
+      <p class="muted">Seasoned men from Europe, level 2. They land here next year. One hire a year per colony.</p>` : ""}
+      ${(() => {
+        let inc = (t.shipments || []).filter((E) => E.to === f.id && E.from === "europe");
+        return inc.length ? `<ul class="underway">${inc.map((E) => `<li>${E.unit ? MERC_NAME[E.unit] : `${E.amount} ${Ne[E.resource].toLowerCase()}`} on the way: due in ${E.arrives - t.year} turn${E.arrives - t.year === 1 ? "" : "s"}</li>`).join("")}</ul>` : "";
+      })()}`;
       (s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       <p class="muted">${T ? "Move over the pale squares to place it." : "Click a building to see it, or pick something to build."}</p>
@@ -17170,6 +17446,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let E = sellEurope(t, f.id, s.querySelector("#sell-what").value, s.querySelector("#sell-amount").value);
           x(E), E.ok && E.note && (h = E.note), R();
         });
+      let by = s.querySelector("#buy-send");
+      by &&
+        (by.onclick = () => {
+          let E = buyEurope(t, f.id, s.querySelector("#buy-what").value, s.querySelector("#buy-amount").value);
+          x(E), E.ok && E.note && (h = E.note), R();
+        });
+      s.querySelectorAll(".merc-hire").forEach(
+        (el) =>
+          (el.onclick = () => {
+            let E = hireMerc(t, f.id, el.dataset.k);
+            x(E), E.ok && E.note && (h = E.note), R();
+          }),
+      );
       let cp = s.querySelector("#cancel-place");
       cp &&
         (cp.onclick = () => {
@@ -17392,6 +17681,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
             fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
+            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
