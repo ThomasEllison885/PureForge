@@ -545,7 +545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.14";
+    "1.15";
   var on = [
       {
         id: "spain",
@@ -4558,9 +4558,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!col || !v) return { ok: !1, error: "No such village." };
       let g = Math.floor(Number(gold));
       if (!(g > 0) || col.stock.gold < g) return { ok: !1, error: `${col.name} does not have ${g} gold.` };
+      // A small gift means a lot the first time and less each time after;
+      // the effect comes back as the years pass without one.
       let nat = nationOf(e, v),
-        d = Math.min(15, Math.round(g * 0.8));
-      (col.stock.gold -= g), shiftAttitude(nat, col.owner, d);
+        gv = (nat.gifts || (nat.gifts = {}))[col.owner] || { n: 0, year: e.year },
+        worn = Math.max(0, gv.n - (e.year - gv.year) * 0.5),
+        d = Math.max(1, Math.round(12 * Math.pow(0.55, worn)));
+      (nat.gifts[col.owner] = { n: worn + 1, year: e.year }), (col.stock.gold -= g), shiftAttitude(nat, col.owner, d);
       return { ok: !0, discoveries: [], note: `The ${nat.name} people accept the gift. They are now ${attitudeWord(nat.att[col.owner])} toward you.` };
     });
   }
@@ -4618,6 +4622,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       owner && owner.isHuman ? out.human.push(rd) : resolveRaid(e, rd, null);
     }
     N.raids = still;
+    // A friendly village now and then brings a present to the nearest
+    // colony of a nation it likes: about once in 25 years for each village.
+    for (let v of N.villages) {
+      if (v.fed != null) continue;
+      let nat = nationOf(e, v);
+      for (let p of e.players) {
+        if (isNatNation(p) || (nat.att[p.id] || 0) < 30) continue;
+        let col = e.colonies
+          .filter((c) => c.owner === p.id && !c.occupied && Math.max(Math.abs(c.x - v.x), Math.abs(c.y - v.y)) <= 14)
+          .sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+        if (!col || z(v.id * 31 + p.id, e.year, (e.seed >>> 0) + 1821) >= 0.04) continue;
+        let r2 = z(v.id + p.id * 7, e.year, (e.seed >>> 0) + 1823),
+          k = r2 < 0.45 ? "food" : r2 < 0.7 ? "wood" : r2 < 0.88 ? "metal" : "goods",
+          n = Math.round({ food: 15, wood: 10, metal: 5, goods: 3 }[k] * (1 + v.size * 0.35) * (0.8 + z(v.id, e.year + 1, (e.seed >>> 0) + 1825) * 0.5));
+        col.stock[k] = Math.min(storeCap(col, k), (col.stock[k] || 0) + n);
+        p.isHuman && pushEvent(e, `${v.name} of the ${nat.name} brought ${n} ${Ne[k].toLowerCase()} to ${col.name} as a gift of friendship.`, col.x, col.y);
+      }
+    }
     // Villages slowly make good their losses.
     for (let v of N.villages) {
       v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < (v.fed != null ? 0.6 : 0.3) && (v.warriors += 1);
@@ -6205,20 +6227,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (e.year - P.met[r.id] > 1 && z(r.id, e.year, (e.seed >>> 0) + 2213) > 0.6) continue;
       let theirs = e.colonies.filter((c) => c.owner === r.id);
       if (!theirs.length) continue;
-      let tot = {};
-      for (let k of keys) tot[k] = theirs.reduce((a, c) => a + (c.stock[k] || 0), 0);
-      let give = keys.slice().sort((a, b) => tot[b] - tot[a])[0],
-        value = { food: 1, wood: 1.2, metal: 3, goods: 5 },
+      // They offer what fills their storehouses most and ask for what they
+      // are shortest of, so offers follow their real needs rather than
+      // always being crops. Kinds you have turned away are not offered.
+      let tot = {},
+        fill = {},
+        muted = P.muteGive || {};
+      for (let k of keys) {
+        tot[k] = theirs.reduce((a, c) => a + (c.stock[k] || 0), 0);
+        let cap = theirs.reduce((a, c) => a + storeCap(c, k), 0);
+        fill[k] = cap ? tot[k] / cap : 0;
+      }
+      let give = keys.filter((k) => !muted[k] && tot[k] >= 8).sort((a, b) => fill[b] - fill[a])[0];
+      if (!give) continue;
+      let value = TRADE_VAL,
         n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
         fair = 0.8 + z(r.id + 9, e.year, (e.seed >>> 0) + 2219) * 0.5,
         // only ask for what one of your colonies can actually pay
         most = (k) => Math.max(0, ...e.colonies.filter((c) => c.owner === hum.id).map((c) => c.stock[k] || 0)),
-        opts = keys.filter((k) => k !== give),
-        start = Math.floor(z(r.id + 3, e.year, (e.seed >>> 0) + 2217) * 3),
+        opts = keys.filter((k) => k !== give).sort((a, b) => fill[a] - fill[b]),
         want = null,
         ask = 0;
       for (let q = 0; q < opts.length && !want; q++) {
-        let k = opts[(start + q) % opts.length],
+        let k = opts[q],
           a2 = Math.max(1, Math.round((n * value[give] * fair) / value[k]));
         hasSkill(hum, "merchant") && (a2 = Math.max(1, Math.round(a2 * 0.87)));
         most(k) >= a2 && ((want = k), (ask = a2));
@@ -6229,32 +6260,53 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Advice on a trade: is it a fair price, does the colony need what comes
   // in, can it spare what goes out, and will the storehouse hold it?
+  // What things are worth against each other: Europe's prices (2 goods,
+  // 6 metal, 12 wood or 20 crops to the gold piece).
+  var TRADE_VAL = { food: 1, wood: 1.7, metal: 3.3, goods: 10 };
+  // Advice on a trade. It weighs the price at Europe's rates, then what each
+  // colony makes and spends a year, what it needs for its next level, and
+  // whether its storehouse would simply overflow, so a "good price" for
+  // something a colony already makes plenty of is not called a good deal.
   function tradeAdvice(e, offer, pay, get) {
-    let VAL = { food: 1, wood: 1.2, metal: 3, goods: 5 },
+    let VAL = TRADE_VAL,
       gName = Ne[offer.give].toLowerCase(),
       wName = Ne[offer.want].toLowerCase(),
       why = [],
-      score = 0;
+      block = !1;
     if (!pay || !get) return { verdict: "fair", head: "", why };
-    let inNet = yn(e, get).net[offer.give] || 0,
-      outNet = yn(e, pay).net[offer.want] || 0,
-      cap = storeCap(get, offer.give),
-      room = Math.max(0, cap - (get.stock[offer.give] || 0)),
+    let gk = offer.give,
+      wk = offer.want,
+      inNet = yn(e, get).net[gk] || 0,
+      outNet = yn(e, pay).net[wk] || 0,
+      gHave = get.stock[gk] || 0,
+      pHave = pay.stock[wk] || 0,
+      need = (c, k) => {
+        let nx = c.level < colMax(c) ? ge("center", c.level + 1) : null;
+        return nx && nx[k] ? nx[k] : 0;
+      },
+      // what still fits once this year's own output is in
+      room = Math.max(0, storeCap(get, gk) - gHave - Math.max(0, inNet)),
       kept = Math.min(offer.n, room),
-      worth = kept * (VAL[offer.give] || 1),
-      price = offer.ask * (VAL[offer.want] || 1),
-      ratio = worth / Math.max(1, price),
-      left = (pay.stock[offer.want] || 0) - offer.ask,
-      nextLv = pay.level < 4 ? ge("center", pay.level + 1) : null,
-      wantForLevel = nextLv && nextLv[offer.want] ? nextLv[offer.want] : 0;
-    ratio >= 1.2 ? (why.push(`A good price: what you get is worth about ${Math.round((ratio - 1) * 100)}% more than what you pay.`), (score += 2)) : ratio >= 0.9 ? (why.push("A fair price."), (score += 0.5)) : why.push(`A poor price: you pay about ${Math.round((1 / Math.max(0.01, ratio) - 1) * 100)}% more than it is worth.`), ratio < 0.9 && (score -= 2);
-    if (inNet < 0 || (get.stock[offer.give] || 0) < 20) why.push(`${get.name} is short of ${gName}${inNet < 0 ? `, losing ${-inNet} a year` : ""}.`), (score += 2);
-    if (kept < offer.n) why.push(`${get.name}'s storehouse can hold only ${kept} more ${gName}; the rest would go to waste.`), (score -= kept === 0 ? 4 : 1);
-    if (left < 0) why.push(`${pay.name} does not have ${offer.ask} ${wName}.`), (score -= 6);
-    else if (outNet < 0 && left < 30) why.push(`${pay.name} is already short of ${wName}.`), (score -= 2);
-    else if (wantForLevel && left < wantForLevel && (pay.stock[offer.want] || 0) >= wantForLevel) why.push(`${pay.name} needs its ${wName} to reach level ${pay.level + 1}.`), (score -= 1.5);
+      market = (offer.n * VAL[gk]) / Math.max(0.01, offer.ask * VAL[wk]),
+      fGet = 1,
+      fPay = 1;
+    why.push(market >= 1.1 ? `At Europe's prices you get about ${Math.round((market - 1) * 100)}% more than you pay.` : market >= 0.9 ? "At Europe's prices it is about even." : `At Europe's prices you pay about ${Math.round((1 / market - 1) * 100)}% more than you get.`);
+    // the colony getting it
+    let gShort = need(get, gk) - gHave - 3 * Math.max(0, inNet);
+    if (kept < offer.n) why.push(kept === 0 ? `${get.name}'s storehouse is full of ${gName} with what it makes this year; it would all go to waste.` : `${get.name} can store only ${kept} more ${gName}; the rest would go to waste.`);
+    if (gShort > 0) (fGet = 1.5), why.push(`${get.name} needs ${need(get, gk)} ${gName} for level ${get.level + 1}, and its own output will not get there soon.`);
+    else if (inNet < 0 && gHave + 5 * inNet < 40) (fGet = 1.4), why.push(`${get.name} is losing ${-inNet} ${gName} a year and will run low within a few years.`);
+    else if (gHave + 5 * Math.max(0, inNet) >= storeCap(get, gk) * 0.8) (fGet = 0.5), why.push(inNet > 0 ? `${get.name} already makes plenty of ${gName} (+${inNet} a year).` : `${get.name} already has plenty of ${gName} in store (${gHave}).`);
+    // the colony paying
+    let left = pHave - offer.ask;
+    if (left < 0) (block = !0), why.push(`${pay.name} has only ${pHave} ${wName}.`);
+    else if (pHave + Math.max(0, outNet) >= storeCap(pay, wk) * 0.85) (fPay = 0.4), why.push(`${pay.name} has more ${wName} than it can keep; paying with it costs little.`);
+    else if (left + 3 * Math.max(0, outNet) < need(pay, wk)) (fPay = 1.4), why.push(`${pay.name} needs its ${wName} for level ${pay.level + 1}.`);
+    else if (left + 5 * Math.min(0, outNet) < { food: 30, wood: 20, metal: 12, goods: 6 }[wk]) (fPay = 1.6), why.push(`${pay.name} would be left short of ${wName}${outNet < 0 ? `, losing ${-outNet} a year` : ""}.`);
+    else if (outNet > 0 && outNet * 2 >= offer.ask) (fPay = 0.75), why.push(`${pay.name} makes that much ${wName} back in ${Math.max(1, Math.ceil(offer.ask / outNet))} year${Math.ceil(offer.ask / outNet) > 1 ? "s" : ""}.`);
     why.push("Trading also warms relations with them a little.");
-    let verdict = score >= 2 ? "good" : score >= 0 ? "fair" : "poor";
+    let ratio = (kept * VAL[gk] * fGet) / Math.max(0.01, offer.ask * VAL[wk] * fPay),
+      verdict = block || kept === 0 ? "poor" : ratio >= 1.25 ? "good" : ratio >= 0.85 ? "fair" : "poor";
     return { verdict, head: verdict === "good" ? "Worth taking" : verdict === "fair" ? "A fair trade, if you want it" : "Better to decline", why };
   }
   function acceptTrade(e, offer, payId, getId) {
@@ -17229,8 +17281,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             return `${m.commonwealth ? '<p class="muted">A commonwealth: the crown takes a fifth of the old tax.</p>' : ""}<div class="row"><button type="button" id="crown-indep" ${ncol >= 3 && !m.suedPeace ? "" : "disabled"}>Declare independence</button></div><p class="muted">${ncol >= 3 ? (m.suedPeace ? "You sued for peace once; the crown will not be defied again." : "Break with the crown: no more tax, but its ports are closed to you and its troops will come for your colonies. Wear them down to win.") : "Found at least three colonies before breaking with the crown."}</p>`;
           })()}`}
         </section>
+        ${(() => {
+          let mu = Object.keys(P.muteGive || {}).filter((k) => P.muteGive[k]);
+          return mu.length ? `<p class="muted">Trade offers you have turned away: ${mu.map((k) => `${Ne[k].toLowerCase()} <button type="button" class="find-link inline" data-unmute="${k}">Allow again</button>`).join(", ")}.</p>` : "";
+        })()}
         <div class="row"><button type="button" id="diplo-close" class="primary">Close</button></div>
       </div>`);
+      a.querySelectorAll("[data-unmute]").forEach((el) => {
+        el.onclick = () => (delete P.muteGive[el.dataset.unmute], diploScreen(`Offers of ${Ne[el.dataset.unmute].toLowerCase()} are welcome again.`));
+      });
       a.querySelectorAll("[data-act]").forEach(
         (el) =>
           (el.onclick = () => {
@@ -17366,7 +17425,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               <div class="trade-picks"><label>Paid from <select class="tr-pay">${opts(of.want, of.give, sv.pay)}</select></label><label>Delivered to <select class="tr-get">${opts(of.want, of.give, sv.get)}</select></label></div>
               <div class="advice ${ad.verdict}"><b>${G(ad.head)}</b> <span>${G(ad.why.filter((q) => !/^Trading also warms/.test(q)).join(" "))}</span></div>
               <p class="down tr-err"></p>
-              <div class="row"><button type="button" class="tr-yes${ad.verdict !== "poor" ? " primary" : ""}">Accept</button><button type="button" class="tr-no${ad.verdict === "poor" ? " primary" : ""}">Decline</button></div>
+              <div class="row"><button type="button" class="tr-yes${ad.verdict !== "poor" ? " primary" : ""}">Accept</button><button type="button" class="tr-no${ad.verdict === "poor" ? " primary" : ""}">Decline</button><button type="button" class="tr-mute find-link inline" title="Decline this, and no nation will offer ${Ne[of.give].toLowerCase()} again until you allow it in Diplomacy.">No more ${Ne[of.give].toLowerCase()} offers</button></div>
             </div>`;
           })
           .join("");
@@ -17386,6 +17445,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           el.querySelector(".tr-yes").onclick = () => {
             let r0 = acceptTrade(t, of, sv.pay, sv.get);
             r0.ok ? (res.set(of.id, r0.note), t.log.push(r0.note), draw()) : (el.querySelector(".tr-err").textContent = r0.error);
+          };
+          el.querySelector(".tr-mute").onclick = () => {
+            (P.muteGive || (P.muteGive = {}))[of.give] = 1;
+            // every unanswered offer of that kind goes too
+            for (let q of list)
+              if (!res.has(q.id) && q.give === of.give) {
+                let msg = `You declined ${nationName(t.players.find((r) => r.id === q.from))}'s offer.`;
+                res.set(q.id, msg), t.log.push(msg);
+              }
+            draw();
           };
           el.querySelector(".tr-no").onclick = () => {
             let msg = `You declined ${nationName(t.players.find((r) => r.id === of.from))}'s offer.`;
@@ -17782,7 +17851,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`;
           return `<li><b>${G(q.name)}</b> · ${G(nt.name)} · <span class="att ${word}">${word}</span><br>
             ${word === "hostile" ? '<small class="down">Will not trade. May raid colonies nearby.</small>' : q.tradedYear === t.year ? "<small>Traded this year.</small>" : `<small>Wants ${Ne[of.want].toLowerCase()} this year: ${per}.</small> <button type="button" class="nat-trade" data-v="${q.id}">Trade 10</button>`}
-            <button type="button" class="nat-gift" data-v="${q.id}" ${f.stock.gold >= 10 ? "" : "disabled"}>Gift 10 gold</button></li>`;
+            <button type="button" class="nat-gift" data-v="${q.id}" ${f.stock.gold >= 2 ? "" : "disabled"}>Gift 2 gold</button></li>`;
         })
         .join("")}</ul>
       <p class="muted">Colonies close to their villages make a nation less friendly each year. Gifts and trade win them back. Drag soldiers onto a village beside them to attack it.</p>`
@@ -17820,7 +17889,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       <p class="muted">${T ? "Move over the pale squares to place it." : "Click a building to see it, or pick something to build."}</p>
       <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button></h2>
-      <p class="people">${f.population} people \xB7 room for ${g.housing} \xB7 ${g.jobs} jobs (${Math.round(g.staffing * 100)}% staffed)</p>
+      <p class="people">${f.population} people \xB7 room for ${g.housing}${g.staffing < 0.995 ? ` \xB7 <span class="down" title="Not enough people to work every building: output falls with it.">${Math.round(g.staffing * 100)}% of buildings worked</span>` : ""}</p>
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
       ${!T && te ? `${te}<div class="row"><button type="button" id="pick-done">Back to the town</button></div>` : ""}
       <div class="town-rest"${!T && te ? " hidden" : ""}>
@@ -17970,7 +18039,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }),
         s.querySelectorAll(".nat-gift").forEach((E) => {
           E.onclick = () => {
-            let res = nativeGift(t, f.id, +E.dataset.v, 10);
+            let res = nativeGift(t, f.id, +E.dataset.v, 2);
             x(res), res.ok && res.note && (h = res.note), R();
           };
         });
@@ -18228,7 +18297,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
             fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
-            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn, order: hr, field: Pn, In, towardUnknown },
+            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn, order: hr, field: Pn, In, towardUnknown, tradeAdvice, tradeOffersTurn },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
