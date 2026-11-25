@@ -545,7 +545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.18";
+    "1.19";
   var on = [
       {
         id: "spain",
@@ -6287,9 +6287,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       let madeAll = keys.reduce((a, k) => a + made[k], 0) || 1,
         score = {};
-      keys.forEach((k, ki) => (score[k] = 0.6 * Math.min(1.5, fill[k]) + 6 * ((prof[r.id] || avg)[k] - avg[k]) + 0.5 * z(r.id * 7 + ki, e.year, (e.seed >>> 0) + 2221)));
+      // Mostly good sense, a stock well past what they need, with only a
+      // light lean toward what their land makes more of than other
+      // nations', and a little chance. They never offer what they are short
+      // of or losing year by year.
+      let netK = {};
+      for (let k of keys) netK[k] = theirs.reduce((a, c) => a + (yn(e, c).net[k] || 0), 0);
+      keys.forEach((k, ki) => (score[k] = Math.min(1.5, fill[k]) + 2.5 * ((prof[r.id] || avg)[k] - avg[k]) + 0.35 * z(r.id * 7 + ki, e.year, (e.seed >>> 0) + 2221)));
       // a kind turned away stays quiet until the year it was silenced to
-      let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8).sort((a, b) => score[b] - score[a])[0];
+      let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8 && fill[k] >= 0.25 && netK[k] >= 0).sort((a, b) => score[b] - score[a])[0];
       if (!give) continue;
       let value = TRADE_VAL,
         n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
