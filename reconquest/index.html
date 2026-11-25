@@ -532,7 +532,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.12";
+    "1.13";
   var on = [
       {
         id: "spain",
@@ -14176,6 +14176,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       cardFor = null,
       // true while handling a click that missed every unit's figure
       offUnitClick = !1,
+      // the last press stopped a unit mid-walk (that click only picks it)
+      walkStopped = !1,
       t = null,
       l = null,
       d = { ox: 80, oy: 40, zoom: $.zoom.start },
@@ -16012,7 +16014,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           // A click on a unit still walking stops it where it is.
           walking = hit && O && isWalking(hit.id) && stopWalk(hit.id),
           v = (hit && O ? [hit] : !hit && featureHere(k.x, k.y) ? [] : stackAt(k.x, k.y)).filter((w) => !isWalking(w.id));
-        walking && ((l = hit.id), R());
+        (walkStopped = !!walking), walking && ((l = hit.id), R());
         if (v.length) {
           let b = l ? j(t, l) : null,
             pick = b && v.some((w) => w.id === b.id) ? b : topOf(v);
@@ -16140,6 +16142,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           if (O) {
             let hu = unitAt(v.x, v.y);
             if (hu) {
+              // picking works the same while others move: the second click
+              // on a picked unit opens its card
+              l === hu.id && !walkStopped && (cardFor = hu.id);
               y && ((y = null), (T = null), (S = null)), (l = hu.id), (h = ""), R();
               return;
             }
