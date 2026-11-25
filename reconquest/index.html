@@ -263,6 +263,9 @@ ul.colony-list small { color: #5c5144; }
 .outcome .ob-text { position: relative; font: 700 clamp(64px, 12vw, 150px)/1 Palatino, Georgia, serif; letter-spacing: 0.08em; text-transform: uppercase; transform: rotate(-3deg); animation: obSlam 0.55s cubic-bezier(.2,.8,.2,1) 0.12s both; }
 .outcome.win .ob-text { background: linear-gradient(180deg, #fff3c4 0%, #f0c04a 45%, #a8741e 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(60, 36, 8, 0.7); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
 .outcome.lose .ob-text { color: #e8ddd0; -webkit-text-stroke: 2px rgba(60, 8, 4, 0.8); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7)); }
+.card.end-card { width: min(780px, calc(100vw - 32px)); max-width: none; }
+.end-table { overflow-x: auto; }
+.end-table table { font-size: 13px; }
 .outcome.loot .ob-band { background: linear-gradient(180deg, rgba(58, 40, 8, 0.95), rgba(30, 20, 2, 0.95)); box-shadow: 0 0 70px rgba(255, 200, 60, 0.35); }
 .outcome.loot .ob-text { background: linear-gradient(180deg, #fffbe0 0%, #ffd84a 40%, #c88a10 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px rgba(70, 40, 0, 0.75); filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)); }
 .outcome.raided .ob-band { background: linear-gradient(180deg, rgba(120, 66, 14, 0.94), rgba(60, 30, 6, 0.94)); }
@@ -519,7 +522,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.09";
+    "1.10";
   var on = [
       {
         id: "spain",
@@ -5029,7 +5032,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return w === "none" ? "none" : w === "war" ? "war" : "peace";
   }
   // Urgent news (a war on you, an army at your gates) is marked; the year's summary opens after every turn that has news.
-  var EVENT_URGENT = /declares war on you|marching on|has reached|will attack next year|lands to retake|declare their independence|Independence is won|commonwealth is agreed|Peace with the crown|has taken|burned .* to the ground|Raiders/;
+  var EVENT_URGENT = /declares war on you|an ultimatum|marching on|has reached|will attack next year|lands to retake|declare their independence|Independence is won|commonwealth is agreed|Peace with the crown|has taken|burned .* to the ground|Raiders/;
   function pushEvent(e, text, x, y) {
     let P = pol(e);
     P.events.push({ text, x: x == null ? null : x, y: y == null ? null : y, urgent: EVENT_URGENT.test(text) });
@@ -5069,7 +5072,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // The first years go to settling; after that the crowns fall out
         // now and then, and a war, once begun, runs for a good while.
         if (e.year - $.startYear < 25 && was !== "war") continue;
-        if (z(a.id * 7 + b.id, e.year, (e.seed >>> 0) + 2203) >= (was === "war" ? 0.065 : 0.02)) continue;
+        // Toward the end the crowns fall out more often and fight longer.
+        let pg = gameProg(e);
+        if (z(a.id * 7 + b.id, e.year, (e.seed >>> 0) + 2203) >= (was === "war" ? 0.065 * (1 - 0.5 * pg) : 0.02 + 0.06 * pg)) continue;
         let now = was === "war" ? "peace" : "war";
         P.europe[k] = now;
         if (hum && (a === hum || b === hum)) {
@@ -5106,7 +5111,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // Each cathedral level cools the court a little more.
       let cath = e.colonies.reduce((a, c) => a + (c.owner === me.id ? bldLevels(c, "cathedral") : 0), 0);
       m.resentment = Math.max(0, (m.resentment || 0) - 1 - cath);
-      let rate = Math.max(0.02, Math.min(0.45, 0.05 + (m.resentment || 0) * 0.01 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1),
+      // The base tax creeps up over the game, and each demand the king makes
+      // leaves it a little higher for good.
+      let rate = Math.max(0.02, Math.min(0.5, 0.03 + 0.08 * gameProg(e) + (m.squeeze || 0) + (m.resentment || 0) * 0.005 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1),
         took = 0;
       for (let c of e.colonies)
         if (c.owner === me.id) {
@@ -5119,6 +5126,115 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       out.push(`The crown took ${took} gold in tax this year, ${Math.round(rate * 100)}% of your colonies' gold.`);
     }
     return out;
+  }
+  // ---- The king's demands ----
+  // The crown asks for more as the years pass: rarely and gently at first,
+  // steadily through the middle, heavily at the end, so that breaking away
+  // comes to look like the better bargain. A demand is answered on a card:
+  // pay and the court is pleased; refuse and it grows angry. Late in the
+  // game an angry court sends an ultimatum: submit, or declare independence.
+  function colsOf(e, pid) {
+    return e.colonies.filter((c) => c.owner === pid && !c.occupied);
+  }
+  function stockOf(e, pid, k) {
+    return colsOf(e, pid).reduce((a, c) => a + (c.stock[k] || 0), 0);
+  }
+  function takeStock(e, pid, k, n) {
+    for (let c of colsOf(e, pid).sort((a, b) => (b.stock[k] || 0) - (a.stock[k] || 0))) {
+      let g = Math.min(n, c.stock[k] || 0);
+      (c.stock[k] -= g), (n -= g);
+      if (n <= 0) break;
+    }
+  }
+  // The king asks for what the colonies hold most of, by its worth in
+  // Europe, and for a larger share of it as the years go by.
+  var TRIBUTE_WORTH = { gold: 1, goods: 1 / 2, metal: 1 / 6, wood: 1 / 12, food: 1 / 20 };
+  function tribute(e, me, mult) {
+    let best = "gold",
+      bv = -1;
+    for (let k of Object.keys(TRIBUTE_WORTH)) {
+      let v = stockOf(e, me.id, k) * TRIBUTE_WORTH[k];
+      v > bv && ((bv = v), (best = k));
+    }
+    let share = (0.12 + 0.28 * gameProg(e)) * (mult || 1),
+      n = Math.max(best === "gold" ? 5 : 10, Math.round(stockOf(e, me.id, best) * Math.min(0.9, share)));
+    return { res: best, n };
+  }
+  function crownDemandTurn(e) {
+    let P = pol(e);
+    for (let me of e.players) {
+      if (!me.isHuman || isNatNation(me)) continue;
+      let m = me.mother || (me.mother = { ...ir });
+      if (m.independent || m.rebel || P.demand) continue;
+      let pg = gameProg(e),
+        cols = colsOf(e, me.id);
+      if (!cols.length || e.year - $.startYear < 12) continue;
+      if (pg >= 0.55 && (m.resentment || 0) >= 40 && (!m.lastUltimatum || e.year - m.lastUltimatum >= 15)) {
+        m.lastUltimatum = e.year;
+        P.demand = { id: `${e.year}u`, kind: "ultimatum", ...tribute(e, me, 2.2), year: e.year, owner: me.id };
+        pushEvent(e, "The king has sent an ultimatum.");
+        continue;
+      }
+      m.nextDemand == null && (m.nextDemand = e.year + 3);
+      if (e.year < m.nextDemand) continue;
+      m.nextDemand = e.year + Math.max(3, Math.round(9 - 6 * pg));
+      m.demands = (m.demands || 0) + 1;
+      m.squeeze = Math.min(0.12, (m.squeeze || 0) + 0.004);
+      let soldiers = e.units.filter((u) => u.owner === me.id && !u.aboard && arm(u.kind)).length,
+        r = z(me.id * 41 + m.demands, e.year, (e.seed >>> 0) + 4601),
+        kind = r < 0.78 || soldiers < 3 || pg < 0.3 ? "tribute" : "troops",
+        dm = { id: `${e.year}d${m.demands}`, kind, year: e.year, owner: me.id };
+      kind === "tribute" ? Object.assign(dm, tribute(e, me)) : (dm.n = Math.min(soldiers - 1, 1 + Math.floor(2.5 * pg)));
+      P.demand = dm;
+      pushEvent(e, "The king has sent a demand.");
+    }
+  }
+  // What a demand asks for, in words.
+  function demandWhat(dm) {
+    return dm.kind === "troops" ? `${dm.n} soldier${dm.n === 1 ? "" : "s"} for his wars in Europe` : `${dm.n} ${Ne[dm.res].toLowerCase()}`;
+  }
+  function canMeet(e, dm) {
+    return dm.kind === "troops" ? e.units.filter((u) => u.owner === dm.owner && !u.aboard && arm(u.kind)).length >= dm.n : stockOf(e, dm.owner, dm.res) >= dm.n;
+  }
+  function answerDemand(e, yes) {
+    return be(e, () => {
+      let P = pol(e),
+        dm = P.demand;
+      if (!dm) return B("There is no demand.");
+      let me = ce(e, dm.owner),
+        m = me.mother || (me.mother = { ...ir }),
+        pg = gameProg(e),
+        note;
+      if (dm.kind === "ultimatum") {
+        if (yes) {
+          takeStock(e, me.id, dm.res, Math.min(dm.n, stockOf(e, me.id, dm.res)));
+          (m.resentment = 10), (m.favor = 0), (m.squeeze = Math.min(0.15, (m.squeeze || 0) + 0.03));
+          note = `You submit. The crown takes ${demandWhat(dm)} and raises your tax for good, but the court is quiet for now.`;
+        } else {
+          let d = declareIndependence(e, me.id);
+          if (!d.ok) {
+            (m.resentment = (m.resentment || 0) + 20), (m.squeeze = Math.min(0.15, (m.squeeze || 0) + 0.02));
+            note = `You defy the king, but ${d.error.toLowerCase()} The court punishes you with a heavier tax.`;
+          } else note = d.note;
+        }
+      } else if (yes) {
+        if (!canMeet(e, dm)) return B(`You do not have ${demandWhat(dm)}.`);
+        if (dm.kind === "troops") {
+          let men = e.units.filter((u) => u.owner === me.id && !u.aboard && arm(u.kind)).sort((a, b) => (a.strength || 3) - (b.strength || 3)).slice(0, dm.n),
+            ids = new Set(men.map((u) => u.id));
+          e.units = e.units.filter((u) => !ids.has(u.id));
+        } else takeStock(e, me.id, dm.res, dm.n);
+        (m.resentment = Math.max(0, (m.resentment || 0) - 4)), (m.favor = Math.min(30, (m.favor || 0) + 3));
+        note = `You send the king ${demandWhat(dm)}. The court is pleased.`;
+      } else {
+        let up = Math.round(6 + 12 * pg);
+        (m.resentment = (m.resentment || 0) + up), (m.favor = Math.max(0, (m.favor || 0) - 5));
+        note = `You refuse the king. Resentment at court rises by ${up}.`;
+      }
+      P.demand = null;
+      pushEvent(e, note);
+      return { ok: !0, discoveries: [], note };
+    });
   }
   // Who has met whom: you meet a rival once you see one of their colonies
   // or men.
@@ -5624,6 +5740,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       P.pool[r.id] = Math.min(14 + 16 * pg, (P.pool[r.id] || 0) + cols.reduce((a, c) => a + scale * (0.6 + 0.4 * (c.level || 1)), 0) * (cols.length > 4 ? 4 / cols.length : 1));
       // Rivals spend their first years building, not marching: no army sets
       // out before the grace years are up, and early armies are small.
+      // Spare gold hires mercenaries for the field army, a few a year.
+      if (!isNatNation(r) && !((r.mother || {}).rebel))
+        for (let k = 0; k < 3 && stockOf(e, r.id, "gold") >= 140 && P.pool[r.id] < 14 + 16 * pg; k++) takeStock(e, r.id, "gold", 40), (P.pool[r.id] += 1);
       let grace = { easy: 30, normal: 20, hard: 14, ruthless: 10 }[e.difficulty] || 20,
         since = e.year - $.startYear - grace,
         biggest = Math.min(Math.round(12 + 8 * pg), 4 + Math.floor(Math.max(0, since) / 8));
@@ -6178,6 +6297,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let turn = e.year - $.startYear + 1,
       best = e.players.slice().sort((a, b) => (b.score || 0) - (a.score || 0))[0],
       hit = null;
+    // Holding three fifths of the colonies in the New World wins outright.
+    let all = e.colonies.length;
+    if (all >= 10 && turn >= 30)
+      for (let q of e.players) {
+        let held = e.colonies.filter((c) => c.owner === q.id && !c.occupied).length;
+        if (held / all >= 0.6) return (P.over = { winner: q.id, why: "conquest", year: e.year, held, all }), P.over;
+      }
     if (turn >= P.length) P.over = { winner: best.id, why: "time", year: e.year };
     return P.over;
   }
@@ -8247,7 +8373,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       PF("Oo", () => Oo(e, r.id)), PF("er", () => er(e, r.id)), PF("rivalMoves", () => rivalMoves(e, r.id)), PF("fed", () => rivalFederate(e, r)), PF("study", () => aiStudy(e, r)), (e.log.length = quiet);
     }
     PF("hold", () => holdTurn(e)), PF("sea", () => seaTurn(e)), PF("crownWar", () => crownWarTurn(e)), PF("pairs", () => rivalPairsTurn(e)), PF("alli", () => allianceTurn(e)), PF("meet", () => meetTurn(e)), PF("europe", () => europeTurn(e)), PF("mood", () => rivalMoodTurn(e)), PF("army", () => rivalArmyTurn(e)), PF("offers", () => tradeOffersTurn(e));
-    PF("crown", () => crownTurn(e));
+    PF("crown", () => crownTurn(e)), PF("demand", () => crownDemandTurn(e));
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
       nt.human.length && e.governorNews.push(...nt.human.map((rd) => `Raiders have reached ${(e.colonies.find((c) => c.id === rd.target) || {}).name}!`));
@@ -15220,6 +15346,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let an = t.announce[0],
           w = `announce:${an.kind}:${t.year}`;
         H !== w && ((H = w), announceCard(an));
+      } else if (!p && t.politics && t.politics.demand && t.politics.demand.owner === f.id) {
+        let w = `demand:${t.politics.demand.id}`;
+        H !== w && ((H = w), demandCard(t.politics.demand));
       } else if (!p && t.politics && t.politics.offers.length && (staleOffers(t), t.politics.offers.length)) {
         let of = t.politics.offers[0],
           w = `offer:${of.id}`;
@@ -16923,6 +17052,43 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       a.querySelector("#of-no").onclick = () => done(`You declined ${nationName(r)}'s offer.`);
     }
     // A short announcement: the settlers are here, or warriors are coming.
+    // The king's demand, or his ultimatum.
+    function demandCard(dm) {
+      let me = V(t),
+        m = me.mother || {},
+        ult = dm.kind === "ultimatum",
+        can = canMeet(t, dm),
+        have = dm.kind === "troops" ? `${t.units.filter((u) => u.owner === me.id && !u.aboard && arm(u.kind)).length} soldiers` : `${stockOf(t, me.id, dm.res)} ${Ne[dm.res].toLowerCase()} across your colonies`,
+        up = Math.round(6 + 12 * gameProg(t)),
+        big = t.colonies.filter((c) => c.owner === me.id).length >= 3;
+      p = !0;
+      a.hidden = !1;
+      a.innerHTML = `
+      <div class="card demand-card">
+        <p class="find-kicker">The crown \u00b7 ${t.year}</p>
+        <h2>${ult ? "The king's ultimatum" : `The king demands ${G(demandWhat(dm))}`}</h2>
+        <p>${
+          ult
+            ? `The court has lost patience with your colonies. Send ${G(demandWhat(dm))} and accept a heavier tax for good, or break with the crown.`
+            : dm.kind === "troops"
+              ? `His wars in Europe need men. The weakest of your soldiers would sail home and not come back.`
+              : `The crown's coffers are empty again, and it looks to its colonies to fill them.`
+        }</p>
+        <p class="muted">You have ${have}. Tax this year was ${Math.round((m.taxRate || 0) * 100)}%. Resentment at court: ${m.resentment || 0}. Independent colonies pay no tax and answer no demands.</p>
+        <div class="row">${
+          ult
+            ? `<button type="button" id="dm-yes">Submit${can ? "" : " (the crown takes what you have)"}</button><button type="button" id="dm-no" class="primary">${big ? "Declare independence" : "Defy the king"}</button>`
+            : `<button type="button" id="dm-yes" class="primary" ${can ? "" : "disabled"}>Send it</button><button type="button" id="dm-no">Refuse (resentment +${up})</button>`
+        }</div>
+        ${ult && !big ? '<p class="muted">You need three colonies to declare independence. Defying the king without them only raises your tax.</p>' : ""}
+      </div>`;
+      let go = (yes) => {
+        let r = answerDemand(t, yes);
+        x(r), (p = !1), (a.hidden = !0), (H = null), r.ok && r.note && (h = r.note), R();
+      };
+      a.querySelector("#dm-yes").onclick = () => go(!0);
+      a.querySelector("#dm-no").onclick = () => go(!1);
+    }
     function announceCard(an) {
       let close = (go) => {
         (t.announce = (t.announce || []).filter((q) => q !== an)), (p = !1), (a.hidden = !0), (H = null);
@@ -17026,11 +17192,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       p = !0;
       (a.hidden = !1),
         (a.innerHTML = `
-      <div class="card">
+      <div class="card end-card">
         <p class="find-kicker">${over.year}</p>
         <h2>${win === me ? "Victory" : `${G(nationName(win))} wins`}</h2>
-        <p>${over.why === "score" ? `${G(win === me ? "You" : nationName(win))} reached ${pol(t).target.toLocaleString()} points first.` : `The ${pol(t).length} years are over, and ${G(win === me ? "yours is" : nationName(win) + "'s is")} the best score.`}</p>
-        <table class="stock"><tr><th></th>${Object.keys(SCORE_KINDS).map((k) => `<th class="num">${SCORE_KINDS[k]}</th>`).join("")}<th class="num">Total</th></tr>${list.map((q) => `<tr><td>${G(q === me ? `You, ${nationName(q)}` : nationName(q))}</td>${Object.keys(SCORE_KINDS).map((k) => `<td class="num">${Es(((q.scoreBy || {})[k]) || 0)}</td>`).join("")}<td class="num"><b>${Es(q.score || 0)}</b></td></tr>`).join("")}</table>
+        <p>${over.why === "conquest" ? `${G(win === me ? "You hold" : `${nationName(win)} holds`)} ${over.held} of the New World's ${over.all} colonies. The continent is ${win === me ? "yours" : "theirs"}.` : over.why === "score" ? `${G(win === me ? "You" : nationName(win))} reached ${pol(t).target.toLocaleString()} points first.` : `The ${pol(t).length} years are over, and ${G(win === me ? "yours is" : nationName(win) + "'s is")} the best score.`}</p>
+        <div class="end-table"><table class="stock"><tr><th></th>${Object.keys(SCORE_KINDS).map((k) => `<th class="num">${SCORE_KINDS[k]}</th>`).join("")}<th class="num">Total</th></tr>${list.map((q) => `<tr><td>${G(q === me ? `You, ${nationName(q)}` : nationName(q))}</td>${Object.keys(SCORE_KINDS).map((k) => `<td class="num">${Es(((q.scoreBy || {})[k]) || 0)}</td>`).join("")}<td class="num"><b>${Es(q.score || 0)}</b></td></tr>`).join("")}</table></div>
         <div class="row"><button type="button" id="end-on" class="primary">Keep playing</button></div>
       </div>`);
       a.querySelector("#end-on").onclick = () => ((over.seen = !0), (p = !1), (a.hidden = !0), R());
@@ -17681,7 +17847,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
             fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
-            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze },
+            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
