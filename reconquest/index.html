@@ -545,7 +545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.15";
+    "1.17";
   var on = [
       {
         id: "spain",
@@ -1688,9 +1688,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       regionGap: 30,
       peakCap: 22,
       regionCount: 14,
-      seaLevel: 0.5,
-      hillLevel: 0.66,
-      mountainLevel: 0.76,
+      seaLevel: 0.48,
+      hillLevel: 0.65,
+      mountainLevel: 0.765,
       ridgeScale: 0.08,
       ridgeStart: 0.85,
       ridgeHeight: 0.3,
@@ -2396,7 +2396,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             ? (A = "mountains")
             : M >= $.hillLevel
               ? (A = "hills")
-              : T > 0.52
+              : T > FOREST_WET
                 ? (A = "forest")
                 : (A = "plains")),
           i.push({
@@ -2417,7 +2417,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ? (u.terrain = "mountains")
           : u.elev >= $.hillLevel
             ? (u.terrain = "hills")
-            : u.moisture > 0.52
+            : u.moisture > FOREST_WET
               ? (u.terrain = "forest")
               : (u.terrain = "plains"));
       // A little more country for flavour: open woods on the edges of the
@@ -2429,9 +2429,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           dry = tn(x * 0.022 + 3.1, y * 0.022 - 7.7, e + 701),
           wet = tn(x * 0.09, y * 0.09, e + 709),
           low = u.elev - $.seaLevel;
-        u.terrain === "plains" && u.moisture > 0.485
+        u.terrain === "plains" && u.moisture > 0.512
           ? (u.terrain = "woods")
-          : u.terrain === "forest" && u.moisture < 0.54 && wet < 0.4 && (u.terrain = "woods");
+          : u.terrain === "forest" && u.moisture < FOREST_WET + FOREST_EDGE && wet < 0.4 && (u.terrain = "woods");
         u.terrain !== "forest" && dry > 0.725 && u.moisture < 0.47 && (u.terrain = "desert");
         low < 0.05 && wet > 0.615 && u.moisture > 0.42 && dry < 0.6 && (u.terrain = "swamp");
       }
@@ -2461,6 +2461,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       specials: l,
     };
   }
+  // How wet ground must be to grow forest rather than open plains.
+  var FOREST_WET = 0.546;
+  // the drier fringe of a forest grows as light woods
+  var FOREST_EDGE = 0.04;
   function Kr(e, n, o) {
     let r = [],
       i = new Uint8Array(e.length),
@@ -2852,17 +2856,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               return nt && (nt.att[o.owner] || 0) <= -30;
             })
           : [],
-      tooClose = (x, y) => foes.some((v) => Math.max(Math.abs(v.x - x), Math.abs(v.y - y)) <= 2 && Math.max(Math.abs(v.x - x), Math.abs(v.y - y)) < Math.max(Math.abs(v.x - o.x), Math.abs(v.y - o.y)));
+      tooClose = (x, y) => foes.some((v) => Math.max(Math.abs(v.x - x), Math.abs(v.y - y)) <= 2 && Math.max(Math.abs(v.x - x), Math.abs(v.y - y)) < Math.max(Math.abs(v.x - o.x), Math.abs(v.y - o.y))),
+      pass = new Set();
     for (r.set(Oe(o.x, o.y), 0); a.length; ) {
       let [t, l, d] = a.shift();
       for (let [u, c] of Z(t, l, e.map.width, e.map.height)) {
         let h = se(e, u, c),
           p = vn(e, o, t, l, u, c),
           m = d + p;
+        if (m > o.mp || !ii(o, h) || (foes.length && tooClose(u, c))) continue;
+        // Other units never wall a unit off: it walks through their square,
+        // it just cannot stop on one it could not share.
         if (
-          m > o.mp ||
-          !ii(o, h) ||
-          (foes.length && tooClose(u, c)) ||
           (Go(e, u, c, [...i]) &&
             // Your own town square takes any of your units.
             !e.colonies.some((q) => q.owner === o.owner && q.x === u && q.y === c && ri(e, u, c).every((w) => w.owner === o.owner)) &&
@@ -2876,12 +2881,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             // a settler or explorer may join its own leader's square
             !(escort(o.kind) && ri(e, u, c).every((q) => q.owner === o.owner) && ri(e, u, c).some((q) => q.kind === "leader")))
         )
-          continue;
+          pass.add(Oe(u, c));
         let y = Oe(u, c);
         (r.has(y) && r.get(y) <= m) || (r.set(y, m), a.push([u, c, m]));
       }
     }
-    return r.delete(Oe(o.x, o.y)), r;
+    r.delete(Oe(o.x, o.y));
+    // the whole walk, pass-through squares included, for tracing the path
+    let full = new Map(r);
+    for (let k of pass) r.delete(k);
+    return (r.full = full), r;
   }
   function wn(e, n, o, r) {
     let i = j(e, n);
@@ -2890,7 +2899,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let s = kn(e, n),
       a = s.get(Oe(o, r));
     if (a == null) return B("That square is out of reach.");
-    let t = ti(e, i, s, o, r),
+    let t = ti(e, i, s.full || s, o, r),
       l = Fn(e, i);
     for (let u of l) {
       let c = j(e, u);
@@ -6238,7 +6247,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let cap = theirs.reduce((a, c) => a + storeCap(c, k), 0);
         fill[k] = cap ? tot[k] / cap : 0;
       }
-      let give = keys.filter((k) => !muted[k] && tot[k] >= 8).sort((a, b) => fill[b] - fill[a])[0];
+      // a kind turned away stays quiet until the year it was silenced to
+      let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8).sort((a, b) => fill[b] - fill[a])[0];
       if (!give) continue;
       let value = TRADE_VAL,
         n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
@@ -6262,6 +6272,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // in, can it spare what goes out, and will the storehouse hold it?
   // What things are worth against each other: Europe's prices (2 goods,
   // 6 metal, 12 wood or 20 crops to the gold piece).
+  // How close a force must be to attack: two squares, not only the next one.
+  var ATTACK_REACH = 2;
   var TRADE_VAL = { food: 1, wood: 1.7, metal: 3.3, goods: 10 };
   // Advice on a trade. It weighs the price at Europe's rates, then what each
   // colony makes and spends a year, what it needs for its next level, and
@@ -7810,9 +7822,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return { ok: !1, error: `${n.name} can find no way there.` };
       }
       let c = kn(e, n.id),
+        cf = c.full || c,
         h = null;
-      for (let m = 1; m < u.length && c.has(`${u[m][0]},${u[m][1]}`); m++)
-        h = u[m];
+      // walk as far along the route as this turn allows, through other
+      // units' squares, and stop on the last square it may stand on
+      for (let m = 1; m < u.length && cf.has(`${u[m][0]},${u[m][1]}`); m++)
+        c.has(`${u[m][0]},${u[m][1]}`) && (h = u[m]);
       if (!h) break;
       let p = wn(e, n.id, h[0], h[1]);
       if (!p.ok) break;
@@ -9202,12 +9217,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function groundH(map, x, y) {
     let v = reliefH(map, x, y) + hillH(map, x, y);
     if (v <= 0) return 0;
+    // A town's land is level; around it the ground rises back to the
+    // country's own height over a few squares, so a town in the hills sits
+    // in a cleared hollow, not at the bottom of a walled pit.
+    let k = 1;
     if (GS && GS.map === map)
       for (let c of GS.colonies) {
-        let r = (reachOf(c) || 1) + 0.5;
-        if (Math.abs(x - c.x) <= r && Math.abs(y - c.y) <= r) return 0;
+        let r = (reachOf(c) || 1) + 0.5,
+          dd = Math.max(Math.abs(x - c.x) - r, Math.abs(y - c.y) - r);
+        if (dd <= 0) return 0;
+        if (dd < 3) {
+          let q = dd / 3;
+          k = Math.min(k, q * q * (3 - 2 * q));
+        }
       }
-    return v;
+    return v * k;
   }
   var RLIGHT = (() => {
     let v = [-0.62, -0.28, 0.73],
@@ -14487,6 +14511,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       return best;
     }
+    // A discovered landmark whose drawing covers this point on the screen.
+    function findAt(sx, sy) {
+      let o = V(t);
+      if (!o) return null;
+      let sc = Math.max(d.zoom * 1.25, 0.55),
+        best = null,
+        bd = 1e9,
+        w = t.map.width;
+      for (let sp of t.map.specials || []) {
+        if (sp.foundBy == null || o.explored[sp.y * w + sp.x] !== "1") continue;
+        let p = Y(sp.x, sp.y, { ox: d.ox, oy: d.oy, zoom: d.zoom, lift: terracePx(t.map, sp.x, sp.y, d.zoom) });
+        if (sx < p.x - 14 * sc || sx > p.x + 14 * sc || sy < p.y - 30 * sc || sy > p.y + 6 * sc) continue;
+        let q = (sx - p.x) ** 2 + (sy - p.y + 10 * sc) ** 2;
+        q < bd && ((bd = q), (best = sp));
+      }
+      return best;
+    }
     function topOf(e) {
       return (
         e.find((n) => n.kind === "ship") ||
@@ -16141,17 +16182,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let foeShip = w && w.kind === "ship" && t.units.find((q) => q.kind === "ship" && q.owner !== w.owner && q.x === b.x && q.y === b.y);
           if (foeShip) {
             let go = () => seaAttack(w, foeShip);
-            if (Math.max(Math.abs(w.x - b.x), Math.abs(w.y - b.y)) <= 1) return go();
+            if (Math.max(Math.abs(w.x - b.x), Math.abs(w.y - b.y)) <= ATTACK_REACH) return go();
             let reach = kn(t, w.id),
               best = null;
             for (let [key, cost] of reach) {
               let [sx, sy] = key.split(",").map(Number);
-              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) === 1 && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
+              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) <= ATTACK_REACH && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
             }
             if (!best) return (h = "She is beyond this turn's sailing."), R();
             neThen(w.id, () => mo(t, w.id, best.x, best.y), () => {
               let s2 = j(t, w.id);
-              s2 && Math.max(Math.abs(s2.x - b.x), Math.abs(s2.y - b.y)) <= 1 ? go() : ((h = "She could not close the distance this turn."), R());
+              s2 && Math.max(Math.abs(s2.x - b.x), Math.abs(s2.y - b.y)) <= ATTACK_REACH ? go() : ((h = "She could not close the distance this turn."), R());
             });
             return;
           }
@@ -16160,7 +16201,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             am = land && !vg && armyAt(t, b.x, b.y),
             rc = land && !vg && !am && t.colonies.find((c) => c.x === b.x && c.y === b.y && (c.owner !== w.owner || c.occupied)),
             rp = land && !vg && !am && !rc && t.units.some((q) => q.owner !== w.owner && !q.aboard && q.kind !== "ship" && q.x === b.x && q.y === b.y),
-            near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= 1;
+            near = Math.max(Math.abs(w ? w.x - b.x : 9), Math.abs(w ? w.y - b.y : 9)) <= ATTACK_REACH;
           // A unit dragged onto one of your ships goes aboard, walking up to
           // the shore beside her first if it can this turn.
           let myShip = land && t.units.find((q) => q.kind === "ship" && q.owner === w.owner && q.x === b.x && q.y === b.y);
@@ -16185,12 +16226,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           if (vg || am || rc || rp) {
             let strike = () => (vg ? attackVillage(w, vg) : am ? attackArmy(w, am) : rc ? attackColony(w, rc) : attackParty(w, b.x, b.y));
             if (near) return strike();
-            // Within this turn's march: walk up beside them, then attack.
+            // Within this turn's march: close to striking distance (two
+            // squares), then attack.
             let reach = kn(t, w.id),
               best = null;
             for (let [key, cost] of reach) {
               let [sx, sy] = key.split(",").map(Number);
-              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) === 1 && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
+              Math.max(Math.abs(sx - b.x), Math.abs(sy - b.y)) <= ATTACK_REACH && (!best || cost < best.cost) && (best = { x: sx, y: sy, cost });
             }
             if (!best) {
               (h = `${vg ? vg.name : rc ? rc.name : "They"} ${vg || rc ? "is" : "are"} beyond this turn's march. Move closer first.`), R();
@@ -16198,7 +16240,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             }
             neThen(w.id, () => mo(t, w.id, best.x, best.y), () => {
               let u2 = j(t, w.id);
-              u2 && Math.max(Math.abs(u2.x - b.x), Math.abs(u2.y - b.y)) <= 1 ? strike() : ((h = "They could not get close enough this turn."), R());
+              u2 && Math.max(Math.abs(u2.x - b.x), Math.abs(u2.y - b.y)) <= ATTACK_REACH ? strike() : ((h = "They could not get close enough this turn."), R());
             });
             return;
           }
@@ -16260,6 +16302,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             }
           }
           let hu = unitAt(v.x, v.y);
+          // a tall landmark is picked where it is drawn, even where its top
+          // stands over the square behind it
+          let fh = !hu && !y && findAt(v.x, v.y);
+          if (fh) return (pin = { kind: "special", id: fh.id }), (l = null), (S = null), (h = ""), R();
           (offUnitClick = !hu), Rn(hu ? hu.x : b.x, hu ? hu.y : b.y), (offUnitClick = !1);
         }
       }),
@@ -16542,7 +16588,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return `<h2>${G(P.name)}</h2>
         <p>${/^[AEIOU]/.test(nationAdj(ow)) ? "An" : "A"} ${G(nationAdj(ow))} ${P.big ? "town" : "colony"}, level ${P.level}. ${war ? "<b>At war with you.</b>" : `Relations: ${G(diploLevel(v).name)}.`}</p>
         <p class="muted">About ${def.units.length} defenders${def.leader ? `, commanded by ${G(def.leader.name)}` : ""}. The ring shows its land.</p>
-        <p class="muted">Drag soldiers beside it onto the town to ${canCap ? "raid or capture" : "raid"} it.${war ? "" : " That means war, and the crown may not approve."}</p>
+        <p class="muted">Drag soldiers within two squares onto the town to ${canCap ? "raid or capture" : "raid"} it.${war ? "" : " That means war, and the crown may not approve."}</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "army") {
@@ -16550,7 +16596,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           tg = t.colonies.find((c) => c.id === P.target);
         return `<h2>${G(nationAdj(ow))} army</h2>
         <p>Under ${G(P.leader.name)}, about ${P.troops.length} men. What kind of men, and how good, you cannot tell from here.</p>
-        <p class="muted">${tg ? `It is marching on ${G(tg.name)}.` : ""} Drag soldiers beside it onto it to attack.</p>
+        <p class="muted">${tg ? `It is marching on ${G(tg.name)}.` : ""} Drag soldiers within two squares onto it to attack.</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "raid") {
@@ -17282,8 +17328,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           })()}`}
         </section>
         ${(() => {
-          let mu = Object.keys(P.muteGive || {}).filter((k) => P.muteGive[k]);
-          return mu.length ? `<p class="muted">Trade offers you have turned away: ${mu.map((k) => `${Ne[k].toLowerCase()} <button type="button" class="find-link inline" data-unmute="${k}">Allow again</button>`).join(", ")}.</p>` : "";
+          let mu = Object.keys(P.muteGive || {}).filter((k) => P.muteGive[k] > t.year);
+          return mu.length ? `<p class="muted">Trade offers you have turned away: ${mu.map((k) => `${Ne[k].toLowerCase()} until ${P.muteGive[k]} <button type="button" class="find-link inline" data-unmute="${k}">Allow again</button>`).join(", ")}.</p>` : "";
         })()}
         <div class="row"><button type="button" id="diplo-close" class="primary">Close</button></div>
       </div>`);
@@ -17425,7 +17471,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               <div class="trade-picks"><label>Paid from <select class="tr-pay">${opts(of.want, of.give, sv.pay)}</select></label><label>Delivered to <select class="tr-get">${opts(of.want, of.give, sv.get)}</select></label></div>
               <div class="advice ${ad.verdict}"><b>${G(ad.head)}</b> <span>${G(ad.why.filter((q) => !/^Trading also warms/.test(q)).join(" "))}</span></div>
               <p class="down tr-err"></p>
-              <div class="row"><button type="button" class="tr-yes${ad.verdict !== "poor" ? " primary" : ""}">Accept</button><button type="button" class="tr-no${ad.verdict === "poor" ? " primary" : ""}">Decline</button><button type="button" class="tr-mute find-link inline" title="Decline this, and no nation will offer ${Ne[of.give].toLowerCase()} again until you allow it in Diplomacy.">No more ${Ne[of.give].toLowerCase()} offers</button></div>
+              <div class="row"><button type="button" class="tr-yes${ad.verdict !== "poor" ? " primary" : ""}">Accept</button><button type="button" class="tr-no${ad.verdict === "poor" ? " primary" : ""}">Decline</button><button type="button" class="tr-mute find-link inline" title="Decline this, and no nation will offer ${Ne[of.give].toLowerCase()} for 20 years. You can allow it again sooner in Diplomacy.">No ${Ne[of.give].toLowerCase()} offers for 20 years</button></div>
             </div>`;
           })
           .join("");
@@ -17447,7 +17493,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             r0.ok ? (res.set(of.id, r0.note), t.log.push(r0.note), draw()) : (el.querySelector(".tr-err").textContent = r0.error);
           };
           el.querySelector(".tr-mute").onclick = () => {
-            (P.muteGive || (P.muteGive = {}))[of.give] = 1;
+            (P.muteGive || (P.muteGive = {}))[of.give] = t.year + 20;
             // every unanswered offer of that kind goes too
             for (let q of list)
               if (!res.has(q.id) && q.give === of.give) {
@@ -17922,7 +17968,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land.</small></button>`}</div>`}
       ${garrison}
       ${X}
-      ${f.occupied ? `<p class="find-stat">Occupied by the crown's troops (${f.occupied.units.length}). It yields nothing until you retake it: drag soldiers beside it onto the town.</p>` : ""}
+      ${f.occupied ? `<p class="find-stat">Occupied by the crown's troops (${f.occupied.units.length}). It yields nothing until you retake it: drag soldiers within two squares onto the town.</p>` : ""}
       ${f.big ? "" : rebelOf(V(t)) ? '<p class="muted">The crown\'s ships blockade your ports: nothing can be sold in Europe until independence is won.</p>' : sell}
       ${natHtml}
       </div>
@@ -18261,7 +18307,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             Kn();
             return;
           }
-          (p = !1), (l = null), R();
+          // Esc closes whatever card is open: a unit's, a find's, a
+          // village's, the colonies list
+          (p = !1), (l = null), (pin = null), (listCols = !1), (cardFor = null), R();
         }
         f.key === "?" && ue();
       }),
