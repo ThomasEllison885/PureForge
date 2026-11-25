@@ -545,7 +545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.17";
+    "1.18";
   var on = [
       {
         id: "spain",
@@ -992,7 +992,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         short: "Customs",
         squares: 1,
         color: "#7a5a3a",
-        produces: "Each year sells in Europe whatever fills the storehouses past three quarters. Coastal level 3 colony.",
+        produces: "Each year sells in Europe whatever stock is well past what the colony needs on hand. Coastal level 3 colony.",
         bonusTerrain: [],
         cost: { wood: 8, metal: 15, goods: 5 },
         workers: 10,
@@ -1722,7 +1722,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     return Object.fromEntries(Object.entries(base).map(([r, v]) => [r, Math.ceil(v * m)]));
   }
   // What a colony's storehouses hold. Food also keeps a few years' eating.
+  // Storehouses hold any amount (no cap since 1.18). What a colony likes
+  // to keep on hand is its reserve: the customs house sells what is past
+  // it, the governor stops adding to a stock well over it, and trade advice
+  // judges plenty against it.
   function storeCap(c, r) {
+    return 1 / 0;
+  }
+  function storeReserve(c, r) {
     if (r === "gold") return 1 / 0;
     let n = 100 + 150 * (c.level || 1) + (c.big ? 300 : 0);
     return r === "food" ? n + Math.ceil((c.population || 0) / we.eatPer) * 3 : n;
@@ -2057,7 +2064,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let sold = 0,
           ind = ((ce(e, r.owner) || {}).mother || {}).independent ? 1.6 : 1;
         for (let s of ["goods", "metal", "wood", "food"]) {
-          let over = r.stock[s] - Math.floor(storeCap(r, s) * 0.75),
+          let over = r.stock[s] - Math.floor(storeReserve(r, s) * 0.75),
             g = over > 0 ? Math.floor(over * EUROPE_PRICE[s] * (1 + 0.15 * (cu - 1)) * ind) : 0;
           g >= 1 && ((r.stock[s] -= over), (sold += g));
         }
@@ -4832,7 +4839,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let near = (c) => Math.hypot(c.x - x, c.y - y),
       room = cols.map((c) => {
         let made = Math.max(0, (yn(e, c).net || {})[k] || 0);
-        return { c, r: Math.max(0, storeCap(c, k) - (c.stock[k] || 0) - made) };
+        return { c, r: Math.max(0, storeReserve(c, k) - (c.stock[k] || 0) - made) };
       }),
       total = room.reduce((a, q) => a + q.r, 0),
       out = new Map(),
@@ -4857,7 +4864,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // spent), else the nearest
       for (let q of room) give(q.c, q.r);
       let left = n - total,
-        best = cols.slice().sort((a, b) => storeCap(b, k) - (b.stock[k] || 0) - (storeCap(a, k) - (a.stock[k] || 0)) || near(a) - near(b))[0];
+        best = cols.slice().sort((a, b) => storeReserve(b, k) - (b.stock[k] || 0) - (storeReserve(a, k) - (a.stock[k] || 0)) || near(a) - near(b))[0];
       give(best, left);
     }
     let list = [...out].map(([c, m]) => ({ c, n: m })).sort((a, b) => b.n - a.n);
@@ -5754,9 +5761,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       near && ((r.dest = { x: near.x, y: near.y }), (r.autoExplore = !1));
     }
   }
-  // Landmarks change hands: a find belongs to whoever has soldiers beside
-  // it. If its holder has none there and another nation has, it passes to
-  // them, and stays theirs until someone takes it back the same way.
+  // Landmarks change hands: a find belongs to whoever holds it. If its
+  // holder has no soldiers beside it and another nation keeps soldiers
+  // there two year-ends running, it passes to them. A party only marching
+  // past does not take it, and the holder is warned after the first year.
   function holdTurn(e) {
     let hum = e.players.find((p) => p.isHuman);
     for (let sp of e.map.specials || []) {
@@ -5764,11 +5772,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let by = new Set();
       for (let u of e.units) !u.aboard && arm(u.kind) && Math.max(Math.abs(u.x - sp.x), Math.abs(u.y - sp.y)) <= 1 && by.add(u.owner);
       for (let A of pol(e).armies) A.hold != null && Math.max(Math.abs(A.x - sp.x), Math.abs(A.y - sp.y)) <= 1 && by.add(A.owner);
-      if (!by.size || by.has(sp.foundBy) || by.size > 1) continue;
+      if (!by.size || by.has(sp.foundBy) || by.size > 1) {
+        delete sp.contest;
+        continue;
+      }
       let to = [...by][0],
         was = sp.foundBy,
         P = e.players.find((p) => p.id === to),
         name = ke[sp.kind] ? ke[sp.kind].name : "a landmark";
+      // armies camped there show on your map while they threaten it
+      for (let A of pol(e).armies) A.owner === to && A.hold != null && Math.max(Math.abs(A.x - sp.x), Math.abs(A.y - sp.y)) <= 1 && was === (hum && hum.id) && (A.seen = 1);
+      if (!sp.contest || sp.contest.by !== to) {
+        sp.contest = { by: to, year: e.year };
+        hum && was === hum.id && pushEvent(e, `${nationName(P)}'s soldiers are beside your ${name}. Station soldiers there before the year is out, or it becomes theirs.`, sp.x, sp.y);
+        continue;
+      }
+      delete sp.contest;
       sp.foundBy = to;
       hum && (to === hum.id ? pushEvent(e, `Your soldiers hold the ${name}. Its bonus now goes to your colonies nearby.`, sp.x, sp.y) : was === hum.id && pushEvent(e, `${nationName(P)} has taken the ${name} from you. Station soldiers beside it to take it back.`, sp.x, sp.y));
     }
@@ -6229,33 +6248,55 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     let P = pol(e),
       hum = e.players.find((p) => p.isHuman);
     if (!hum || !e.colonies.some((c) => c.owner === hum.id)) return;
-    let keys = ["food", "wood", "metal", "goods"];
+    let keys = ["food", "wood", "metal", "goods"],
+      // each nation's share of what it makes, against the average of all
+      // of them: what it makes more of than the rest is what it trades
+      prof = {},
+      avg = { food: 0, wood: 0, metal: 0, goods: 0 },
+      nP = 0;
+    for (let r of e.players) {
+      if (r.isHuman || isNatNation(r)) continue;
+      let m = {},
+        all = 0;
+      for (let k of keys) (m[k] = e.colonies.reduce((a, c) => a + (c.owner === r.id ? Math.max(0, yn(e, c).made[k] || 0) : 0), 0) * TRADE_VAL[k]), (all += m[k]);
+      if (!all) continue;
+      for (let k of keys) (m[k] /= all), (avg[k] += m[k]);
+      (prof[r.id] = m), nP++;
+    }
+    for (let k of keys) avg[k] /= Math.max(1, nP);
     for (let r of e.players) {
       if (r.isHuman || !P.met[r.id] || atWar(e, hum.id, r.id) || relOf(e, hum.id, r.id) < DIPLO[3].min) continue;
       // A new acquaintance always opens with an offer; after that, often.
       if (e.year - P.met[r.id] > 1 && z(r.id, e.year, (e.seed >>> 0) + 2213) > 0.6) continue;
       let theirs = e.colonies.filter((c) => c.owner === r.id);
       if (!theirs.length) continue;
-      // They offer what fills their storehouses most and ask for what they
-      // are shortest of, so offers follow their real needs rather than
-      // always being crops. Kinds you have turned away are not offered.
+      // They offer what their colonies make most of, by worth: a nation on
+      // forest land offers wood, one in the hills metal, one on open plains
+      // crops. Then how full their stores are, and a little of each
+      // nation's own mind, so they do not all offer the same thing at once.
+      // They ask for what they are shortest of.
       let tot = {},
         fill = {},
+        made = {},
         muted = P.muteGive || {};
       for (let k of keys) {
         tot[k] = theirs.reduce((a, c) => a + (c.stock[k] || 0), 0);
-        let cap = theirs.reduce((a, c) => a + storeCap(c, k), 0);
+        let cap = theirs.reduce((a, c) => a + storeReserve(c, k), 0);
         fill[k] = cap ? tot[k] / cap : 0;
+        made[k] = theirs.reduce((a, c) => a + Math.max(0, yn(e, c).net[k] || 0), 0) * TRADE_VAL[k];
       }
+      let madeAll = keys.reduce((a, k) => a + made[k], 0) || 1,
+        score = {};
+      keys.forEach((k, ki) => (score[k] = 0.6 * Math.min(1.5, fill[k]) + 6 * ((prof[r.id] || avg)[k] - avg[k]) + 0.5 * z(r.id * 7 + ki, e.year, (e.seed >>> 0) + 2221)));
       // a kind turned away stays quiet until the year it was silenced to
-      let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8).sort((a, b) => fill[b] - fill[a])[0];
+      let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8).sort((a, b) => score[b] - score[a])[0];
       if (!give) continue;
       let value = TRADE_VAL,
         n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
         fair = 0.8 + z(r.id + 9, e.year, (e.seed >>> 0) + 2219) * 0.5,
         // only ask for what one of your colonies can actually pay
         most = (k) => Math.max(0, ...e.colonies.filter((c) => c.owner === hum.id).map((c) => c.stock[k] || 0)),
-        opts = keys.filter((k) => k !== give).sort((a, b) => fill[a] - fill[b]),
+        opts = keys.filter((k) => k !== give).sort((a, b) => score[a] - score[b]),
         want = null,
         ask = 0;
       for (let q = 0; q < opts.length && !want; q++) {
@@ -6308,11 +6349,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     if (kept < offer.n) why.push(kept === 0 ? `${get.name}'s storehouse is full of ${gName} with what it makes this year; it would all go to waste.` : `${get.name} can store only ${kept} more ${gName}; the rest would go to waste.`);
     if (gShort > 0) (fGet = 1.5), why.push(`${get.name} needs ${need(get, gk)} ${gName} for level ${get.level + 1}, and its own output will not get there soon.`);
     else if (inNet < 0 && gHave + 5 * inNet < 40) (fGet = 1.4), why.push(`${get.name} is losing ${-inNet} ${gName} a year and will run low within a few years.`);
-    else if (gHave + 5 * Math.max(0, inNet) >= storeCap(get, gk) * 0.8) (fGet = 0.5), why.push(inNet > 0 ? `${get.name} already makes plenty of ${gName} (+${inNet} a year).` : `${get.name} already has plenty of ${gName} in store (${gHave}).`);
+    else if (gHave + 5 * Math.max(0, inNet) >= storeReserve(get, gk) * 0.8) (fGet = 0.5), why.push(inNet > 0 ? `${get.name} already makes plenty of ${gName} (+${inNet} a year).` : `${get.name} already has plenty of ${gName} in store (${gHave}).`);
     // the colony paying
     let left = pHave - offer.ask;
     if (left < 0) (block = !0), why.push(`${pay.name} has only ${pHave} ${wName}.`);
-    else if (pHave + Math.max(0, outNet) >= storeCap(pay, wk) * 0.85) (fPay = 0.4), why.push(`${pay.name} has more ${wName} than it can keep; paying with it costs little.`);
+    else if (pHave + Math.max(0, outNet) >= storeReserve(pay, wk) * 1.2) (fPay = 0.5), why.push(`${pay.name} has far more ${wName} than it needs; paying with it costs little.`);
     else if (left + 3 * Math.max(0, outNet) < need(pay, wk)) (fPay = 1.4), why.push(`${pay.name} needs its ${wName} for level ${pay.level + 1}.`);
     else if (left + 5 * Math.min(0, outNet) < { food: 30, wood: 20, metal: 12, goods: 6 }[wk]) (fPay = 1.6), why.push(`${pay.name} would be left short of ${wName}${outNet < 0 ? `, losing ${-outNet} a year` : ""}.`);
     else if (outNet > 0 && outNet * 2 >= offer.ask) (fPay = 0.75), why.push(`${pay.name} makes that much ${wName} back in ${Math.max(1, Math.ceil(offer.ask / outNet))} year${Math.ceil(offer.ask / outNet) > 1 ? "s" : ""}.`);
@@ -6670,18 +6711,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       growth: {
         name: "Grow population",
         blurb: "Housing, churches, and the farms to feed them.",
-        mix: { house: 4, church: 2, farm: 3, mill: 1, cathedral: 1 },
+        mix: { house: 4, church: 2, farm: 3, mill: 1, gold_mine: 1, cathedral: 1 },
       },
       resources: {
         name: "Grow resources",
         blurb: "Mills, mines, and farms on the best ground, then commerce.",
-        mix: { mill: 3, mine: 3, farm: 3, gold_mine: 1, commerce: 2, house: 2, customs: 1 },
+        mix: { mill: 3, mine: 3, farm: 3, gold_mine: 2, commerce: 2, house: 2, customs: 1 },
       },
       military: {
         name: "Military",
         blurb:
           "Forts first, a war college, and enough housing and food to man them.",
-        mix: { fort: 3, war_college: 1, house: 2, farm: 2, mine: 1, arsenal: 1, university: 1 },
+        mix: { fort: 3, war_college: 1, house: 2, farm: 2, mine: 1, gold_mine: 1, arsenal: 1, university: 1 },
       },
       balanced: {
         name: "Balanced",
@@ -6691,6 +6732,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           farm: 3,
           mill: 2,
           mine: 2,
+          gold_mine: 1,
           church: 1,
           commerce: 1,
           fort: 1,
@@ -6753,7 +6795,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       l = [
         ...i.filter((d) => !n.buildings.some((u) => u.id === d && u.building)),
         ...t.filter((d) => !i.includes(d)),
-      ].filter((d) => (!glut[d] || (n.stock[glut[d]] || 0) + 3 * Math.max(0, r.net[glut[d]]) < storeCap(n, glut[d])) && !(d === "house" && r.net.food <= 0));
+      ].filter((d) => (!glut[d] || (n.stock[glut[d]] || 0) + 3 * Math.max(0, r.net[glut[d]]) < storeReserve(n, glut[d]) * 1.5) && !(d === "house" && r.net.food <= 0));
     // Once a colony is big enough, its first new ground goes to a late
     // building it lacks, before the mills and mines take it all.
     {
@@ -8777,7 +8819,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       blitFog(e, o.map, { ox: r.ox, oy: r.oy, zoom: r.zoom }, t.explored),
       yt(e, o, r, i, t),
       kt(e, o, r, n, t),
-      vt(e, o, r, n, l, i);
+      // No second fog: every unit, army and war party on charted ground is
+      // shown, not only those your men can see this moment.
+      vt(e, o, r, n, { has: (k) => { let c = k.indexOf(","); return t.explored[+k.slice(c + 1) * o.map.width + +k.slice(0, c)] === "1"; } }, i);
   }
   var Q = null;
   function Xi(e, n, o) {
@@ -14522,7 +14566,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let sp of t.map.specials || []) {
         if (sp.foundBy == null || o.explored[sp.y * w + sp.x] !== "1") continue;
         let p = Y(sp.x, sp.y, { ox: d.ox, oy: d.oy, zoom: d.zoom, lift: terracePx(t.map, sp.x, sp.y, d.zoom) });
-        if (sx < p.x - 14 * sc || sx > p.x + 14 * sc || sy < p.y - 30 * sc || sy > p.y + 6 * sc) continue;
+        if (sx < p.x - 18 * sc || sx > p.x + 18 * sc || sy < p.y - 42 * sc || sy > p.y + 8 * sc) continue;
         let q = (sx - p.x) ** 2 + (sy - p.y + 10 * sc) ** 2;
         q < bd && ((bd = q), (best = sp));
       }
@@ -16476,7 +16520,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           np = (q) => ((pin = q), (l = null), (y = null), (T = null), (h = ""), R());
         if (w && w.colony.owner !== k.id && seen) return np({ kind: "colony", id: w.colony.id });
         if (vg) return np({ kind: "village", id: vg.id });
-        if (ar && (ar.seen || ar.owner === k.id)) return np({ kind: "army", id: ar.id });
+        if (ar && (ar.seen || seen || ar.owner === k.id)) return np({ kind: "army", id: ar.id });
         if (sp && sp.foundBy != null) return np({ kind: "special", id: sp.id });
       }
       pin = null;
