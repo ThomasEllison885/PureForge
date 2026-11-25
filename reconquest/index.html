@@ -178,6 +178,9 @@ footer.bar { border-bottom: 0; border-top: 1px solid #1e3342; height: 92px; alig
 .layout aside#side { position: absolute; top: 10px; right: 10px; width: 340px; max-height: calc(100% - 230px); min-height: 0; border: 1px solid #b9a67e; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); z-index: 6; padding-top: 10px; }
 .layout aside#side.closed { display: none; }
 .layout aside#side.colony { max-height: calc(100% - 20px); right: 240px; }
+.town-leaders { margin: 8px 0; padding: 6px 8px; border: 1px solid #b9a67e; border-radius: 6px; background: rgba(140, 106, 47, 0.08); }
+.town-leaders .row { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.town-leaders .row .muted { flex: 1; }
 .brules summary { cursor: pointer; color: #9fb3a8; font-size: 13px; margin-top: 8px; }
 .brules[open] summary { margin-bottom: 4px; }
 .card-x { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 16px; line-height: 24px; background: #efe4cc; color: #4a3a22; border: 1px solid #b9a67e; z-index: 1; }
@@ -529,7 +532,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.11";
+    "1.12";
   var on = [
       {
         id: "spain",
@@ -1167,7 +1170,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         group: "gem",
         color: "#3a63d8",
         terrain: ["hills", "mountains"],
-        building: "gold_mine",
+        // Cut stones go into the workshops' wares: more goods, not gold.
+        building: "commerce",
         bonus: 70,
         radius: 5,
       },
@@ -1341,6 +1345,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     ],
     ke = Object.fromEntries(An.map((e) => [e.id, e])),
     xr = {
+      commerce: "goods workshops",
       gold_mine: "gold mines",
       mine: "metal mines",
       mill: "mills",
@@ -1770,9 +1775,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let c of n.buildings)
         gn(c) && c.id === "dock" && ((i.goods += (c.level || 1) * ro), (i.gold += (c.level || 1) * ro));
     for (let c of Object.keys(i)) i[c] = Math.floor(i[c]);
-    let a = 0;
+    let a = 0,
+      // a workshop near a sapphire find turns out extra goods for free
+      gx = 0;
     for (let c of n.buildings)
-      gn(c) && c.id === "commerce" && (a += c.level || 1);
+      gn(c) && c.id === "commerce" && ((a += c.level || 1), (gx += ((c.level || 1) * rn(e, "commerce", c.x, c.y, n.owner).total) / 100));
     a = Math.floor(a * r);
     let t = Math.ceil((n.population || 0) / we.eatPer),
       l = n.stock,
@@ -1780,7 +1787,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         0,
         Math.min(a, l.wood + i.wood, l.metal + i.metal, l.food + i.food - t),
       );
-    (i.goods += d), (s.wood += d), (s.metal += d), (s.food += d + t);
+    (i.goods += d + (a ? Math.floor(gx * r * (d / a)) : 0)), (s.wood += d), (s.metal += d), (s.food += d + t);
     let u = Object.fromEntries(Ce.map((c) => [c, i[c] - s[c]]));
     return {
       made: i,
@@ -2691,7 +2698,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         e.kind === "ship" &&
           n.skills.includes("navigator") &&
           (o += $.navigatorBonus),
-        e.kind === "explorer" && n.perks && n.perks.trail && (o += 1),
+        e.kind === "explorer" && n.perks && n.perks.trail && (o += 2),
         // The native power knows its own country: every land unit moves a
         // square farther, and its runners two.
         isNatNation(n) && e.kind !== "ship" && (o += e.kind === "explorer" ? 2 : 1)),
@@ -3675,8 +3682,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let it of e.pendingNames.filter((q) => q.ownerId === n)) Jo(e, it.kind, it.id, Vo(e, it.kind, n), n);
   }
   // ---- Ancient Ruins --------------------------------------------
-  // Small finds, never a windfall: a few coins, old maps, a survivor, or one
-  // of two lasting curiosities.
+  // Small finds, never a windfall: a few coins, old maps of a wide stretch
+  // of country, a survivor, or one of two lasting curiosities. Once
+  // searched, ruins give nothing more and are not worth guarding.
   function ruinsPrize(e, n, s) {
     if (s.prize) return;
     let p = ce(e, n),
@@ -3691,15 +3699,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       col ? (col.stock.gold += g) : (p.treasury = (p.treasury || 0) + g);
       return `A small cache of old coins: ${g} gold${col ? `, carried to ${col.name}` : ", kept until your first colony is founded"}.`;
     };
-    if (r < 0.32) msg = cache();
-    else if (r < 0.58) {
+    if (r < 0.25) msg = cache();
+    else if (r < 0.6) {
+      // Old maps: a wide stretch of country, out to about 25 squares.
       let ex = p.explored.split(""),
-        w = e.map.width;
-      paintSight(e.map, s.x, s.y, 10, (x, y) => {
-        ex[C(x, y, w)] = "1";
-      });
+        w = e.map.width,
+        n0 = 0,
+        R0 = 22 + Math.floor(z(s.x, s.y + 3, seed + 923) * 7);
+      for (let y = Math.max(0, s.y - R0); y <= Math.min(e.map.height - 1, s.y + R0); y++)
+        for (let x = Math.max(0, s.x - R0); x <= Math.min(w - 1, s.x + R0); x++)
+          Math.hypot(x - s.x, y - s.y) <= R0 && ex[C(x, y, w)] !== "1" && ((ex[C(x, y, w)] = "1"), n0++);
       p.explored = ex.join("");
-      msg = "Weathered maps of the country round about. The land for some miles around the ruins is now on your charts.";
+      msg = `Old maps drawn by the people who lived here. ${n0} squares of country for some ${R0} squares around the ruins are now on your charts.`;
     } else if (r < 0.82) {
       let settlers = z(s.x + 7, s.y, seed + 921) < 0.2,
         u = Le(e, p, settlers ? "settler" : "explorer", s.x, s.y, settlers ? "Settlers" : "Survivor");
@@ -3709,7 +3720,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         : "A lone survivor of an earlier voyage joins you as an explorer.";
     } else if (!p.perks.trail) {
       p.perks.trail = 1;
-      msg = "Carved trail markers show the old paths. From now on your explorers travel farther each turn.";
+      msg = "Carved trail markers show the old paths. From now on every explorer of yours moves two squares farther each turn.";
     } else if (!p.perks.calendar) {
       p.perks.calendar = 1;
       addScore(p, "finds", 60);
@@ -7638,6 +7649,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       t = n.prev[t];
     return a.reverse();
   }
+  // Bound for country nobody has charted: no known route may exist, so
+  // the unit heads for the reachable square closest to it and tries from
+  // there, the way an explorer would. Null if it cannot get any closer.
+  function towardUnknown(e, n, o, r) {
+    let { width: w, height: h } = e.map,
+      u = n.unit,
+      here = u ? Math.hypot(u.x - o, u.y - r) : 1 / 0,
+      best = -1,
+      bd = here - 0.5,
+      bc = 1 / 0;
+    for (let k = 0; k < w * h; k++) {
+      let c = n.dist[k];
+      if (!Number.isFinite(c) || c === 0) continue;
+      let d = Math.hypot((k % w) - o, ((k / w) | 0) - r);
+      (d < bd - 0.01 || (Math.abs(d - bd) <= 0.01 && c < bc)) && ((bd = d), (bc = c), (best = k));
+    }
+    return best < 0 ? null : In(e, n, best % w, (best / w) | 0);
+  }
   function fr(e, n, o, r) {
     let { width: i, height: s } = e.map,
       a = null;
@@ -7674,7 +7703,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         };
       t = u;
     }
-    if (!In(e, a, t.x, t.y))
+    if (!In(e, a, t.x, t.y) && !(s.explored[C(o, r, e.map.width)] !== "1" && towardUnknown(e, a, o, r)))
       return { ok: !1, error: "No known way to get there." };
     (i.dest = t), delete i.destBest, delete i.destStuck, (i.autoExplore = !1);
     let d = pr(e, i, a);
@@ -7706,7 +7735,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           break;
         }
       }
-      let u = In(e, l, r.x, r.y);
+      let u = In(e, l, r.x, r.y) || (ce(e, n.owner).explored[C(r.x, r.y, e.map.width)] !== "1" ? towardUnknown(e, l, r.x, r.y) : null);
       if (!u) {
         if (((n.dest = null), i.length > 1)) break;
         return { ok: !1, error: `${n.name} can find no way there.` };
@@ -14145,6 +14174,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // The unit whose card is open. Picking a unit does not open it; a
       // second click on the picked unit does.
       cardFor = null,
+      // true while handling a click that missed every unit's figure
+      offUnitClick = !1,
       t = null,
       l = null,
       d = { ox: 80, oy: 40, zoom: $.zoom.start },
@@ -14253,6 +14284,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
       return `<div class="recruits">${i.join("")}</div>`;
     }
+    // A village, town, army or find on this square, which a click beside
+    // the unit standing there picks instead of the unit.
+    function featureHere(f, g) {
+      let k = V(t),
+        seen = k.explored[g * t.map.width + f] === "1",
+        sp = seen && ro(t, f, g);
+      return !!(seen && (villageAt(t, f, g) || ln(t, f, g) || (t.politics && armyAt(t, f, g)) || (sp && sp.foundBy != null)));
+    }
     function stackAt(e, n) {
       let o = V(t);
       let sel = l && t.units.find((q) => q.id === l && q.x === e && q.y === n);
@@ -14334,9 +14373,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             zoom: d.zoom,
             lift: terracePx(t.map, at.x, at.y, d.zoom),
           }),
-          hw = (u.kind === "ship" ? 30 : 16) * sc,
-          up = (u.kind === "ship" ? 30 : 18) * sc,
-          dn = (u.kind === "ship" ? 22 : 14) * sc;
+          // a land unit is hit on its figure, not the whole square, so the
+          // village or town it stands on can still be clicked around it
+          hw = (u.kind === "ship" ? 30 : 9) * sc,
+          up = (u.kind === "ship" ? 30 : 16) * sc,
+          dn = (u.kind === "ship" ? 22 : 7) * sc;
         if (sx < p.x - hw || sx > p.x + hw || sy < p.y - up || sy > p.y + dn)
           continue;
         let dx = sx - p.x,
@@ -15263,6 +15304,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           let L = In(t, M.field, F, D);
           L && (!w || L.length < w.length) && (w = L);
         }
+      // into uncharted country: head as close as it can get
+      !w && V(t).explored[C(g, k, t.map.width)] !== "1" && (w = towardUnknown(t, M.field, g, k));
       return w
         ? { path: w, stops: gr(t, f, w), x: g, y: k }
         : { path: null, x: g, y: k };
@@ -15691,17 +15734,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let rnu = s.querySelector("#rename-unit");
       rnu && (rnu.onclick = () => namePrompt(`Rename ${f.name}`, "", f.name, (nm) => (f.name = nm)));
       let mo_ = s.querySelector("#march-out");
-      mo_ &&
-        (mo_.onclick = () => {
-          let reach = kn(t, f.id),
-            best = null;
-          for (let [key, cost] of reach) {
-            let [sx, sy] = key.split(",").map(Number);
-            colonyOf(t, sx, sy) || (best && best.cost <= cost) || (best = { x: sx, y: sy, cost });
-          }
-          if (!best) return (h = "There is no room to march out this turn."), R();
-          ne(f.id, () => mo(t, f.id, best.x, best.y));
-        });
+      mo_ && (mo_.onclick = () => marchOut(f.id));
       let gat = s.querySelector("#gather");
       gat && (gat.onclick = () => ne(f.id, () => gatherMen(t, f.id)));
       let cv2 = s.querySelector("#convert");
@@ -15978,7 +16011,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           k = hit || tileAt(t.map, g.x, g.y, d),
           // A click on a unit still walking stops it where it is.
           walking = hit && O && isWalking(hit.id) && stopWalk(hit.id),
-          v = (hit && O ? [hit] : stackAt(k.x, k.y)).filter((w) => !isWalking(w.id));
+          v = (hit && O ? [hit] : !hit && featureHere(k.x, k.y) ? [] : stackAt(k.x, k.y)).filter((w) => !isWalking(w.id));
         walking && ((l = hit.id), R());
         if (v.length) {
           let b = l ? j(t, l) : null,
@@ -16122,7 +16155,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             }
           }
           let hu = unitAt(v.x, v.y);
-          Rn(hu ? hu.x : b.x, hu ? hu.y : b.y);
+          (offUnitClick = !hu), Rn(hu ? hu.x : b.x, hu ? hu.y : b.y), (offUnitClick = !1);
         }
       }),
       window.addEventListener("pointermove", (f) => {
@@ -16257,6 +16290,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       let b = stackAt(f, g);
+      // a click beside the unit, not on it, picks what it stands on
+      offUnitClick && b.length && featureHere(f, g) && (b = []);
       if (v && b.length && v.x === f && v.y === g) {
         // the second click on a picked unit opens its card
         if (cardFor !== v.id) return (cardFor = v.id), (h = ""), R();
@@ -16367,10 +16402,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (pin.kind === "special") {
         let d = ke[P.kind],
           who = P.foundBy === me_.id ? "Yours" : `Held by ${ee[ce(t, P.foundBy).nationId].name}`;
+        // Ruins give their one prize when found; nothing after is worth holding.
+        let spent = P.kind === "ancient_ruins";
         return `<h2>${G(d.name)}</h2>
-        <p>${G(qn(d))}.</p>
-        <p class="muted">${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}</p>
-        <p class="muted">${P.foundBy === me_.id ? "Keep soldiers beside it: if a rival stations soldiers here while none of yours are, it becomes theirs." : "Station soldiers beside it, with none of the holder's there, and at the end of the year it becomes yours."}</p>
+        <p>${G(spent && P.foundBy === me_.id ? P.prize || qn(d) : spent ? "Already searched." : qn(d))}${spent ? "" : "."}</p>
+        <p class="muted">${spent ? `Searched by ${P.foundBy === me_.id ? "you" : ee[ce(t, P.foundBy).nationId].name}${P.foundYear ? ` in ${P.foundYear}` : ""}. Nothing more is to be found here.` : `${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}`}</p>
+        ${spent ? "" : `<p class="muted">${P.foundBy === me_.id ? "Keep soldiers beside it: if a rival stations soldiers here while none of yours are, it becomes theirs." : "Station soldiers beside it, with none of the holder's there, and at the end of the year it becomes yours."}</p>`}
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "village") {
@@ -16435,7 +16472,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         document.body.appendChild(tipEl));
       let B = ae[T] || ye(T),
         here = an(t, col.id, T, u.x, u.y),
-        val = here.ok && $.yield[T] ? (Ve(t, T, u.x, u.y) || 0) + rn(t, T, u.x, u.y, col.owner).total : null;
+        val = here.ok && ($.yield[T] || T === "commerce") ? (Ve(t, T, u.x, u.y) || 0) + rn(t, T, u.x, u.y, col.owner).total : null;
       (tipEl.innerHTML = `<b>${G(B.name)}</b> ${
         here.ok
           ? `<span class="ok">${val != null ? `${val > 0 ? "+" : ""}${Math.round(val)}% here · ` : ""}click to build</span>`
@@ -17495,7 +17532,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // the productivity it would get there, and the best of them.
     function placePlan(f) {
       let r = reachOf(f) || 1,
-        yields = !!$.yield[T],
+        yields = !!$.yield[T] || T === "commerce",
         spots = [];
       for (let yy = f.y - r; yy <= f.y + r; yy++)
         for (let xx = f.x - r; xx <= f.x + r; xx++) {
@@ -17595,7 +17632,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           loose = t.units.filter((q) => q.owner === me_.id && !q.aboard && arm(q.kind) && !(lead && q.leaderId === lead.id && q.x === lead.x && q.y === lead.y) && Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (reachOf(f) || 3) + 2);
         let lds = inTown.filter((q) => q.kind === "leader"),
           men = inTown.filter((q) => q.kind !== "leader");
-        return `${lds.length ? `<p class="muted">Leaders in the town: ${lds.map((q) => `<button type="button" class="find-link inline" data-sel="${q.id}">${G(q.name)}</button> (${t.units.filter((w) => w.leaderId === q.id && w.x === q.x && w.y === q.y).length} of ${leaderStats(q).cmd} men)`).join(", ")}. Click one to lead him out.</p>` : ""}${men.length ? `<p class="muted">Soldiers in the town: ${men.length}${men.some((q) => !q.leaderId) ? `, ${men.filter((q) => !q.leaderId).length} without a leader` : ""}.</p>` : ""}: ""}
+        return `${men.length ? `<p class="muted">Soldiers in the town: ${men.length}${men.some((q) => !q.leaderId) ? `, ${men.filter((q) => !q.leaderId).length} without a leader` : ""}.</p>` : ""}
         <div class="row">${lead && loose.length ? `<button type="button" id="town-gather" data-l="${lead.id}">${G(lead.name)}: gather the men (${loose.length} nearby)</button>` : ""}
         ${outside.map((q) => `<button type="button" class="town-call" data-u="${q.id}">Call ${G(q.name)} in (${Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y))} squares)</button>`).join("")}</div>`;
       })()}
@@ -17655,6 +17692,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button></h2>
       <p class="people">${f.population} people \xB7 room for ${g.housing} \xB7 ${g.jobs} jobs (${Math.round(g.staffing * 100)}% staffed)</p>
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
+      ${!T && te ? `${te}<div class="row"><button type="button" id="pick-done">Back to the town</button></div>` : ""}
+      <div class="town-rest"${!T && te ? " hidden" : ""}>
+      ${(() => {
+        // Leaders in the town, each with one button to lead his men out.
+        let lds = t.units.filter((q) => q.owner === V(t).id && q.kind === "leader" && !q.aboard && inColony(f, q));
+        return lds.length
+          ? `<div class="town-leaders">${lds
+              .map((q) => {
+                let n = Math.min(leaderStats(q).cmd, t.units.filter((w) => w.leaderId === q.id && w.x === q.x && w.y === q.y).length);
+                return `<div class="row"><b>${G(q.name)}</b><span class="muted">${n} m${n === 1 ? "a" : "e"}n</span><button type="button" class="primary lead-out" data-u="${q.id}" ${q.mp > 0 ? "" : "disabled title=\"He has no movement left this turn.\""}>Lead out</button></div>`;
+              })
+              .join("")}</div>`
+          : "";
+      })()}
       <div class="auto ${Ae ? "on" : ""}">
         <button type="button" id="auto-toggle" class="${Ae ? "primary" : ""}">Auto Colony: ${Ae ? "On" : "Off"}</button>
         <div class="goals">${Object.entries(Ze)
@@ -17666,15 +17717,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <p class="muted">${Ae ? `${G(Ze[Ae].blurb)} It starts several buildings now, then more at the start of each turn.` : "Turn it on and the colony builds and grows on its own toward the goal you pick."}</p>
       </div>
       ${F ? `<h3 class="side-sub">Under construction</h3>${F}` : ""}
-      ${T ? placingPanel(f) : te}
-      <h3 class="side-sub">Build</h3>
+      ${T ? placingPanel(f) : ""}
+      ${`<h3 class="side-sub">Build</h3>
       <div class="build-list">${v}</div>
-      <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land.</small></button>`}</div>
+      <div class="row">${f.level >= colMax(f) ? `<span class="muted">The colony is at the top level.${f.big ? " Ixtal towns stop at level 2, but their land reaches farther and they house half as many again." : ""}</span>` : `<button type="button" id="upgrade" ${D && D.building ? "disabled" : Me(f.stock, K) ? "" : "disabled"}>Raise colony to level ${L}<small>${qe(K)}. Widens its land.</small></button>`}</div>`}
       ${garrison}
       ${X}
       ${f.occupied ? `<p class="find-stat">Occupied by the crown's troops (${f.occupied.units.length}). It yields nothing until you retake it: drag soldiers beside it onto the town.</p>` : ""}
       ${f.big ? "" : rebelOf(V(t)) ? '<p class="muted">The crown\'s ships blockade your ports: nothing can be sold in Europe until independence is won.</p>' : sell}
       ${natHtml}
+      </div>
       <p class="muted">Click anywhere outside the colony to go back to the map.</p>`),
         (s.querySelector("#auto-toggle").onclick = () => {
           x(go(t, f.id, Ae ? null : f.lastGoal || "balanced")), R();
@@ -17749,8 +17801,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             R();
           };
         });
+      let pd_ = s.querySelector("#pick-done");
+      pd_ && (pd_.onclick = () => ((S = null), (tearArm = null), R()));
+      s.querySelectorAll(".lead-out").forEach((E) => {
+        E.onclick = () => {
+          let id = +E.dataset.u;
+          (y = null), (T = null), (S = null), (h = ""), (l = id), (cardFor = null), marchOut(id);
+        };
+      });
       s.querySelectorAll("[data-sel]").forEach((E) => {
-        E.onclick = () => ((l = +E.dataset.sel), (y = null), (T = null), (S = null), (h = ""), R());
+        E.onclick = () => ((l = +E.dataset.sel), (cardFor = +E.dataset.sel), (y = null), (T = null), (S = null), (h = ""), R());
       });
       let rnc = s.querySelector("#rename-col");
       rnc && (rnc.onclick = () => namePrompt(`Rename ${f.name}`, "", f.name, (nm) => (f.name = nm)));
@@ -17862,6 +17922,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           return Z(u.x, u.y, t.map.width, t.map.height).some(([x, y]) => ii(u, se(t, x, y)) && vn(t, u, u.x, u.y, x, y) <= u.mp);
         })
         .sort((a, b) => a.id - b.id);
+    }
+    // A leader in a town marches his column to the nearest open square
+    // outside it, and stays picked so he can be dragged on from there.
+    function marchOut(id) {
+      let reach = kn(t, id),
+        best = null;
+      for (let [key, cost] of reach) {
+        let [sx, sy] = key.split(",").map(Number);
+        colonyOf(t, sx, sy) || (best && best.cost <= cost) || (best = { x: sx, y: sy, cost });
+      }
+      if (!best) return (h = "There is no room to march out this turn."), R();
+      ne(id, () => mo(t, id, best.x, best.y));
     }
     function nextUnit() {
       if (!t) return;
@@ -18026,7 +18098,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             centerOn: _,
             battle: (spec, mine) => preBattle(spec, mine, (B) => (window.__lastBattle = B)),
             fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
-            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn },
+            site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn, order: hr, field: Pn, In, towardUnknown },
             paper: () => t.paper && de(t.paper),
             select: (f) => {
               (l = f), R();
