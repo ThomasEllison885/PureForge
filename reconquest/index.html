@@ -255,6 +255,14 @@ ul.colony-list small { color: #5c5144; }
 #intro canvas.iscene { position: absolute; inset: 0; width: 100%; height: 100%; }
 #intro .iload { position: absolute; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 10px; color: #f4ead2; font: 600 16px Palatino, Georgia, serif; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 #intro .iskip { position: absolute; left: 24px; bottom: 18px; margin: 0; color: rgba(244,234,210,0.6); font: 13px "Segoe UI", sans-serif; }
+.trades-card { width: min(640px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 60px); overflow-y: auto; }
+.trade-row { border-top: 1px solid #d8c9a6; padding: 8px 0 4px; }
+.trade-row > p { margin: 2px 0; }
+.trade-row.done { opacity: 0.7; }
+.trade-picks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+.trade-picks select { max-width: 100%; }
+.trade-row .advice { margin: 6px 0 2px; padding: 5px 10px; }
+.trade-row .advice b { font-size: 14px; }
 .advice { margin: 10px 0 4px; padding: 8px 12px; border-radius: 6px; border-left: 5px solid #b9a67e; background: rgba(0,0,0,0.04); font: 14px "Segoe UI", sans-serif; }
 .advice b { font: 700 16px Palatino, Georgia, serif; }
 .advice ul { margin: 4px 0 0; padding-left: 18px; }
@@ -267,6 +275,11 @@ ul.colony-list small { color: #5c5144; }
 .announce-card.raid .ann-art { background: linear-gradient(#e8c8a0, #b88a5a); }
 .outcome { position: fixed; inset: 0; z-index: 1100; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(8, 6, 4, 0.28); cursor: pointer; animation: obFade 0.3s ease; transition: opacity 0.5s ease; }
 .outcome.out { opacity: 0; pointer-events: none; }
+/* After a battle: a card in the middle of the field with the way back. */
+.bover { position: fixed; inset: 0; z-index: 1050; display: flex; align-items: center; justify-content: center; background: rgba(8, 6, 4, 0.35); animation: boverIn 0.4s ease 1.4s both; }
+.bover .card { max-width: 420px; text-align: center; }
+.bover .card button { font-size: 17px; padding: 10px 22px; }
+@keyframes boverIn { from { opacity: 0; } to { opacity: 1; } }
 .outcome .ob-band { position: absolute; left: -10%; width: 120%; top: 50%; height: 190px; margin-top: -105px; transform: rotate(-3deg); transform-origin: left center; clip-path: polygon(0 12%, 6% 4%, 14% 10%, 25% 2%, 38% 9%, 52% 0, 63% 8%, 77% 3%, 88% 10%, 100% 5%, 100% 92%, 90% 98%, 78% 90%, 64% 99%, 50% 91%, 37% 100%, 24% 92%, 12% 99%, 0 90%); animation: obWipe 0.45s cubic-bezier(.2,.7,.2,1) both; }
 .outcome.win .ob-band { background: linear-gradient(180deg, rgba(40, 26, 10, 0.94), rgba(20, 12, 4, 0.94)); box-shadow: 0 0 60px rgba(230, 180, 80, 0.25); }
 .outcome.lose .ob-band { background: linear-gradient(180deg, rgba(110, 18, 12, 0.94), rgba(50, 6, 4, 0.94)); }
@@ -532,7 +545,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.13";
+    "1.14";
   var on = [
       {
         id: "spain",
@@ -2699,6 +2712,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           n.skills.includes("navigator") &&
           (o += $.navigatorBonus),
         e.kind === "explorer" && n.perks && n.perks.trail && (o += 2),
+        // a seasoned explorer covers more ground: a square per level above 1
+        e.kind === "explorer" && (o += Math.max(0, (e.level || 1) - 1)),
         // The native power knows its own country: every land unit moves a
         // square farther, and its runners two.
         isNatNation(n) && e.kind !== "ship" && (o += e.kind === "explorer" ? 2 : 1)),
@@ -3715,9 +3730,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let settlers = z(s.x + 7, s.y, seed + 921) < 0.2,
         u = Le(e, p, settlers ? "settler" : "explorer", s.x, s.y, settlers ? "Settlers" : "Survivor");
       u.mp = 0;
+      // years alone in the wild: a seasoned explorer, level 3 or 4
+      settlers || (u.level = 3 + (z(s.x, s.y + 11, seed + 925) < 0.4 ? 1 : 0));
       msg = settlers
         ? "A few castaways living in the ruins ask to join you. They come as settlers."
-        : "A lone survivor of an earlier voyage joins you as an explorer.";
+        : `A lone survivor of an earlier voyage joins you. Years in the wild have made him a level ${u.level} explorer, who moves ${u.level - 1} squares farther each turn.`;
     } else if (!p.perks.trail) {
       p.perks.trail = 1;
       msg = "Carved trail markers show the old paths. From now on every explorer of yours moves two squares farther each turn.";
@@ -9048,7 +9065,37 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           }
         mtb[y * w + x] = s / 10;
       }
-    F = { w, h, mt, mtb, ht, rv, pk, deep, wet, memo: new Map(), hmemo: new Map(), seed: map.seed >>> 0 };
+    // rivers carve broad valleys: spread over two squares either side, so
+    // the slopes run down to the water instead of dropping as a wall
+    let rvb = new Float32Array(n);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let s = 0,
+          wt = 0;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            let xx = x + dx,
+              yy = y + dy,
+              k = 3 - Math.max(Math.abs(dx), Math.abs(dy));
+            xx >= 0 && yy >= 0 && xx < w && yy < h && (s += rv[yy * w + xx] * k), (wt += k);
+          }
+        rvb[y * w + x] = Math.min(1, (s / wt) * 2.2);
+      }
+    // a named peak rises as a broad summit over a few squares, not a needle
+    let pkb = new Float32Array(n);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        let s = 0;
+        for (let dy = -2; dy <= 2; dy++)
+          for (let dx = -2; dx <= 2; dx++) {
+            let xx = x + dx,
+              yy = y + dy,
+              k = 3 - Math.max(Math.abs(dx), Math.abs(dy));
+            xx >= 0 && yy >= 0 && xx < w && yy < h && (s += pk[yy * w + xx] * k * k);
+          }
+        pkb[y * w + x] = s / 9;
+      }
+    F = { w, h, mt, mtb, ht, rv: rvb, pk: pkb, deep, wet, memo: new Map(), hmemo: new Map(), seed: map.seed >>> 0 };
     reliefCache.set(map, F);
     return F;
   }
@@ -9056,7 +9103,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // whole numbers).
   function reliefH(map, px, py) {
     let F = reliefField(map),
-      key = Math.round(px * 6) * 65536 + Math.round(py * 6),
+      // fine enough that a unit walking over the range rises and falls
+      // smoothly rather than in little jumps
+      key = Math.round(px * 32) * 65536 + Math.round(py * 32),
       v = F.memo.get(key);
     if (v != null) return v;
     let m = Math.min(1, wo(F.mtb, F.w, F.h, px, py) * 1.25);
@@ -9065,22 +9114,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       dp = wo(F.deep, F.w, F.h, px, py),
       rv = wo(F.rv, F.w, F.h, px, py),
       pk = wo(F.pk, F.w, F.h, px, py),
-      rg = 0,
-      amp = 0.62,
-      f = 0.36;
-    // ridged noise: crests and summits, softer valleys between
-    for (let k = 0; k < 3; k++) {
-      let e = 1 - Math.abs(Ee(px * f, py * f, s + 701 + k) * 2 - 1);
-      (rg += e * e * amp), (amp *= 0.45), (f *= 2.2);
-    }
+      // rounded massifs: broad swells with smaller shoulders on them, no
+      // knife-edge ridges or needle spikes (smoothed in 1.14)
+      rg = 0.6 * Ee(px * 0.24, py * 0.24, s + 701) + 0.3 * Ee(px * 0.5, py * 0.5, s + 702) + 0.1 * Ee(px * 0.95, py * 0.95, s + 703);
     let shape = m * m * (3 - 2 * m);
-    v = (shape * (3 + 8 * dp + 52 * Math.pow(rg, 1.7) * (0.4 + 0.6 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * 30 * shape) * 3.2;
+    v = (shape * (3 + 8 * dp + 44 * Math.pow(rg, 1.8) * (0.4 + 0.6 * dp)) * (1 - 0.8 * rv * (1 - pk)) + pk * pk * (3 - 2 * pk) * 30 * shape) * 3.2;
     return F.memo.set(key, v), v;
   }
   // Gentle rolling height for hill country.
   function hillH(map, px, py) {
     let F = reliefField(map),
-      key = Math.round(px * 6) * 65536 + Math.round(py * 6),
+      key = Math.round(px * 32) * 65536 + Math.round(py * 32),
       v = F.hmemo.get(key);
     if (v != null) return v;
     let m = wo(F.ht, F.w, F.h, px, py);
@@ -9122,7 +9166,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // front, around the square's centre (zoom 1 units). raised: mountains
   // stand up off the ground; otherwise only light and shade are laid on.
   function reliefMesh(g, map, x, y, hf, raised) {
-    let n = 3,
+    let n = 4,
       P = [],
       top = 0;
     for (let j = 0; j <= n; j++)
@@ -14279,7 +14323,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             u =
               s === "settler"
                 ? ` Founds with ${t === 1 ? "the usual stores" : t + " times the stores"}.`
-                : "";
+                : s === "explorer" && t > 1
+                  ? ` Moves ${t - 1} square${t > 2 ? "s" : ""} farther each turn.`
+                  : "";
           i.push(
             `<button type="button" class="recruit" data-recruit="${s}:${t}" ${d ? "" : "disabled"}>${a}, level ${t}<small>${l.people} people, ${qe(l.stock)}.${u}</small></button>`,
           );
@@ -15505,9 +15551,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let w = `demand:${t.politics.demand.id}`;
         H !== w && ((H = w), demandCard(t.politics.demand));
       } else if (!p && t.politics && t.politics.offers.length && (staleOffers(t), t.politics.offers.length)) {
-        let of = t.politics.offers[0],
-          w = `offer:${of.id}`;
-        H !== w && ((H = w), offerPrompt(of));
+        // Peace offers each get their own card; every trade offer of the
+        // year comes together on one.
+        let pc = t.politics.offers.find((q) => q.kind === "peace");
+        if (pc) H !== `offer:${pc.id}` && ((H = `offer:${pc.id}`), offerPrompt(pc));
+        else H !== "trades" && ((H = "trades"), tradesPrompt());
       } else if (!p && t.politics && t.politics.showSummary && t.politics.events.length) {
         H !== "summary" && ((H = "summary"), summaryBox(t.politics.events));
       } else p || ((a.hidden = !0), (H = null));
@@ -16395,7 +16443,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     function pinArea() {
       let P = pinned();
       if (!P) return null;
-      if (pin.kind === "village") return { x: P.x, y: P.y, radius: 10, color: "#d08a3a" };
+      // a village's reach still counts, but is not drawn
+      if (pin.kind === "village") return null;
       if (pin.kind === "colony") return { x: P.x, y: P.y, radius: reachOf(P) || 1, color: ee[(t.players.find((q) => q.id === P.owner) || {}).nationId || "england"].color };
       return null;
     }
@@ -16429,7 +16478,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${isNatNation(me_) && P.fed == null ? `<p class="muted">${canInvite ? "Your leader is here: you can ask them to join your federation." : att >= 30 ? "Friendly: send a leader here to ask them to join your federation." : "Not friendly enough to join you freely. Win them over with gifts and trade, or bring them in by force with an army."}</p>${canInvite ? '<div class="row"><button type="button" id="fed-invite" class="primary">Invite into the federation</button></div>' : ""}` : ""}
         <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
         <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
-        <p class="muted">The ring shows how far its warriors will come: ${word === "friendly" ? "while friendly, its warriors come to help defend your colonies inside it" : "friendly villages send warriors to help defend colonies inside it"}.${near.length ? ` ${near.map((c) => G(c.name)).join(", ")} ${near.length === 1 ? "is" : "are"} inside.` : ""} Drag soldiers onto the village to raid or destroy it.</p>
+        <p class="muted">Drag soldiers onto the village to raid or destroy it.</p>
         <div class="row">${go}</div>`;
       }
       if (pin.kind === "colony") {
@@ -16910,6 +16959,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               .map((u) => tok(u, " reserve"))
               .join("") || '<em class="muted">none</em>';
           r.innerHTML = `
+        ${B.over ? `<div class="bover"><div class="card"><p class="find-kicker">${G(outcomeOf(B, mine).word)}</p><p>${G(overText(B, mine))}</p><div class="row" style="justify-content:center"><button type="button" id="b-done2" class="primary">Back to the map</button></div></div></div>` : ""}
         <div class="bwrap">
           <div class="bmain">
             <h1>${G(spec.title)}</h1>
@@ -16970,8 +17020,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ba && (ba.onclick = () => (sel.clear(), bAutoFinish(B), (fxSeen = B.fx.length), (queue.length = 0), (playing = null), draw()));
           let bf = r.querySelector("#b-flee");
           bf && (bf.onclick = () => (skipFx(), sel.clear(), bRetreat(B, mine), draw()));
-          let bd = r.querySelector("#b-done");
-          bd && (bd.onclick = () => (cancelAnimationFrame(raf), (raf = 0), (r.hidden = !0), (o.hidden = !1), done(B)));
+          let bd = r.querySelector("#b-done"),
+            bd2 = r.querySelector("#b-done2"),
+            back = () => (cancelAnimationFrame(raf), (raf = 0), (r.hidden = !0), (o.hidden = !1), done(B));
+          bd && (bd.onclick = back), bd2 && (bd2.onclick = back);
           sceneKick();
         },
         act = (c, rr) => {
@@ -17270,6 +17322,79 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         res.ok ? done(res.note) : (a.querySelector("#of-err").textContent = res.error);
       };
       a.querySelector("#of-no").onclick = () => done(`You declined ${nationName(r)}'s offer.`);
+    }
+    // Every trade offer at once: one row each, with where to pay from and
+    // deliver to, the advice, and Accept or Decline. The card stays open
+    // until you are done; offers left unanswered are declined.
+    function tradesPrompt() {
+      let P = pol(t),
+        me = V(t),
+        list = P.offers.filter((q) => q.kind === "trade" && t.players.some((r) => r.id === q.from)),
+        res = new Map(),
+        sel = new Map(),
+        mine = t.colonies.filter((c) => c.owner === me.id),
+        amt = (c, k) => {
+          let cap = storeCap(c, k);
+          return `${c.stock[k] || 0}${isFinite(cap) ? `/${cap}` : ""} ${Ne[k].toLowerCase()}`;
+        },
+        close = () => {
+          for (let of of list) res.has(of.id) || t.log.push(`You declined ${nationName(t.players.find((r) => r.id === of.from))}'s offer.`);
+          let ids = new Set(list.map((q) => q.id));
+          (P.offers = P.offers.filter((q) => !ids.has(q.id))), (p = !1), (a.hidden = !0), (H = null), R();
+        };
+      if (!list.length) return (P.offers = P.offers.filter((q) => q.kind !== "trade")), R();
+      for (let of of list)
+        sel.set(of.id, {
+          pay: (mine.slice().sort((x1, x2) => (x2.stock[of.want] || 0) - (x1.stock[of.want] || 0))[0] || {}).id,
+          get: (mine.slice().sort((x1, x2) => (x1.stock[of.give] || 0) - (x2.stock[of.give] || 0))[0] || {}).id,
+        });
+      p = !0;
+      a.hidden = !1;
+      let draw = () => {
+        let rows = list
+          .map((of) => {
+            let r = t.players.find((q) => q.id === of.from),
+              head = `<b>${G(nationName(r))}</b> offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()} <span class="muted">· ${G(diploLevel(relOf(t, me.id, r.id)).name)}</span>`;
+            if (res.has(of.id)) return `<div class="trade-row done"><p>${head}</p><p class="muted">${G(res.get(of.id))}</p></div>`;
+            let sv = sel.get(of.id),
+              pc = mine.find((c) => c.id === sv.pay),
+              gc = mine.find((c) => c.id === sv.get),
+              ad = tradeAdvice(t, of, pc, gc),
+              opts = (k1, k2, cur) => mine.map((c) => `<option value="${c.id}" ${c.id === cur ? "selected" : ""}>${G(c.name)} (${amt(c, k1)}, ${amt(c, k2)})</option>`).join("");
+            return `<div class="trade-row" data-of="${of.id}">
+              <p>${head}</p>
+              <div class="trade-picks"><label>Paid from <select class="tr-pay">${opts(of.want, of.give, sv.pay)}</select></label><label>Delivered to <select class="tr-get">${opts(of.want, of.give, sv.get)}</select></label></div>
+              <div class="advice ${ad.verdict}"><b>${G(ad.head)}</b> <span>${G(ad.why.filter((q) => !/^Trading also warms/.test(q)).join(" "))}</span></div>
+              <p class="down tr-err"></p>
+              <div class="row"><button type="button" class="tr-yes${ad.verdict !== "poor" ? " primary" : ""}">Accept</button><button type="button" class="tr-no${ad.verdict === "poor" ? " primary" : ""}">Decline</button></div>
+            </div>`;
+          })
+          .join("");
+        let left = list.filter((q) => !res.has(q.id)).length;
+        a.innerHTML = `
+      <div class="card trades-card">
+        <p class="find-kicker">Trade offers · ${t.year}</p>
+        <h2>${list.length} offer${list.length === 1 ? "" : "s"} this year</h2>
+        ${rows}
+        <div class="row"><button type="button" id="tr-done" class="${left ? "" : "primary"}">${left ? `Decline the rest and close` : "Done"}</button></div>
+      </div>`;
+        a.querySelectorAll(".trade-row[data-of]").forEach((el) => {
+          let of = list.find((q) => q.id === +el.dataset.of),
+            sv = sel.get(of.id);
+          el.querySelector(".tr-pay").onchange = (ev) => ((sv.pay = +ev.target.value), draw());
+          el.querySelector(".tr-get").onchange = (ev) => ((sv.get = +ev.target.value), draw());
+          el.querySelector(".tr-yes").onclick = () => {
+            let r0 = acceptTrade(t, of, sv.pay, sv.get);
+            r0.ok ? (res.set(of.id, r0.note), t.log.push(r0.note), draw()) : (el.querySelector(".tr-err").textContent = r0.error);
+          };
+          el.querySelector(".tr-no").onclick = () => {
+            let msg = `You declined ${nationName(t.players.find((r) => r.id === of.from))}'s offer.`;
+            res.set(of.id, msg), t.log.push(msg), draw();
+          };
+        });
+        a.querySelector("#tr-done").onclick = close;
+      };
+      draw();
     }
     // A short announcement: the settlers are here, or warriors are coming.
     // The king's demand, or his ultimatum.
