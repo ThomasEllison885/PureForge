@@ -43,7 +43,12 @@ button.ghost { background: transparent; color: var(--paper); border-color: #3d51
 /* The pulse is a ring scaled and faded on its own layer, so the page is not repainted each frame. */
 #next-unit.pending::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; border: 2px solid rgba(127, 208, 180, 0.7); pointer-events: none; will-change: transform, opacity; animation: nextPulse 1.8s ease-out infinite; }
 @keyframes nextPulse { 0% { transform: scale(1); opacity: 0.9; } 70% { transform: scale(1.12, 1.35); opacity: 0; } 100% { transform: scale(1.12, 1.35); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { #next-unit.pending { animation: none; } }
+#next-unit.wait { position: relative; background: #8a5a1c; color: #fff8ea; border-color: #e8b860; }
+#next-unit.wait::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; border: 2px solid rgba(232, 184, 96, 0.75); pointer-events: none; will-change: transform, opacity; animation: nextPulse 1.8s ease-out infinite; }
+#next-unit.play { opacity: 0.7; font-style: italic; }
+#next-unit.done { color: #9fb3a8; border-color: #3d5160; }
+#end.ready { box-shadow: 0 0 0 2px #e8b860, 0 0 10px rgba(232, 184, 96, 0.6); }
+@media (prefers-reduced-motion: reduce) { #next-unit.pending::after, #next-unit.wait::after { animation: none; } }
 
 #battle {
   max-width: 1280px;
@@ -173,6 +178,8 @@ footer.bar { border-bottom: 0; border-top: 1px solid #1e3342; height: 92px; alig
 .layout aside#side { position: absolute; top: 10px; right: 10px; width: 340px; max-height: calc(100% - 230px); min-height: 0; border: 1px solid #b9a67e; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); z-index: 6; padding-top: 10px; }
 .layout aside#side.closed { display: none; }
 .layout aside#side.colony { max-height: calc(100% - 20px); right: 240px; }
+.brules summary { cursor: pointer; color: #9fb3a8; font-size: 13px; margin-top: 8px; }
+.brules[open] summary { margin-bottom: 4px; }
 .card-x { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 16px; line-height: 24px; background: #efe4cc; color: #4a3a22; border: 1px solid #b9a67e; z-index: 1; }
 #mini { position: absolute; right: 10px; bottom: 10px; width: 220px; z-index: 5; border: 1px solid #3d5160; border-radius: 6px; overflow: hidden; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); background: #07141d; }
 #mini canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; cursor: pointer; }
@@ -522,7 +529,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.10";
+    "1.11";
   var on = [
       {
         id: "spain",
@@ -2034,6 +2041,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             g = over > 0 ? Math.floor(over * EUROPE_PRICE[s] * (1 + 0.15 * (cu - 1)) * ind) : 0;
           g >= 1 && ((r.stock[s] -= over), (sold += g));
         }
+        sold && noteTrade(e, r.owner, sold);
         sold && ((r.stock.gold += sold), o.push(`${r.name}'s customs house sold its surplus in Europe for ${sold} gold.`));
       }
       // Whatever the storehouses cannot hold goes to waste.
@@ -2190,7 +2198,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!(t > 0)) return { ok: !1, error: "Buy at least 1." };
       let cost = Math.max(1, Math.ceil(t * EUROPE_BUY[r]));
       if (c.stock.gold < cost) return { ok: !1, error: `${t} ${Ne[r].toLowerCase()} costs ${cost} gold; ${c.name} has ${c.stock.gold}.` };
-      c.stock.gold -= cost;
+      (c.stock.gold -= cost), noteTrade(e, c.owner, cost);
       let l = europeTurns(e, c);
       (e.shipments || (e.shipments = [])).push({ from: "europe", to: c.id, resource: r, amount: t, arrives: e.year + l });
       return { ok: !0, discoveries: [], note: `Bought ${t} ${Ne[r].toLowerCase()} for ${cost} gold. It reaches ${c.name} in ${l} turns.` };
@@ -2207,7 +2215,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (c.mercYear === e.year) return { ok: !1, error: `${c.name} has sent for mercenaries this year already.` };
       let cost = MERC_COST[kind];
       if (c.stock.gold < cost) return { ok: !1, error: `${MERC_NAME[kind]} cost ${cost} gold; ${c.name} has ${c.stock.gold}.` };
-      (c.stock.gold -= cost), (c.mercYear = e.year);
+      (c.stock.gold -= cost), (c.mercYear = e.year), noteTrade(e, c.owner, cost);
       (e.shipments || (e.shipments = [])).push({ from: "europe", to: c.id, unit: kind, arrives: e.year + 1 });
       return { ok: !0, discoveries: [], note: `${MERC_NAME[kind]} hired for ${cost} gold. They land at ${c.name} next year.` };
     });
@@ -2222,6 +2230,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       if (r.to === "europe") {
         let c = e.colonies.find((s) => s.id === r.from);
+        c && noteTrade(e, c.owner, r.gold);
         c &&
           ((c.stock.gold += r.gold),
           n.push(`Europe paid ${r.gold} gold for ${r.amount} ${Ne[r.resource].toLowerCase()} from ${c.name}.`));
@@ -3500,14 +3509,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // Computer nations explore with their ship and explorers, name what they
   // reach first, bring their storeship to a good stretch of coast, found
   // colonies there and further inland, and run them with the colony governor.
-  function rivalSiteOk(e, s) {
+  // A computer nation keeps twice the usual spacing from any other
+  // nation's colony, yours included; its own colonies may sit closer.
+  function rivalSiteOk(e, s, n) {
     if (!s) return !1;
     let t = se(e, s.x, s.y);
     return (
       !!t &&
       Ho(t.terrain) &&
       !ln(e, s.x, s.y) &&
-      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < $.colonySpacing) &&
+      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < (n != null && c.owner !== n ? 2 : 1) * $.colonySpacing) &&
+      // nor from a landing another nation has already picked out
+      !(n != null && e.players.some((o) => o.id !== n && o.siteA && Math.max(Math.abs(o.siteA.x - s.x), Math.abs(o.siteA.y - s.y)) < 2 * $.colonySpacing)) &&
       !natives(e).villages.some((v) => Math.max(Math.abs(v.x - s.x), Math.abs(v.y - s.y)) <= 3)
     );
   }
@@ -3521,7 +3534,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       for (let x = Math.max(1, cx - R); x <= Math.min(w - 2, cx + R); x++) {
         if (p.explored[y * w + x] !== "1") continue;
         let t = tiles[y * w + x];
-        if (!Ho(t.terrain) || !rivalSiteOk(e, { x, y })) continue;
+        if (!Ho(t.terrain) || !rivalSiteOk(e, { x, y }, n)) continue;
         if (avoid && avoid.some((a) => a && Math.max(Math.abs(a.x - x), Math.abs(a.y - y)) < $.colonySpacing)) continue;
         let shore = Z(x, y, w, h).some(([a, b]) => {
           let q = tiles[b * w + a].terrain;
@@ -3574,6 +3587,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         !u.rivalInit &&
         (u.kind === "explorer" || (u.kind === "ship" && u.name !== "Storeship")) &&
         ((u.autoExplore = !0), (u.rivalInit = 1));
+    // Explorers go ashore as soon as their ship lies beside open shore,
+    // just as yours do with "Explorers ashore and exploring".
+    for (let u of e.units)
+      if (u.owner === n && u.kind === "explorer" && u.aboard != null) {
+        let sh = j(e, u.aboard);
+        sh && sh.kind === "ship" && Xe(e, sh.id).length && ((u.autoExplore = !0), Mn(e, u.id, new Set()));
+      }
+    // An explorer that ran out of ground tries again every few years, as
+    // borders and roads open new ways on.
+    if (e.year % 3 === 0) for (let u of e.units) u.owner === n && u.kind === "explorer" && u.aboard == null && !u.autoExplore && (u.autoExplore = !0);
     // The storeship carries the settlers to a good stretch of coast.
     let store = e.units.find(
       (u) => u.owner === n && u.kind === "ship" && e.units.some((s) => s.aboard === u.id && s.kind === "settler"),
@@ -3591,7 +3614,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     if (store && e.units.some((s) => s.aboard === store.id && s.kind === "settler")) {
-      rivalSiteOk(e, p.siteA) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
+      rivalSiteOk(e, p.siteA, n) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
       let s = p.siteA;
       if (s && Xe(e, store.id).some(([a, b]) => a === s.x && b === s.y)) {
         let aboard = e.units.filter((q) => q.aboard === store.id),
@@ -3638,7 +3661,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (blocked || near.some((o) => o.id < q.id)) && (q.site = null);
       }
       theirs = rivalsS.filter((o) => !q.site || o.id < q.id).map((o) => o.site);
-      if (!rivalSiteOk(e, q.site)) {
+      if (!rivalSiteOk(e, q.site, q.owner)) {
         let others = walkers.filter((o) => o !== q).map((o) => o.site).concat(theirs, p.badSites || []);
         q.site = rivalSite(e, n, q.x, q.y, !1, others) || ((q.stuck || 0) % 4 === 1 ? rivalSite(e, n, q.x, q.y, !1, others, !0) : null);
       }
@@ -3942,7 +3965,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       { bonus, parts } = bGroupBonus(group),
       hurt = new Map(),
       total = 0,
-      fell = [];
+      fell = [],
+      size0 = stack.reduce((a, q) => a + Math.max(0, q.str), 0);
     S.attacksLeft -= 1;
     let fxShot = { t: "shot", side: group[0].side, to: [tc, tr], from: group.map((u) => ({ key: u.key, pos: u.pos.slice(), cls: bCls(u), charge: bHorse(u) && u.moved })), fell: [], hits: 0 };
     for (let u of group) {
@@ -3975,7 +3999,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       dealt && hurt.set(t, (hurt.get(t) || 0) + dealt);
       t.str <= 0 && (bRemove(B, t), fell.push(t));
     }
-    (fxShot.hits = total), (fxShot.fell = fell.map((u) => ({ key: u.key }))), B.fx.push(fxShot);
+    (fxShot.hits = total), (fxShot.fell = fell.map((u) => ({ key: u.key }))), (fxShot.size = size0);
+    // who was hit and how hard, so the screen can show men falling
+    fxShot.hurt = [...hurt].map(([u, d]) => ({ key: u.key, before: Math.max(0, u.str) + d, after: Math.max(0, u.str) }));
+    B.fx.push(fxShot);
     let one = (list) => list.length === 1 && !/s$|militia|artillery|infantry/i.test(list[0].name),
       cap = (w) => w.charAt(0).toUpperCase() + w.slice(1),
       msg = `${S.name || "They"}: ${bLabel(group)} attack${one(group) ? "s" : ""}${parts.length ? ` (${parts.join(", ")})` : ""}, ${total} hit${total === 1 ? "" : "s"}.`;
@@ -4568,35 +4595,38 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       v.warriors < v.size + 2 && z(v.id, e.year, (e.seed >>> 0) + 1813) < (v.fed != null ? 0.6 : 0.3) && (v.warriors += 1);
       v.gold < 10 + v.size * 20 && (v.gold += 1);
     }
-    // A first, small war party: two turns after your first colony stands,
-    // a few warriors from the nearest village come to see what you are made
-    // of. It teaches what a raid is and how to meet one.
-    if (hum && !e.lessonRaid) {
-      let mine = e.colonies.filter((c) => c.owner === hum.id);
-      if (mine.length) {
-        e.lessonRaidAt == null && (e.lessonRaidAt = e.year + 2);
-        if (e.year >= e.lessonRaidAt) {
-          e.lessonRaid = 1;
-          let col = mine[0],
-            v = N.villages
-              .filter((q) => q.fed == null || q.fed !== hum.id)
-              .sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y))[0];
-          if (v && Math.hypot(v.x - col.x, v.y - col.y) <= 60) {
-            let dx = Math.sign(v.x - col.x) || 1,
-              dy = Math.sign(v.y - col.y);
-            N.raids.push({ id: N.nextRaid++, village: v.id, target: col.id, x: col.x + dx, y: col.y + dy, year: e.year, small: !0 });
-            e.log.push(`Scouts report a small war party from ${v.name} closing on ${col.name}.`);
-            (e.announce || (e.announce = [])).push({
-              kind: "raid",
-              year: e.year,
-              title: `Warriors are coming for ${col.name}`,
-              text: `Scouts have seen a small war party from ${v.name} a short way from ${col.name}. They will strike next year. A town defends itself with its militia, but soldiers inside, best of all with a leader, hold it far better. Move what men you have into ${col.name}. When they strike you can fight it out on the battlefield or let it resolve itself.`,
-              x: col.x,
-              y: col.y,
-            });
-          }
-        }
-      }
+    // A first, small war party: some two to five years after a nation's
+    // first colony stands (a different year for each, so they are not all
+    // struck at once), a few warriors from the nearest village come to see
+    // what the newcomers are made of. For you it teaches what a raid is.
+    e.lessonRaids || (e.lessonRaids = {});
+    hum && e.lessonRaid && (e.lessonRaids[hum.id] = "done");
+    for (let pl of e.players) {
+      if (pl.nationId === "ixtal" || pl.rebel || e.lessonRaids[pl.id] === "done") continue;
+      let mine = e.colonies.filter((c) => c.owner === pl.id);
+      if (!mine.length) continue;
+      e.lessonRaids[pl.id] == null && (e.lessonRaids[pl.id] = e.year + 2 + Math.floor(z(pl.id + 7, e.year, (e.seed >>> 0) + 1815) * 4));
+      if (e.year < e.lessonRaids[pl.id]) continue;
+      e.lessonRaids[pl.id] = "done";
+      pl.isHuman && (e.lessonRaid = 1);
+      let col = mine[0],
+        v = N.villages
+          .filter((q) => q.fed == null || q.fed !== pl.id)
+          .sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y))[0];
+      if (!v || Math.hypot(v.x - col.x, v.y - col.y) > 60) continue;
+      let dx = Math.sign(v.x - col.x) || 1,
+        dy = Math.sign(v.y - col.y);
+      N.raids.push({ id: N.nextRaid++, village: v.id, target: col.id, x: col.x + dx, y: col.y + dy, year: e.year, small: !0 });
+      if (!pl.isHuman) continue;
+      e.log.push(`Scouts report a small war party from ${v.name} closing on ${col.name}.`);
+      (e.announce || (e.announce = [])).push({
+        kind: "raid",
+        year: e.year,
+        title: `Warriors are coming for ${col.name}`,
+        text: `Scouts have seen a small war party from ${v.name} a short way from ${col.name}. They will strike next year. A town defends itself with its militia, but soldiers inside, best of all with a leader, hold it far better. Move what men you have into ${col.name}. When they strike you can fight it out on the battlefield or let it resolve itself.`,
+        x: col.x,
+        y: col.y,
+      });
     }
     // Hostile villages may send a new party at a colony within reach.
     for (let v of N.villages) {
@@ -5093,12 +5123,43 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
       }
   }
+  // Gold that has crossed the ocean for a nation: sales to Europe, goods
+  // and men bought there. The crown watches it.
+  function noteTrade(e, pid, g) {
+    let me = ce(e, pid);
+    if (!me || !(g > 0)) return;
+    let m = me.mother || (me.mother = { ...ir });
+    m.trade = (m.trade || 0) + g;
+  }
+  // The crown leaves a young venture alone. It takes notice once the
+  // nation is clearly doing well: a third colony, or a real trade with
+  // Europe. Only then do the taxes start to climb and the demands come.
+  var CROWN_TRADE = 200;
+  function crownNoticed(e, me) {
+    let m = me.mother || (me.mother = { ...ir });
+    if (m.noticed) return !0;
+    if (colsOf(e, me.id).length >= 3 || (m.trade || 0) >= CROWN_TRADE) {
+      m.noticed = e.year;
+      me.isHuman && pushEvent(e, `The king has noticed how well his colonies are doing. ${colsOf(e, me.id).length >= 3 ? "A third colony" : "The trade crossing the ocean"} has caught the court's eye, and the crown will want its share from now on.`);
+      return !0;
+    }
+    return !1;
+  }
   function crownTurn(e) {
     let out = [];
     for (let me of e.players) {
-      if (!me.isHuman) continue;
+      if (isNatNation(me)) continue;
       let m = me.mother || (me.mother = { ...ir });
-      if (m.independent || m.rebel || isNatNation(me)) continue;
+      if (m.independent || m.rebel) continue;
+      // Computer nations do as their crown says and pay the same tax.
+      if (!me.isHuman) {
+        let cath = e.colonies.reduce((a, c) => a + (c.owner === me.id ? bldLevels(c, "cathedral") : 0), 0);
+        m.resentment = Math.max(0, (m.resentment || 0) - 1 - cath);
+        let rate = crownRate(e, me, m);
+        for (let c of e.colonies) c.owner === me.id && (c.stock.gold -= Math.floor(c.stock.gold * rate));
+        m.taxRate = rate;
+        continue;
+      }
       let crossed = [];
       for (let r of e.players) {
         if (r === me || !pol(e).met[r.id]) continue;
@@ -5113,7 +5174,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       m.resentment = Math.max(0, (m.resentment || 0) - 1 - cath);
       // The base tax creeps up over the game, and each demand the king makes
       // leaves it a little higher for good.
-      let rate = Math.max(0.02, Math.min(0.5, 0.03 + 0.08 * gameProg(e) + (m.squeeze || 0) + (m.resentment || 0) * 0.005 - (m.favor || 0) * 0.004)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1),
+      let rate = crownRate(e, me, m),
         took = 0;
       for (let c of e.colonies)
         if (c.owner === me.id) {
@@ -5126,6 +5187,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       out.push(`The crown took ${took} gold in tax this year, ${Math.round(rate * 100)}% of your colonies' gold.`);
     }
     return out;
+  }
+  // The tax rate: a light 3% until the crown takes notice, then climbing
+  // with the years, each demand made, and the court's mood.
+  function crownRate(e, me, m) {
+    let noticed = crownNoticed(e, me),
+      base = noticed ? 0.03 + 0.08 * gameProg(e) + (m.squeeze || 0) + (m.resentment || 0) * 0.005 - (m.favor || 0) * 0.004 : 0.03;
+    return Math.max(0.02, Math.min(0.5, base)) * (m.commonwealth ? 0.2 : 1) * (hasSkill(me, "smuggler") ? 0.67 : 1);
   }
   // ---- The king's demands ----
   // The crown asks for more as the years pass: rarely and gently at first,
@@ -5163,19 +5231,23 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function crownDemandTurn(e) {
     let P = pol(e);
     for (let me of e.players) {
-      if (!me.isHuman || isNatNation(me)) continue;
+      if (isNatNation(me)) continue;
       let m = me.mother || (me.mother = { ...ir });
-      if (m.independent || m.rebel || P.demand) continue;
+      if (m.independent || m.rebel || (me.isHuman && P.demand)) continue;
       let pg = gameProg(e),
         cols = colsOf(e, me.id);
-      if (!cols.length || e.year - $.startYear < 12) continue;
+      // Nothing is asked until the venture is clearly paying.
+      if (!cols.length || !crownNoticed(e, me)) continue;
+      // A computer nation answers at once, by the same rules as you.
+      let send = (dm) => (me.isHuman ? (P.demand = dm) : aiAnswerDemand(e, me, dm));
       if (pg >= 0.55 && (m.resentment || 0) >= 40 && (!m.lastUltimatum || e.year - m.lastUltimatum >= 15)) {
         m.lastUltimatum = e.year;
-        P.demand = { id: `${e.year}u`, kind: "ultimatum", ...tribute(e, me, 2.2), year: e.year, owner: me.id };
-        pushEvent(e, "The king has sent an ultimatum.");
+        send({ id: `${e.year}u`, kind: "ultimatum", ...tribute(e, me, 2.2), year: e.year, owner: me.id });
+        me.isHuman && pushEvent(e, "The king has sent an ultimatum.");
         continue;
       }
-      m.nextDemand == null && (m.nextDemand = e.year + 3);
+      // The first demand comes two years after the crown takes notice.
+      m.nextDemand == null && (m.nextDemand = Math.max(e.year, m.noticed) + 2);
       if (e.year < m.nextDemand) continue;
       m.nextDemand = e.year + Math.max(3, Math.round(9 - 6 * pg));
       m.demands = (m.demands || 0) + 1;
@@ -5185,9 +5257,24 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         kind = r < 0.78 || soldiers < 3 || pg < 0.3 ? "tribute" : "troops",
         dm = { id: `${e.year}d${m.demands}`, kind, year: e.year, owner: me.id };
       kind === "tribute" ? Object.assign(dm, tribute(e, me)) : (dm.n = Math.min(soldiers - 1, 1 + Math.floor(2.5 * pg)));
-      P.demand = dm;
-      pushEvent(e, "The king has sent a demand.");
+      send(dm);
+      me.isHuman && pushEvent(e, "The king has sent a demand.");
     }
+  }
+  // A computer nation pays when it can and the court has not soured on
+  // it; otherwise it refuses and the court's anger grows, just as yours
+  // would. Defying an ultimatum is a rising, if it is big enough.
+  function aiAnswerDemand(e, me, dm) {
+    let m = me.mother || (me.mother = { ...ir }),
+      r = z(me.id * 53 + (m.demands || 0), e.year, (e.seed >>> 0) + 4613),
+      pay = canMeet(e, dm) && r < 0.8 - (m.resentment || 0) / 100,
+      cols = colsOf(e, me.id);
+    if (dm.kind === "ultimatum" && !pay && cols.length >= 3) {
+      m.rebel = { damage: 0, need: REBEL_NEED[e.difficulty] || 60, since: e.year };
+      pol(e).met[me.id] && pushEvent(e, `${nationName(me)}'s colonies have defied their king's ultimatum and risen against the crown!`);
+      return;
+    }
+    applyDemand(e, me, dm, pay || dm.kind === "ultimatum");
   }
   // What a demand asks for, in words.
   function demandWhat(dm) {
@@ -5201,8 +5288,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let P = pol(e),
         dm = P.demand;
       if (!dm) return B("There is no demand.");
-      let me = ce(e, dm.owner),
-        m = me.mother || (me.mother = { ...ir }),
+      let me = ce(e, dm.owner);
+      if (yes && dm.kind !== "ultimatum" && !canMeet(e, dm)) return B(`You do not have ${demandWhat(dm)}.`);
+      let note = applyDemand(e, me, dm, yes);
+      P.demand = null;
+      pushEvent(e, note);
+      return { ok: !0, discoveries: [], note };
+    });
+  }
+  // What answering a demand does, for any nation.
+  function applyDemand(e, me, dm, yes) {
+    {
+      let m = me.mother || (me.mother = { ...ir }),
         pg = gameProg(e),
         note;
       if (dm.kind === "ultimatum") {
@@ -5218,7 +5315,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           } else note = d.note;
         }
       } else if (yes) {
-        if (!canMeet(e, dm)) return B(`You do not have ${demandWhat(dm)}.`);
         if (dm.kind === "troops") {
           let men = e.units.filter((u) => u.owner === me.id && !u.aboard && arm(u.kind)).sort((a, b) => (a.strength || 3) - (b.strength || 3)).slice(0, dm.n),
             ids = new Set(men.map((u) => u.id));
@@ -5231,10 +5327,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (m.resentment = (m.resentment || 0) + up), (m.favor = Math.max(0, (m.favor || 0) - 5));
         note = `You refuse the king. Resentment at court rises by ${up}.`;
       }
-      P.demand = null;
-      pushEvent(e, note);
-      return { ok: !0, discoveries: [], note };
-    });
+      return note;
+    }
   }
   // Who has met whom: you meet a rival once you see one of their colonies
   // or men.
@@ -5742,7 +5836,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // out before the grace years are up, and early armies are small.
       // Spare gold hires mercenaries for the field army, a few a year.
       if (!isNatNation(r) && !((r.mother || {}).rebel))
-        for (let k = 0; k < 3 && stockOf(e, r.id, "gold") >= 140 && P.pool[r.id] < 14 + 16 * pg; k++) takeStock(e, r.id, "gold", 40), (P.pool[r.id] += 1);
+        for (let k = 0; k < 3 && stockOf(e, r.id, "gold") >= 140 && P.pool[r.id] < 14 + 16 * pg; k++) takeStock(e, r.id, "gold", 40), noteTrade(e, r.id, 40), (P.pool[r.id] += 1);
       let grace = { easy: 30, normal: 20, hard: 14, ruthless: 10 }[e.difficulty] || 20,
         since = e.year - $.startYear - grace,
         biggest = Math.min(Math.round(12 + 8 * pg), 4 + Math.floor(Math.max(0, since) / 8));
@@ -7742,8 +7836,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           M && nativeStart(u, S, M, h);
           return;
         }
-        // Rivals land on your stretch of coast, near enough to fight over.
-        let M = nearStart(a, p, h) || nearStart(a, p, h, 26, 90, 55, 24) || lo(a, (P) => P < a.width * 0.42, h);
+        // Rivals land on your stretch of coast, near enough to fight over
+        // but some way off: 64 to 124 squares from you and 60 from each
+        // other, closer only when the coast runs out.
+        let M = nearStart(a, p, h, 64, 124, 90, 60) || nearStart(a, p, h, 48, 150, 90, 45) || nearStart(a, p, h) || nearStart(a, p, h, 26, 90, 55, 24) || lo(a, (P) => P < a.width * 0.42, h);
         M && Gi(u, S, M, h);
       }),
       Dn(u);
@@ -7843,8 +7939,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       s = Le(e, n, "ship", o[0], o[1], "Ship"),
       a = freshLeader(Le(e, n, "leader", o[0], o[1], i.leaders[0]), 1, 2);
     a.aboard = s.id;
-    let t = Le(e, n, "explorer", o[0], o[1], "Explorer");
-    t.aboard = s.id;
+    // three explorers, the same as yours
+    for (let k = 0; k < 3; k++) Le(e, n, "explorer", o[0], o[1], "Explorer").aboard = s.id;
     for (let k = 0; k < 3; k++) {
       let d = Le(e, n, "infantry", o[0], o[1], "Guard");
       (d.aboard = s.id), (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
@@ -8507,6 +8603,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         arrivedThisTurn: e.arrivedThisTurn || [],
         lessonRaid: e.lessonRaid || 0,
         lessonRaidAt: e.lessonRaidAt == null ? null : e.lessonRaidAt,
+        lessonRaids: e.lessonRaids || {},
         announce: e.announce || [],
         paper: e.paper || null,
         dispatch: e.dispatch || null,
@@ -14045,6 +14142,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       tipBox = e.querySelector("#maptip"),
       toastEl = e.querySelector("#toast"),
       listCols = !1,
+      // The unit whose card is open. Picking a unit does not open it; a
+      // second click on the picked unit does.
+      cardFor = null,
       t = null,
       l = null,
       d = { ox: 80, oy: 40, zoom: $.zoom.start },
@@ -15285,7 +15385,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // The Next unit button lights up while someone still has a move to make.
       let nu_ = e.querySelector("#next-unit"),
         idle_ = idleUnits().length;
-      nu_ && (nu_.classList.toggle("pending", idle_ > 0), (nu_.textContent = idle_ ? `Next unit (${idle_})` : "Next unit"));
+      // Three states in one button: moves waiting to be played, units with
+      // moves left, and everyone done (then End turn lights up as well).
+      let mv_ = O && O.paused ? "wait" : O ? "play" : idle_ ? "pending" : "done";
+      if (nu_ && nu_.dataset.st !== mv_ + idle_) {
+        nu_.dataset.st = mv_ + idle_;
+        for (let c_ of ["wait", "play", "pending", "done"]) nu_.classList.toggle(c_, c_ === mv_);
+        nu_.textContent = mv_ === "wait" ? "▶ Watch moves" : mv_ === "play" ? "Moves playing…" : idle_ ? `Next unit (${idle_})` : "✓ All moved";
+        nu_.title = mv_ === "wait" ? "This turn's moves have not played yet. Click to watch them (Space)." : mv_ === "play" ? "Moves are playing out." : idle_ ? `${idle_} unit${idle_ > 1 ? "s" : ""} can still move. Click to select the next one (N).` : "No unit has a move left. End the turn when ready.";
+        let end_ = e.querySelector("#end");
+        end_ && end_.classList.toggle("ready", mv_ === "done");
+      }
       let k = l ? j(t, l) : null;
       fedNotice();
       let rdNow = !p && nextFight();
@@ -15386,6 +15496,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         return;
       }
       s.classList.remove("colony");
+      // A picked unit only shows its card once it is clicked a second time.
+      f && cardFor !== f.id && (f = null);
       // Nothing picked: no card, just the map.
       if (!f && !(pin && pinned()) && !listCols) {
         s.classList.add("closed"), (s.innerHTML = ""), drawMini();
@@ -15723,18 +15835,22 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <form class="card">
         <h2>${G(title)}</h2>
         ${note ? `<p>${G(note)}</p>` : ""}
-        <input name="title" maxlength="32" placeholder="Name" required autofocus value="${G(cur)}">
-        <div class="row"><button class="primary" type="submit">Use this name</button><button type="button" id="name-cancel">Keep "${G(cur)}"</button></div>
+        <input name="title" maxlength="32" placeholder="Name" autofocus value="${G(cur)}">
+        <div class="row"><button class="primary" type="submit" id="name-ok">Keep "${G(cur)}"</button></div>
       </form>`);
       let k = a.querySelector("form"),
         close = (v) => ((p = !1), (a.hidden = !0), done(v), R());
       k.title.select();
+      // One button: it keeps the offered name, or uses the one typed.
+      k.title.oninput = () => {
+        let nm = k.title.value.replace(/\s+/g, " ").trim().slice(0, 32);
+        a.querySelector("#name-ok").textContent = !nm || nm === cur ? `Keep "${cur}"` : `Name it "${nm}"`;
+      };
       k.onsubmit = (v) => {
         v.preventDefault();
         let nm = k.title.value.replace(/\s+/g, " ").trim().slice(0, 32);
         close(nm || cur);
       };
-      a.querySelector("#name-cancel").onclick = () => close(cur);
     }
     // Is this river, peak or region still waiting for its name?
     function holdOpenName(f) {
@@ -15799,7 +15915,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       <div class="card">
         <h2>Keys</h2>
         <p>Drag to pan, or hold W A S D or the arrow keys to scroll (Shift scrolls faster). Wheel to zoom. Drag a unit to send it. A click only picks it up.</p>
-        <p>Enter ends the turn and opens the dispatch. Enter or Esc closes it. N selects the next unit with movement left. U undoes a move. E sends the selected explorer or ship exploring.</p>
+        <p>Enter ends the turn and opens the dispatch. Enter or Esc closes it. Click a picked unit again to open its card. N selects the next unit with movement left. U undoes a move. E sends the selected explorer or ship exploring.</p>
         <p>Tick Keep exploring and an explorer or ship explores on its own at the start of every turn until there is nothing left it can reach. On a ship, Explorers ashore lands every explorer aboard and sets them all exploring.</p>
         <p>Moves play out on the map. Clicking still picks units and squares while they do. Press Space to skip ahead. A find stops everyone until you close its card.</p>
         <p>Click outside an open colony to put it away.</p>
@@ -16142,10 +16258,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       let b = stackAt(f, g);
       if (v && b.length && v.x === f && v.y === g) {
+        // the second click on a picked unit opens its card
+        if (cardFor !== v.id) return (cardFor = v.id), (h = ""), R();
         let w = b.findIndex((F) => F.id === v.id),
           F = b[w + 1];
         if (F) {
-          (l = F.id), (h = ""), R();
+          (l = F.id), (cardFor = F.id), (h = ""), R();
           return;
         }
         (v.dest = null), (l = null), (h = ""), R();
@@ -16441,6 +16559,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       gun: '<svg viewBox="0 0 30 30"><path d="M4 14l18-6 2 3-18 7z" fill="currentColor"/><circle cx="10" cy="21" r="5.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M10 15.5v11M4.5 21h11" stroke="currentColor" stroke-width="1.2"/><path d="M13 19l12 5" stroke="currentColor" stroke-width="2.4"/></svg>',
     };
     function gridBattle(spec, mine, done) {
+      // The rules show open in the first battle only; after that they wait,
+      // folded, under "How battles work".
+      let firstFight = !0;
+      try {
+        (firstFight = !localStorage.getItem("rcq-fought")), localStorage.setItem("rcq-fought", "1");
+      } catch (err) {}
+      let rulesOpen = firstFight;
       let B = battleNew(spec, (Date.now() >>> 0) ^ 0x51ed),
         sel = new Set(),
         flip = mine === "def",
@@ -16457,6 +16582,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             ${B_ICON[bCls(u)]}<span class="${u.militia || (u.kind === "artillery" && typeof u.id === "string") ? "red" : u.ally ? "yellow" : ""}">${u.str}</span>${dots}</button>`;
         },
         unitByKey = (k) => B.sides[k.startsWith("att") ? "att" : "def"].units.find((q) => q.key === k),
+        // A unit shows as up to four men, two riders or one gun, thinning
+        // as it takes losses.
+        menOf = (u, str) => (str <= 0 ? 0 : Math.max(1, Math.ceil(((bCls(u) === "gun" ? 1 : bCls(u) === "horse" ? 2 : 4) * str) / Math.max(u.max || str, str)))),
+        formation = (n) => (n >= 4 ? [[-9, -3], [3, -3], [-3, 1], [9, 1]] : n === 3 ? [[-7, -2], [7, -2], [0, 1]] : n === 2 ? [[-6, -1], [6, 1]] : [[0, 0]]),
         // ---- the scene behind the board ----
         sceneSpec = { ...(spec.def.scene || spec.scene || { kind: "plains" }), bottom: mine === "def" },
         backdrop = null,
@@ -16467,9 +16596,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         playing = null,
         raf = 0,
         lookFor = (side) => lookOf(B.sides[side].nat || (native(side) ? "tribe" : "england")),
-        // Quick, so the board keeps up with your clicks; and any click
-        // skips whatever is still waiting to play.
-        fxDur = (ev) => (ev.t === "move" ? 200 : ev.from.some((q) => q.cls === "gun") ? 480 : ev.from.some((q) => q.charge) ? 400 : 330),
+        // Slow enough to watch each volley land (twice the old pace); any
+        // click still skips whatever is waiting to play.
+        fxDur = (ev) => (ev.t === "move" ? 260 : ev.from.some((q) => q.cls === "gun") ? 960 : ev.from.some((q) => q.charge) ? 800 : 660),
+        // men struck down: they fall and stay on the field
+        bodies = [],
         skipFx = () => ((queue.length = 0), (playing = null)),
         render = (now) => {
           let cv = r.querySelector("canvas.bscene");
@@ -16518,6 +16649,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             if (q.t === "move") held.has(q.key) || held.set(q.key, q.from);
             else for (let f of q.fell) ghosts.push({ key: f.key, at: q.to, fall: 0 });
           ev && ev.t === "shot" && ev.fell.forEach((f) => ghosts.push({ key: f.key, at: ev.to, fall: p > 0.6 ? (p - 0.6) / 0.4 : 0 }));
+          // Until a volley lands, the men it will kill are still standing.
+          let shownStr = new Map(),
+            impact = ev && ev.t === "shot" && p >= 0.6;
+          for (let q of [impact ? null : ev, ...queue]) if (q && q.t === "shot" && q.hurt) for (let hh of q.hurt) shownStr.has(hh.key) || shownStr.set(hh.key, hh.before);
           let spots = new Map(),
             put = (u, at, extra) => {
               let k = at ? at.join() : null;
@@ -16550,6 +16685,41 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           };
           let where = new Map();
           for (let [k, list] of spots) list.forEach((it, i) => where.set(it.u.key, posOf(k, i, list.length)));
+          // The moment a volley lands, the men it kills begin to fall.
+          if (impact && !ev.bodied) {
+            ev.bodied = !0;
+            let cell = cells.get(ev.to.join());
+            for (let hh of ev.hurt || []) {
+              let u = unitByKey(hh.key),
+                at = where.get(hh.key);
+              if (!u || !at || !cell) continue;
+              let b0 = menOf(u, hh.before),
+                a0 = menOf(u, hh.after),
+                of = formation(b0),
+                face = u.side === mine ? 1 : -1;
+              for (let k2 = a0; k2 < b0; k2++) {
+                let [ox, oy] = of[k2],
+                  x = at.x + ox * at.s * (bCls(u) === "horse" ? 1.3 : 1),
+                  y2 = at.y + oy * at.s;
+                bodies.push({ u, cell: ev.to.join(), fx: (x - cell.x) / cell.w, fy: (y2 - cell.y) / cell.h, fs: at.s / cell.h, face, t0: now + (k2 - a0) * 90, look: lookFor(u.side), small: b0 > 1 });
+              }
+            }
+            bodies.length > 80 && bodies.splice(0, bodies.length - 80);
+          }
+          // the fallen, lying where they dropped
+          for (let bd of bodies) {
+            let cell = cells.get(bd.cell);
+            if (!cell || now < bd.t0) continue;
+            let fq = Math.min(1, (now - bd.t0) / 380),
+              e3 = 1 - (1 - fq) * (1 - fq),
+              sc = bd.fs * cell.h;
+            g.save(), g.translate(cell.x + bd.fx * cell.w, cell.y + bd.fy * cell.h), g.scale(sc, sc);
+            (g.fillStyle = `rgba(0,0,0,${0.12 + 0.12 * e3})`), g.beginPath(), g.ellipse(bd.face * 6 * e3, 1, 9 + 6 * e3, 3, 0, 0, Math.PI * 2), g.fill();
+            g.rotate(bd.face * e3 * (bCls(bd.u) === "horse" ? 1.1 : 1.5)), (g.globalAlpha = 1 - 0.4 * e3);
+            bd.small && g.scale(0.86, 0.86);
+            sceneUnit(g, bd.u, bd.look, bd.face, null, 0);
+            g.restore();
+          }
           // a unit on the move, walking between squares
           if (ev && ev.t === "move") {
             let u = unitByKey(ev.key),
@@ -16584,17 +16754,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
                 (ldx = (tc.x - it.at.x) * 0.45 * f), (ldy = (tc.y - it.at.y) * 0.45 * f);
               }
             }
+            // a destroyed unit is drawn by its falling men alone
+            if (it.fall && impact) continue;
             g.save(), g.translate(it.at.x + ldx, it.at.y + ldy), g.scale(it.at.s, it.at.s);
-            if (it.fall) (g.globalAlpha = Math.max(0, 1 - it.fall)), g.rotate(face * Math.min(1, it.fall * 2) * 1.4);
             (g.fillStyle = "rgba(0,0,0,0.25)"), g.beginPath(), g.ellipse(0, 1, 13, 3.4, 0, 0, Math.PI * 2), g.fill();
             // a gold ring under your men who can still act
             sceneReady.has(u.key) && !it.fall && ((g.strokeStyle = `rgba(255,214,90,${0.55 + 0.35 * Math.sin(now / 260)})`), (g.lineWidth = 1.6), g.beginPath(), g.ellipse(0, 1, 16, 4.6, 0, 0, Math.PI * 2), g.stroke());
             // A unit shows as a few men, a pair of riders or a gun, thinning
             // as it takes losses.
             let cl = bCls(u),
-              frac = u.max ? u.str / u.max : 1,
-              men = cl === "gun" ? 1 : cl === "horse" ? (frac > 0.5 ? 2 : 1) : frac > 0.67 ? 3 : frac > 0.34 ? 2 : 1,
-              offs = men === 3 ? [[-7, -2], [7, -2], [0, 1]] : men === 2 ? [[-6, -1], [6, 1]] : [[0, 0]],
+              men = Math.max(1, menOf(u, shownStr.has(u.key) ? shownStr.get(u.key) : u.str)),
+              offs = formation(men),
               ph = it.walk ? now / 90 : null;
             for (let [ox, oy] of offs) g.save(), g.translate(ox * (cl === "horse" ? 1.3 : 1), oy), men > 1 && g.scale(0.86, 0.86), sceneUnit(g, u, lookFor(u.side), face, ph, lean), g.restore();
             u.str > 0 && !it.fall && it.at && (g.globalAlpha = 1);
@@ -16631,15 +16801,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               for (let k2 = 0; k2 < 5; k2++) disc(g, tgt.x + (k2 - 2) * 9 * tgt.s, tgt.y - 6 * tgt.s - q * 10 * k2, (4 + q * 7) * tgt.s, (3 + q * 4) * tgt.s, `rgba(170,150,110,${0.5 * (1 - q)})`);
               ev.from.some((q2) => q2.charge) && p < 0.75 && [0, 1, 2].forEach((k2) => disc(g, tgt.x + (k2 - 1) * 7, tgt.y - 22 * tgt.s, 2.2, 2.2, "rgba(255,240,180,0.9)"));
               (g.font = `700 ${Math.round(15 * Math.min(1.6, tgt.s))}px Palatino, Georgia, serif`), (g.textAlign = "center");
-              (g.lineWidth = 3), (g.strokeStyle = "rgba(20,10,4,0.7)"), (g.fillStyle = ev.hits ? "#ffd0b8" : "#e8e8e0");
-              let tx = ev.hits ? `-${ev.hits}` : "miss";
-              g.strokeText(tx, tgt.x, tgt.y - 26 * tgt.s - q * 12), g.fillText(tx, tgt.x, tgt.y - 26 * tgt.s - q * 12);
+              // how well the attack landed, in a word, with the losses under it
+              let share = ev.size ? ev.hits / ev.size : 0,
+                [word, col] = !ev.hits ? ["Miss", "#e8e8e0"] : share < 0.2 ? ["Glancing", "#ffe6b0"] : share < 0.45 ? ["Solid hit", "#ffc890"] : share < 0.75 ? ["Heavy losses", "#ff9a70"] : ["Devastating", "#ff6a50"],
+                ty = tgt.y - 30 * tgt.s - q * 12,
+                fs = Math.round(15 * Math.min(1.6, tgt.s));
+              (g.globalAlpha = Math.min(1, (1 - q) * 3)), (g.lineWidth = 3.5), (g.strokeStyle = "rgba(20,10,4,0.75)"), (g.fillStyle = col);
+              (g.font = `700 ${Math.round(fs * 1.15)}px Palatino, Georgia, serif`), g.strokeText(word, tgt.x, ty), g.fillText(word, tgt.x, ty);
+              ev.hits && ((g.font = `700 ${fs}px Palatino, Georgia, serif`), g.strokeText(`-${ev.hits}`, tgt.x, ty + fs * 1.1), g.fillText(`-${ev.hits}`, tgt.x, ty + fs * 1.1));
+              g.globalAlpha = 1;
             }
           }
         },
         frame = (now) => {
           (raf = 0), render(now);
-          (playing || queue.length || sceneReady.size) && (raf = requestAnimationFrame(frame));
+          (playing || queue.length || sceneReady.size || bodies.some((b) => now - b.t0 < 420)) && (raf = requestAnimationFrame(frame));
         },
         sceneKick = () => {
           queue.push(...B.fx.slice(fxSeen)), (fxSeen = B.fx.length);
@@ -16707,7 +16883,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             <div class="bres theirs"><span>${G(B.sides[foe].name)}: reserves</span>${res(foe)}</div>
             <div class="bboard scene${(sceneSpec.kind === "town" || sceneSpec.kind === "village") && sceneSpec.bottom ? " behind-me" : ""}"><canvas class="bscene"></canvas><div class="bgrid">${rows.join("")}</div></div>
             <div class="bres mine"><span>Your reserves${myTurn ? " (click one, then a square on your home row)" : ""}</span>${res(mine)}</div>
-            <p class="muted">A square holds 6 infantry, 3 dragoons or 3 guns, or a mix. Pick units, then click a green square to move or a red one to attack. Everyone picked joins the attack: more kinds of unit and more squares attacking together hit harder. Infantry move or fire. Dragoons get two actions: two moves, or a move and a charge, in either order. Artillery stays on your home row and fires up its column. Take the enemy flag, or drive them from the field, to win.</p>
+            <details class="brules"${rulesOpen ? " open" : ""}><summary>How battles work</summary><p class="muted">A square holds 6 infantry, 3 dragoons or 3 guns, or a mix. Pick units, then click a green square to move or a red one to attack. Everyone picked joins the attack: more kinds of unit and more squares attacking together hit harder. Infantry move or fire. Dragoons get two actions: two moves, or a move and a charge, in either order. Artillery stays on your home row and fires up its column. Take the enemy flag, or drive them from the field, to win.</p></details>
           </div>
           <div class="bside">
             <h3>${B.over ? (B.over.winner === mine ? "Victory" : "Defeat") : "Battle log"}</h3>
@@ -16743,6 +16919,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               }
             };
           });
+          let rl_ = r.querySelector(".brules");
+          rl_ && (rl_.ontoggle = () => (rulesOpen = rl_.open));
           let be_ = r.querySelector("#b-end");
           be_ && (be_.onclick = () => (skipFx(), sel.clear(), bEndTurn(B), B.over || (bAiTurn(B), bEndTurn(B)), draw()));
           let ba = r.querySelector("#b-auto");
@@ -16828,8 +17006,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <h2>${nat ? "The empire wakes" : "Landfall"}</h2>
         <ul class="hints">
           <li><b>Move:</b> drag a unit to where it should go. It keeps going on later turns. Drag a ship onto the shore and everyone steps off.</li>
-          <li><b>Look:</b> click anything (a unit, town, village, landmark or army) and its card opens. Click empty ground to close it.</li>
-          <li><b>${nat ? "Towns" : "Colonies"}:</b> ${nat ? "your settlers are already ashore" : "your settlers come on the second ship"}; select one and press Found colony on good ground near rivers and the coast.</li>
+          <li><b>Look:</b> click a town, village, landmark or army and its card opens; click a unit once to pick it and again for its card. Click empty ground to close it.</li>
+          <li><b>${nat ? "Towns" : "Colonies"}:</b> ${nat ? "your settlers are already ashore" : "your settlers come on the second ship"}; select one, click it again to open its card, and press Found colony on good ground near rivers and the coast.</li>
           <li><b>Armies:</b> soldiers alone are slow; put them with a leader and they march at his pace. Drag them onto an enemy within a turn's march to attack.</li>
           <li><b>Defend:</b> a leader with soldiers in a town holds it well. Without them, raiders get in.</li>
           <li><b>Turns:</b> Next unit (N) finds anyone with moves left; End turn brings the newspaper and the year's news.</li>
@@ -17687,6 +17865,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function nextUnit() {
       if (!t) return;
+      if (O && O.paused) return He();
       let list = idleUnits();
       if (!list.length) {
         (h = "Every unit has moved this turn."), R();
@@ -17714,7 +17893,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }),
     (e.querySelector("#cols-btn").onclick = () => t && ((listCols = !listCols), (l = null), (pin = null), y && ((y = null), (T = null), (S = null)), R())),
     s.addEventListener("click", (ev) => {
-      ev.target && ev.target.id === "card-x" && (y ? Kn() : ((l = null), (pin = null), (listCols = !1), (h = ""), R()));
+      ev.target && ev.target.id === "card-x" && (y ? Kn() : l && cardFor === l && !(pin && pinned()) && !listCols ? ((cardFor = null), R()) : ((l = null), (pin = null), (listCols = !1), (h = ""), R()));
     }),
     // A click on the dark space around a card closes it, as its own close
     // button would. Cards that wait on a choice have no such button and stay.
