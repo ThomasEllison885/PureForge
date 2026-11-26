@@ -557,7 +557,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.22";
+    "1.23";
   var on = [
       {
         id: "spain",
@@ -12993,34 +12993,40 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     scaffold(g, f[0], f[1], f[2], f[3], f[4], detail);
     detail && (lumber(g, f[0] - f[2] / 2 - 6, f[1] + f[3] / 2 + 6, 2), bperson(g, f[0] + f[2] / 2 + 4, f[1] + f[3] / 2 + 5, "#7a5a3a"));
   }
-  function ft(e, n, o, r) {
-    let { building: i, colony: s } = r,
-      a = i.w || 1,
-      t = i.h || 1,
-      l = Y(i.x + (a - 1) / 2, i.y + (t - 1) / 2, {
-        ox: o.ox,
-        oy: o.oy,
-        zoom: o.zoom,
-        lift: terracePx(n.map, i.x, i.y, o.zoom),
+  // Where a building is drawn, and how big. A 1x1 on a river stands off the
+  // water; that shift drops the terrain lift, the same way the picture does.
+  function bldgAnchor(game, cam, b) {
+    let w = b.w || 1,
+      h = b.h || 1,
+      l = Y(b.x + (w - 1) / 2, b.y + (h - 1) / 2, {
+        ox: cam.ox,
+        oy: cam.oy,
+        zoom: cam.zoom,
+        lift: terracePx(game.map, b.x, b.y, cam.zoom),
       }),
-      d = n.players.find((h) => h.id === s.owner),
-      u = d ? ee[d.nationId].color : "#c8b89a",
-      c = ye(i.id),
-      off = a === 1 && t === 1 ? riverShift(n.map, i.x, i.y) : null;
-    off && (l = Y(i.x + off.x, i.y + off.y, o));
+      off = w === 1 && h === 1 ? riverShift(game.map, b.x, b.y) : null;
+    off && (l = Y(b.x + off.x, b.y + off.y, cam));
     // A farmstead goes up on a dry corner of its fields, not in the river.
-    if (i.id === "farm" && a === 2 && t === 2) {
-      let wet = (qx, qy) => !!(se(n, i.x + qx, i.y + qy) || {}).riverId;
+    if (b.id === "farm" && w === 2 && h === 2) {
+      let wet = (qx, qy) => !!(se(game, b.x + qx, b.y + qy) || {}).riverId;
       if (wet(1, 0)) {
         let dry = [[0, 0], [1, 1], [0, 1]].find(([qx, qy]) => !wet(qx, qy));
         if (dry) {
-          let from = Y(i.x + 1, i.y, o),
-            to = Y(i.x + dry[0], i.y + dry[1], o);
+          let from = Y(b.x + 1, b.y, cam),
+            to = Y(b.x + dry[0], b.y + dry[1], cam);
           l = { x: l.x + to.x - from.x, y: l.y + to.y - from.y };
         }
       }
     }
-    Ye(e, l.x, l.y, o.zoom * (off ? 0.86 : 1), (h) => {
+    return { x: l.x, y: l.y, scale: cam.zoom * (off ? 0.86 : 1) };
+  }
+  function ft(e, n, o, r) {
+    let { building: i, colony: s } = r,
+      l = bldgAnchor(n, o, i),
+      d = n.players.find((h) => h.id === s.owner),
+      u = d ? ee[d.nationId].color : "#c8b89a",
+      c = ye(i.id);
+    Ye(e, l.x, l.y, l.scale, (h) => {
       if (i.building === "new") {
         buildSite(h, i.id, u, o.zoom >= 0.75, i.x * 31 + i.y);
         return;
@@ -13037,6 +13043,66 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ),
         i.building === "upgrade" && upgradeScaffold(h, i.id, o.zoom >= 0.75);
     });
+  }
+  // The part of a colony center that stands above its ground square.
+  // One square is only 16px tall up-screen at zoom 1. A capital's bell
+  // tower and flag are drawn far above that, so a click on the picture
+  // used to hit the ground behind the town.
+  function centerRects(col, b) {
+    if (b.building === "new") return [[-12, -22, 12, -14]];
+    if (col.big) return [(col.level || 1) >= 2 ? [-14, -40, 14, -12] : [-12, -28, 12, -12]];
+    let L = Math.max(1, Math.min(4, col.level || 1));
+    if (L <= 1) return [[-8, -24, 12, -14]];
+    if (L === 2) return [[-12, -38, 14, -14]];
+    if (L === 3) return [[-14, -46, 14, -14]];
+    // The side boxes are only the corner-tower caps. Their bottoms stay
+    // above the squares beside the town, or a click there would open this one.
+    return [[-14, -56, 14, -14], [-38, -34, -24, -20], [24, -34, 38, -20]];
+  }
+  function colonyLabelText(game, col, player) {
+    let text = col.name || "Town";
+    if (player && col.owner === player.id) {
+      let g = 0,
+        r = (reachOf(col) || 1) + 1;
+      for (let u of game.units) {
+        if (u.aboard || u.owner !== col.owner || (u.kind !== "leader" && !arm(u.kind))) continue;
+        if (Math.abs(u.x - col.x) > r || Math.abs(u.y - col.y) > r || !garrisoned(game, u)) continue;
+        let q = ln(game, u.x, u.y);
+        q && q.colony === col && g++;
+      }
+      g && (text = `${text} · ${g} men`);
+    }
+    return text.length > 18 ? `${text.slice(0, 17)}\u2026` : text;
+  }
+  // The colony center under this point, when the point is on the drawing
+  // or on the name above it, rather than on the ground square.
+  function centerPict(game, sx, sy, cam, player) {
+    if (!game || !player || !player.explored) return null;
+    let w = game.map.width,
+      best = null,
+      key = -1,
+      on = (x, y, sc, rects) => {
+        for (let [x0, y0, x1, y1] of rects)
+          if (sx >= x + x0 * sc - 2 && sx <= x + x1 * sc + 2 && sy >= y + y0 * sc - 2 && sy <= y + y1 * sc + 2) return !0;
+        return !1;
+      };
+    for (let col of game.colonies) {
+      if (player.explored[C(col.x, col.y, w)] !== "1") continue;
+      let b = col.buildings.find((q) => q.id === "center");
+      if (!b) continue;
+      let a = bldgAnchor(game, cam, b),
+        hit = on(a.x, a.y, a.scale, centerRects(col, b));
+      if (!hit) {
+        let l = Y(col.x, col.y, { ox: cam.ox, oy: cam.oy, zoom: cam.zoom, lift: terracePx(game.map, col.x, col.y, cam.zoom) }),
+          sc = Math.max(cam.zoom, 0.7),
+          half = colonyLabelText(game, col, player).length * 2.2 + 6;
+        hit = sx >= l.x - half * sc && sx <= l.x + half * sc && sy >= l.y - 48 * sc && sy <= l.y - 32 * sc;
+      }
+      if (!hit) continue;
+      let k = col.x + col.y;
+      (!best || k >= key) && ((key = k), (best = { x: b.x, y: b.y }));
+    }
+    return best;
   }
   function ht(e, n) {
     e.save(),
@@ -13877,9 +13943,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     g.save(), g.beginPath(), g.moveTo(x, y), g.quadraticCurveTo(x + w / 2, y + wv(0), x + w, y + wv(1));
     g.lineTo(x + w, y + h + wv(1)), g.quadraticCurveTo(x + w / 2, y + h + wv(0), x, y + h), g.closePath(), g.clip();
     let f = (c, a, b, cw, ch) => ((g.fillStyle = c), g.fillRect(a, b, cw, ch));
-    if (nat === "spain") f("#f4efe2", x, y - 2, w, h + 4), ln_(g, x, y, x + w, y + h, "#b8222a", h * 0.2), ln_(g, x + w, y, x, y + h, "#b8222a", h * 0.2);
+    // Spain is red and gold bands. A red saltire on white is the period
+    // banner, but on a flag this small it reads as England's cross.
+    if (nat === "spain") f("#a31824", x, y - 2, w, h + 4), f("#e2b033", x, y + h * 0.26, w, h * 0.48);
     else if (nat === "portugal") f("#2e6a3e", x, y - 2, w * 0.4, h + 4), f("#c0282a", x + w * 0.4, y - 2, w * 0.6, h + 4), disc(g, x + w * 0.4, y + h / 2, h * 0.22, h * 0.22, "#e8c84a");
-    else if (nat === "england") f("#f4efe2", x, y - 2, w, h + 4), f("#c0282a", x + w * 0.4, y - 2, w * 0.18, h + 4), f("#c0282a", x, y + h * 0.4, w, h * 0.2);
+    // England keeps the white field. The cross is wide so it still shows
+    // when the flag is only a few pixels tall.
+    else if (nat === "england") f("#f7f4ee", x, y - 2, w, h + 4), f("#9e1824", x + w * 0.36, y - 2, w * 0.28, h + 4), f("#9e1824", x, y + h * 0.34, w, h * 0.32);
     else if (nat === "france") {
       f("#2c4c9c", x, y - 2, w, h + 4);
       for (let [a, b] of [[0.28, 0.3], [0.72, 0.3], [0.5, 0.72]]) disc(g, x + w * a, y + h * b, h * 0.11, h * 0.13, "#f0d060");
@@ -16480,8 +16550,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // its way somewhere has to finish walking first.
       if (t && !y) {
         let g = Fe(f),
-          hit = unitAt(g.x, g.y),
-          k = hit || tileAt(t.map, g.x, g.y, d),
+          pict = centerPict(t, g.x, g.y, d, V(t)),
+          hit = unitAt(g.x, g.y);
+        // The tower is not the soldier standing on the square behind it.
+        if (pict && (!hit || hit.x !== pict.x || hit.y !== pict.y)) hit = null;
+        let k = hit || pict || tileAt(t.map, g.x, g.y, d),
           // A click on a unit still walking stops it where it is.
           walking = hit && O && isWalking(hit.id) && stopWalk(hit.id),
           v = (hit && O ? [hit] : !hit && featureHere(k.x, k.y) ? [] : stackAt(k.x, k.y)).filter((w) => !isWalking(w.id));
@@ -16610,9 +16683,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           return;
         }
         if (!g) {
-          let sel = l ? j(t, l) : null;
+          let sel = l ? j(t, l) : null,
+            pict = centerPict(t, v.x, v.y, d, V(t)),
+            hu = unitAt(v.x, v.y);
+          // A click on the town's tower or its name is the town, even where
+          // that picture stands over the square behind it.
+          if (pict && (!hu || hu.x !== pict.x || hu.y !== pict.y)) hu = null;
           if (O) {
-            let hu = unitAt(v.x, v.y);
             if (hu) {
               // picking works the same while others move: the second click
               // on a picked unit opens its card
@@ -16621,7 +16698,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               return;
             }
           }
-          if (!O && sel && sel.kind === "ship") {
+          if (!O && !pict && sel && sel.kind === "ship") {
             let spot = Xe(t, sel.id).find(
               ([sx, sy]) => sx === b.x && sy === b.y,
             );
@@ -16631,12 +16708,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               return;
             }
           }
-          let hu = unitAt(v.x, v.y);
           // a tall landmark is picked where it is drawn, even where its top
           // stands over the square behind it
-          let fh = !hu && !y && findAt(v.x, v.y);
+          let fh = !hu && !pict && !y && findAt(v.x, v.y);
           if (fh) return (pin = { kind: "special", id: fh.id }), (l = null), (S = null), (h = ""), R();
-          (offUnitClick = !hu), Rn(hu ? hu.x : b.x, hu ? hu.y : b.y), (offUnitClick = !1);
+          (offUnitClick = !hu), Rn(hu ? hu.x : pict ? pict.x : b.x, hu ? hu.y : pict ? pict.y : b.y), (offUnitClick = !1);
         }
       }),
       window.addEventListener("pointermove", (f) => {
@@ -16659,8 +16735,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
         if (!t || o.hidden) return;
         let g = Fe(f),
-          hit = unitAt(g.x, g.y),
-          k = hit || tileAt(t.map, g.x, g.y, d);
+          pict = centerPict(t, g.x, g.y, d, V(t)),
+          hit = unitAt(g.x, g.y);
+        if (pict && (!hit || hit.x !== pict.x || hit.y !== pict.y)) hit = null;
+        let k = hit || pict || tileAt(t.map, g.x, g.y, d);
         if (!(u && u.x === k.x && u.y === k.y)) {
           let was = u;
           u = k;
@@ -16735,6 +16813,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // While moves play, a click still selects units, squares and colonies.
       // It never skips the moves ahead.
       let k = V(t);
+      // The colony center is how the building list and Auto Colony open.
+      // A unit standing on it used to take the click, so the town never opened.
+      {
+        let ctr = ln(t, f, g);
+        if (ctr && ctr.colony.owner === k.id && ctr.building.id === "center" && (y !== ctr.colony.id || S || T)) {
+          pin = null;
+          if (y !== ctr.colony.id) Re(ctr.colony.id);
+          else (S = null), (T = null), (h = ""), R();
+          return;
+        }
+      }
       // a war party wins over the town square it stands on, even with the town open
       {
         let wp0 = !T && t.natives && t.natives.raids.find((q) => q.x === f && q.y === g);
@@ -16828,6 +16917,17 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (y = f), (T = null), (S = null), (m = !1), (a.hidden = !0), (listCols = !1);
       let g = t.colonies.find((k) => k.id === f);
       R(), g && requestAnimationFrame(() => frameColony(g));
+    }
+    // The next town of yours, opened on its center, with the map left
+    // where it is. The center is the page with the building list.
+    function overTown() {
+      if (!t || y == null) return;
+      let mine = t.colonies.filter((c) => c.owner === V(t).id);
+      if (mine.length < 2) return;
+      let i = mine.findIndex((c) => c.id === y),
+        n = mine[(i < 0 ? 0 : i + 1) % mine.length];
+      (y = n.id), (T = null), (S = null), (l = null), (pin = null), (cardFor = null), (h = "");
+      R();
     }
     // Bring a colony's whole land into the part of the map the card does
     // not cover, as close as it will fit.
@@ -18291,7 +18391,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       <p class="muted">${T ? "Move over the pale squares to place it." : "Click a building to see it, or pick something to build."}</p>
-      <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button></h2>
+      <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button>${t.colonies.filter((E) => E.owner === k.id).length > 1 ? ` <button type="button" class="find-link inline" id="town-over" title="The next town, on its center. The map stays where it is.">Over</button>` : ""}</h2>
       <p class="people">${f.population} people \xB7 room for ${g.housing}${g.staffing < 0.995 ? ` \xB7 <span class="down" title="Not enough people to work every building: output falls with it.">${Math.round(g.staffing * 100)}% of buildings worked</span>` : ""}</p>
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
       ${!T && te ? `${te}<div class="row"><button type="button" id="pick-done">Back to the town</button></div>` : ""}
@@ -18322,6 +18422,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (s.querySelector("#auto-toggle").onclick = () => {
           x(go(t, f.id, Ae ? null : f.lastGoal || "balanced")), R();
         }),
+        (s.querySelector("#town-over") && (s.querySelector("#town-over").onclick = () => overTown())),
         s.querySelectorAll("[data-goal]").forEach((E) => {
           E.onclick = () => {
             (f.lastGoal = E.dataset.goal), x(go(t, f.id, E.dataset.goal)), R();
