@@ -557,7 +557,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.20";
+    "1.21";
   var on = [
       {
         id: "spain",
@@ -764,7 +764,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         id: "diplomat",
         name: "Diplomat",
         cost: 2,
-        effect: "Goodwill with nations and tribes grows half again as fast",
+        effect: "Friendship with tribes and other nations builds 50% faster",
       },
       {
         id: "spymaster",
@@ -3765,7 +3765,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         for (let x = Math.max(0, s.x - R0); x <= Math.min(w - 1, s.x + R0); x++)
           Math.hypot(x - s.x, y - s.y) <= R0 && ex[C(x, y, w)] !== "1" && ((ex[C(x, y, w)] = "1"), n0++);
       p.explored = ex.join("");
-      msg = `Old maps drawn by the people who lived here. ${n0} squares of country for some ${R0} squares around the ruins are now on your charts.`;
+      msg = `Old maps drawn by the people who lived here. About ${acres(n0)} acres of country, for some ${R0 * MILES_PER_TILE} miles around the ruins, are now on your charts.`;
     } else if (r < 0.82) {
       let settlers = z(s.x + 7, s.y, seed + 921) < 0.2,
         u = Le(e, p, settlers ? "settler" : "explorer", s.x, s.y, settlers ? "Settlers" : "Survivor");
@@ -5790,13 +5790,25 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // holder has no soldiers beside it and another nation keeps soldiers
   // there two year-ends running, it passes to them. A party only marching
   // past does not take it, and the holder is warned after the first year.
+  // The nations with soldiers on or beside a landmark right now.
+  function landmarkGuards(e, sp) {
+    let by = new Set();
+    for (let u of e.units) !u.aboard && arm(u.kind) && Math.max(Math.abs(u.x - sp.x), Math.abs(u.y - sp.y)) <= 1 && by.add(u.owner);
+    for (let A of (e.politics && pol(e).armies) || []) A.hold != null && Math.max(Math.abs(A.x - sp.x), Math.abs(A.y - sp.y)) <= 1 && by.add(A.owner);
+    return by;
+  }
+  // Who is pressing a landmark: a lone other nation beside it, none of the
+  // holder's there. Null when it is safe.
+  function landmarkChallenger(e, sp) {
+    if (sp.foundBy == null) return null;
+    let by = landmarkGuards(e, sp);
+    return by.size === 1 && !by.has(sp.foundBy) ? [...by][0] : null;
+  }
   function holdTurn(e) {
     let hum = e.players.find((p) => p.isHuman);
     for (let sp of e.map.specials || []) {
       if (sp.foundBy == null) continue;
-      let by = new Set();
-      for (let u of e.units) !u.aboard && arm(u.kind) && Math.max(Math.abs(u.x - sp.x), Math.abs(u.y - sp.y)) <= 1 && by.add(u.owner);
-      for (let A of pol(e).armies) A.hold != null && Math.max(Math.abs(A.x - sp.x), Math.abs(A.y - sp.y)) <= 1 && by.add(A.owner);
+      let by = landmarkGuards(e, sp);
       if (!by.size || by.has(sp.foundBy) || by.size > 1) {
         delete sp.contest;
         continue;
@@ -5814,7 +5826,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
       delete sp.contest;
       sp.foundBy = to;
-      hum && (to === hum.id ? pushEvent(e, `Your soldiers hold the ${name}. Its bonus now goes to your colonies nearby.`, sp.x, sp.y) : was === hum.id && pushEvent(e, `${nationName(P)} has taken the ${name} from you. Station soldiers beside it to take it back.`, sp.x, sp.y));
+      sp.takenYear = e.year;
+      hum && (to === hum.id ? pushEvent(e, `Your soldiers have taken the ${name}${was != null ? ` from ${nationName(e.players.find((q) => q.id === was))}` : ""}. Its bonus now goes to your colonies nearby.`, sp.x, sp.y) : was === hum.id ? pushEvent(e, `${nationName(P)} has taken the ${name} from you. Station soldiers beside it to take it back.`, sp.x, sp.y) : hum.explored[sp.y * e.map.width + sp.x] === "1" && pushEvent(e, `${nationName(P)} has taken the ${name} from ${nationName(e.players.find((q) => q.id === was))}.`, sp.x, sp.y));
     }
   }
   // Computer nations deal with one another as well: crowded neighbours sour
@@ -6905,6 +6918,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     return e.buildings.reduce((i, s) => i + (s.w || 1) * (s.h || 1), 0) / Math.max(1, o) > 0.45;
   }
+  var FORT_CAP = 3;
   function ci(e, n, o) {
     let r = {};
     for (let a of n.buildings) r[a.id] = (r[a.id] || 0) + 1;
@@ -6921,6 +6935,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // A university mostly pays off through cheaper research, which needs a
       // war college, so the governor waits until the nation has one going.
       .filter((a) => a !== "university" || e.colonies.some((t) => t.owner === n.owner && t.buildings.some((l) => l.id === "war_college")))
+      // Three forts are all a colony needs, as in the old game.
+      .filter((a) => a !== "fort" || (r.fort || 0) < FORT_CAP)
       .map((a) => ({ id: a, gap: (o[a] / i) * s - (r[a] || 0) }))
       .sort((a, t) => t.gap - a.gap)
       .map((a) => a.id);
@@ -7170,16 +7186,19 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ],
     };
   }
+  // A map square is MILES_PER_TILE (12) miles across: 144 square miles,
+  // 640 acres to the square mile. Rounded the way a gazette would.
+  function acres(n) {
+    let a = n * MILES_PER_TILE * MILES_PER_TILE * 640,
+      r = a >= 1e6 ? 1e5 : a >= 1e5 ? 1e4 : 1e3;
+    return (Math.round(a / r) * r).toLocaleString("en-US");
+  }
   function gi(e, n, o, r) {
     let i = [];
     if (!o) i.push("The charts show the water and land around the ships.");
     else if (r.explored > o.explored) {
       let p = r.explored - o.explored;
-      i.push(
-        p === 1
-          ? "The charts grew by 1 square."
-          : `The charts grew by ${p} squares.`,
-      );
+      i.push(`The charts grew by about ${acres(p)} acres.`);
     } else i.push("No new land or sea was charted.");
     let s = so(e, n.id),
       a = new Set(o ? o.colonyIds : []),
@@ -8279,6 +8298,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         id: n.id,
         foundBy: n.foundBy,
         foundYear: n.foundYear,
+        contest: n.contest || null,
+        takenYear: n.takenYear || null,
       })),
       players: e.players.map((n) => ({
         id: n.id,
@@ -8317,7 +8338,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.pendingRaids = o.pendingRaids || []), (e.battleNews = o.battleNews || []), o.politics && (e.politics = o.politics);
     for (let r of o.specials || []) {
       let i = (e.map.specials || []).find((s) => s.id === r.id);
-      i && ((i.foundBy = r.foundBy), (i.foundYear = r.foundYear));
+      i && ((i.foundBy = r.foundBy), (i.foundYear = r.foundYear), r.contest && (i.contest = r.contest), r.takenYear && (i.takenYear = r.takenYear));
     }
     (e.log = o.log), (e.glimpsed = o.glimpsed || []);
     for (let r of o.players) {
@@ -11449,10 +11470,20 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     // clear of the building.
     for (let [p, S, built] of finds) {
       let M = ke[S.kind],
-        k = Math.max(d * 1.3, 0.7);
+        k = Math.max(d * 1.3, 0.7),
+        own = n.players.find((q) => q.id === S.foundBy),
+        ch = S.kind !== "ancient_ruins" && landmarkChallenger(n, S),
+        chP = ch != null && n.players.find((q) => q.id === ch),
+        // the holder's flag beside the find; a challenger's opposite it,
+        // and a red ring while the find is under threat
+        flags = (P) => {
+          chP && (P.save(), (P.strokeStyle = "#d02a1e"), (P.lineWidth = 2), P.setLineDash([4, 3]), P.beginPath(), P.ellipse(0, 2, 20, 10, 0, 0, Math.PI * 2), P.stroke(), P.restore());
+          own && (ln_(P, 13, 4, 13, -20, "#3a2a18", 1.2), natFlag(P, own.nationId, 13, -20, 10, 6.5, null));
+          chP && (ln_(P, -13, 4, -13, -20, "#3a2a18", 1.2), natFlag(P, chP.nationId, -23, -20, 10, 6.5, null), (P.fillStyle = "#d02a1e"), (P.font = "bold 11px sans-serif"), (P.textAlign = "center"), P.fillText("!", 0, -16));
+        };
       built
-        ? Ye(e, p.x, p.y + 11 * d, k * 0.62, (P) => discIcon(P, M))
-        : Ye(e, p.x, p.y, k, (P) => discIcon(P, M));
+        ? Ye(e, p.x, p.y + 11 * d, k * 0.62, (P) => (discIcon(P, M), flags(P)))
+        : Ye(e, p.x, p.y, k, (P) => (discIcon(P, M), flags(P)));
     }
   }
   function tt(e, n) {
@@ -14504,6 +14535,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // second click on the picked unit does.
       cardFor = null,
       troopPick = null,
+      // the colony picked to trade with or give gifts to a village
+      villageCol = null,
       // true while handling a click that missed every unit's figure
       offUnitClick = !1,
       // the last press stopped a unit mid-walk (that click only picks it)
@@ -16076,6 +16109,18 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         let P = pinned();
         P && (glide(P.x, P.y), R());
       });
+      let vcs = s.querySelector("#vil-col");
+      vcs && (vcs.onchange = () => ((villageCol = +vcs.value), R()));
+      let vgf = s.querySelector("#vil-gift"),
+        vtr = s.querySelector("#vil-trade");
+      vgf && (vgf.onclick = () => {
+        let res = nativeGift(t, +vgf.dataset.c, pin.id, 2);
+        x(res), res.ok && res.note && (h = res.note), R();
+      });
+      vtr && (vtr.onclick = () => {
+        let res = nativeTrade(t, +vtr.dataset.c, pin.id, 10);
+        x(res), res.ok && res.note && (h = res.note), R();
+      });
       let fin = s.querySelector("#fed-invite");
       fin &&
         (fin.onclick = () => {
@@ -16496,7 +16541,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             if (hu) {
               // picking works the same while others move: the second click
               // on a picked unit opens its card
-              l === hu.id && !walkStopped && (cardFor = hu.id);
+              (l === hu.id || quickCard(hu)) && !walkStopped && (cardFor = hu.id);
               y && ((y = null), (T = null), (S = null)), (l = hu.id), (h = ""), R();
               return;
             }
@@ -16696,8 +16741,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       pin = null;
       b.length && ((y = null), (T = null)),
         (l = b.length ? topOf(b).id : null),
+        // explorers and ships open their card on the first click
+        b.length && quickCard(topOf(b)) && (cardFor = l),
         (h = ""),
         R();
+    }
+    function quickCard(u) {
+      return !!u && u.owner === V(t).id && (u.kind === "explorer" || u.kind === "ship");
     }
     function Re(f) {
       (y = f), (T = null), (S = null), (m = !1), (a.hidden = !0), (listCols = !1);
@@ -16774,12 +16824,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         go = `<button type="button" id="pin-go">Show on map</button> <button type="button" id="pin-close">Close</button>`;
       if (pin.kind === "special") {
         let d = ke[P.kind],
-          who = P.foundBy === me_.id ? "Yours" : `Held by ${ee[ce(t, P.foundBy).nationId].name}`;
+          hp = t.players.find((q) => q.id === P.foundBy),
+          who = P.foundBy === me_.id ? "<b>Yours</b>" : `<b>Held by ${G(nationName(hp))}</b>`,
+          chI = landmarkChallenger(t, P),
+          chP = chI != null && t.players.find((q) => q.id === chI),
+          chName = chP && (chP.id === me_.id ? "Your" : `${G(nationName(chP))}'s`),
+          // the take-over, step by step
+          threat = P.kind === "ancient_ruins" ? "" : chP
+            ? `<p class="find-stat" style="color:#a02018"><b>${P.contest && P.contest.by === chI ? `${chName} soldiers have held it a full year. If they are still there, with none of ${P.foundBy === me_.id ? "yours" : `${G(nationName(hp))}'s`}, it becomes ${chP.id === me_.id ? "yours" : `${G(nationName(chP))}'s`} when this year ends.` : `${chName} soldiers are beside it. If they hold it through two year-ends, with none of ${P.foundBy === me_.id ? "yours" : `${G(nationName(hp))}'s`} there, it becomes ${chP.id === me_.id ? "yours" : `${G(nationName(chP))}'s`}.`}</b></p>`
+            : P.takenYear ? `<p class="muted">Taken by ${P.foundBy === me_.id ? "you" : G(nationName(hp))} in ${P.takenYear}.</p>` : "";
         // Ruins give their one prize when found; nothing after is worth holding.
         let spent = P.kind === "ancient_ruins";
         return `<h2>${G(d.name)}</h2>
         <p>${G(spent && P.foundBy === me_.id ? P.prize || qn(d) : spent ? "Already searched." : qn(d))}${spent ? "" : "."}</p>
-        <p class="muted">${spent ? `Searched by ${P.foundBy === me_.id ? "you" : ee[ce(t, P.foundBy).nationId].name}${P.foundYear ? ` in ${P.foundYear}` : ""}. Nothing more is to be found here.` : `${who}${P.foundYear ? `, found in ${P.foundYear}` : ""}. ${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}`}</p>
+        <p class="muted">${spent ? `Searched by ${P.foundBy === me_.id ? "you" : ee[ce(t, P.foundBy).nationId].name}${P.foundYear ? ` in ${P.foundYear}` : ""}. Nothing more is to be found here.` : `${P.foundYear ? `Found in ${P.foundYear}. ` : ""}${d.radius ? `The dashed ring shows its reach. Only its holder's buildings inside it get the bonus.` : ""}`}</p>
+        ${spent ? "" : `<p>${who}. ${standWith(hp)}</p>${threat}`}
         ${spent ? "" : `<p class="muted">${P.foundBy === me_.id ? "Keep soldiers beside it: if a rival stations soldiers here while none of yours are, it becomes theirs." : "Station soldiers beside it, with none of the holder's there, and at the end of the year it becomes yours."}</p>`}
         <div class="row">${go}</div>`;
       }
@@ -16789,14 +16848,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           word = attitudeWord(att),
           of = villageOffer(t, P),
           per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`,
-          near = t.colonies.filter((c) => c.owner === me_.id && Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= 10);
+          near = t.colonies.filter((c) => c.owner === me_.id && Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= 10),
+          // your colonies that can deal with this village, nearest first
+          dealers = t.colonies
+            .filter((c) => c.owner === me_.id && (P.fed === me_.id || Math.max(Math.abs(c.x - P.x), Math.abs(c.y - P.y)) <= (c.big ? 24 : 12)))
+            .sort((c1, c2) => Math.hypot(c1.x - P.x, c1.y - P.y) - Math.hypot(c2.x - P.x, c2.y - P.y)),
+          dc = dealers.find((c) => c.id === villageCol) || dealers[0],
+          dealHtml = !dealers.length
+            ? `<p class="muted">Found a colony within 12 squares to trade and give gifts here.</p>`
+            : `<h3 class="side-sub">Win them over</h3>
+          ${dealers.length > 1 ? `<label class="muted">From <select id="vil-col">${dealers.map((c) => `<option value="${c.id}" ${c === dc ? "selected" : ""}>${G(c.name)} (${c.stock.gold} gold, ${c.stock[of.want] || 0} ${Ne[of.want].toLowerCase()})</option>`).join("")}</select></label>` : `<p class="muted">From ${G(dc.name)}: ${dc.stock.gold} gold, ${dc.stock[of.want] || 0} ${Ne[of.want].toLowerCase()}.</p>`}
+          <div class="row">
+            <button type="button" id="vil-gift" data-c="${dc.id}" ${dc.stock.gold >= 2 ? "" : "disabled"}>Gift 2 gold</button>
+            ${word === "hostile" ? "" : P.tradedYear === t.year ? '<span class="muted">Traded this year.</span>' : `<button type="button" id="vil-trade" data-c="${dc.id}" ${(dc.stock[of.want] || 0) >= 10 ? "" : "disabled"}>Trade 10 ${Ne[of.want].toLowerCase()}</button>`}
+          </div>
+          <p class="muted">A gift means most the first time and less if repeated soon. Trade also warms them a little.</p>`;
         let fedP = P.fed != null && t.players.find((q) => q.id === P.fed),
           canInvite = isNatNation(me_) && P.fed == null && att >= 30 && t.units.some((u) => u.owner === me_.id && u.kind === "leader" && !u.aboard && Math.max(Math.abs(u.x - P.x), Math.abs(u.y - P.y)) <= 2);
         return `<h2>${G(P.name)}</h2>
         ${fedP ? `<p class="find-stat">Federated with ${fedP === me_ ? "your empire" : G(nationName(fedP))}.</p>` : ""}
         ${isNatNation(me_) && P.fed == null ? `<p class="muted">${canInvite ? "Your leader is here: you can ask them to join your federation." : att >= 30 ? "Friendly: send a leader here to ask them to join your federation." : "Not friendly enough to join you freely. Win them over with gifts and trade, or bring them in by force with an army."}</p>${canInvite ? '<div class="row"><button type="button" id="fed-invite" class="primary">Invite into the federation</button></div>' : ""}` : ""}
         <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
-        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Trade from the Native villages list in a colony nearby.`}</p>
+        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}.`}</p>
+        ${dealHtml}
         <p class="muted">Drag soldiers onto the village to raid or destroy it.</p>
         <div class="row">${go}</div>`;
       }
@@ -18110,26 +18184,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${outside.map((q) => `<button type="button" class="town-call" data-u="${q.id}">Call ${G(q.name)} in (${Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y))} squares)</button>`).join("")}</div>`;
       })()}
       <button type="button" class="recruit" id="recruit-leader" ${f.stock.gold >= LEADER_COST[Math.min(4, f.level || 1)] ? "" : "disabled"}>Commission a leader, level ${Math.min(4, f.level || 1)}<small>${LEADER_COST[Math.min(4, f.level || 1)]} gold. Bigger colonies train better leaders: more actions a turn, more charisma, more men under command.</small></button>`,
-        nearV = natives(t)
-          .villages.filter((q) => q.fed === f.owner || (Math.max(Math.abs(q.x - f.x), Math.abs(q.y - f.y)) <= (f.big ? 24 : 12) && k.explored[q.y * t.map.width + q.x] === "1"))
-          .sort((q1, q2) => Math.hypot(q1.x - f.x, q1.y - f.y) - Math.hypot(q2.x - f.x, q2.y - f.y)),
-        natHtml = nearV.length
-          ? `
-      <h3 class="side-sub">Native villages nearby</h3>
-      <ul class="natives">${nearV
-        .map((q) => {
-          let nt = nationOf(t, q),
-            att = nt.att[k.id] || 0,
-            word = attitudeWord(att),
-            of = villageOffer(t, q),
-            per = of.price >= 1 ? `${of.price.toFixed(1)} gold each` : `1 gold per ${Math.ceil(1 / of.price)}`;
-          return `<li><b>${G(q.name)}</b> · ${G(nt.name)} · <span class="att ${word}">${word}</span><br>
-            ${word === "hostile" ? '<small class="down">Will not trade. May raid colonies nearby.</small>' : q.tradedYear === t.year ? "<small>Traded this year.</small>" : `<small>Wants ${Ne[of.want].toLowerCase()} this year: ${per}.</small> <button type="button" class="nat-trade" data-v="${q.id}">Trade 10</button>`}
-            <button type="button" class="nat-gift" data-v="${q.id}" ${f.stock.gold >= 2 ? "" : "disabled"}>Gift 2 gold</button></li>`;
-        })
-        .join("")}</ul>
-      <p class="muted">Colonies close to their villages make a nation less friendly each year. Gifts and trade win them back. Drag soldiers onto a village beside them to attack it.</p>`
-          : "",
         eu = europeTurns(t, f),
         onWay = (t.shipments || []).filter((E) => E.to === "europe" && E.from === f.id),
         sell = `
@@ -18187,7 +18241,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       ${X}
       ${f.occupied ? `<p class="find-stat">Occupied by the crown's troops (${f.occupied.units.length}). It yields nothing until you retake it: drag soldiers within two squares onto the town.</p>` : ""}
       ${f.big ? "" : rebelOf(V(t)) ? '<p class="muted">The crown\'s ships blockade your ports: nothing can be sold in Europe until independence is won.</p>' : sell}
-      ${natHtml}
+
       </div>
       <p class="muted">Click anywhere outside the colony to go back to the map.</p>`),
         (s.querySelector("#auto-toggle").onclick = () => {
@@ -18297,18 +18351,6 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (rl.onclick = () => {
           let res = recruitLeader(t, f.id);
           x(res), res.ok && ((h = res.note), t.log.push(res.note)), R();
-        });
-      s.querySelectorAll(".nat-trade").forEach((E) => {
-        E.onclick = () => {
-          let res = nativeTrade(t, f.id, +E.dataset.v, 10);
-          x(res), res.ok && res.note && (h = res.note), R();
-        };
-      }),
-        s.querySelectorAll(".nat-gift").forEach((E) => {
-          E.onclick = () => {
-            let res = nativeGift(t, f.id, +E.dataset.v, 2);
-            x(res), res.ok && res.note && (h = res.note), R();
-          };
         });
       let sl = s.querySelector("#sell-send");
       sl &&
