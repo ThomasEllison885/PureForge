@@ -557,7 +557,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.21";
+    "1.22";
   var on = [
       {
         id: "spain",
@@ -2089,8 +2089,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           ind = ((ce(e, r.owner) || {}).mother || {}).independent ? 1.6 : 1;
         for (let s of ["goods", "metal", "wood", "food"]) {
           let over = r.stock[s] - Math.floor(storeReserve(r, s) * 0.75),
-            g = over > 0 ? Math.floor(over * EUROPE_PRICE[s] * (1 + 0.15 * (cu - 1)) * ind) : 0;
-          g >= 1 && ((r.stock[s] -= over), (sold += g));
+            g = over > 0 ? Math.floor(over * europeQuote(e, s) * (1 + 0.15 * (cu - 1)) * ind) : 0;
+          g >= 1 && ((r.stock[s] -= over), (sold += g), nudgeMarket(e, s, over, !1));
         }
         sold && noteTrade(e, r.owner, sold);
         sold && ((r.stock.gold += sold), o.push(`${r.name}'s customs house sold its surplus in Europe for ${sold} gold.`));
@@ -2171,11 +2171,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     );
   }
   // ---- Selling in Europe ----
-  // Fixed prices in gold per unit. A coastal colony's cargo sails out and the
-  // gold comes back in two turns; an inland colony hauls to the coast first.
-  // Deliberately a poor deal: Europe pays little for colonial raw goods. A
-  // proper trade system with better and worse offers comes later.
-  var EUROPE_PRICE = { goods: 1 / 2, metal: 1 / 6, wood: 1 / 12, food: 1 / 20 };
+  // Usual prices in gold per unit, before the market moves. A coastal
+  // colony's cargo sails out and the gold comes back in two turns; an inland
+  // colony hauls to the coast first. Europe still pays poorly for raw goods.
+  // Selling a lot of one thing makes the next sale worse; buying makes it
+  // dearer. Prices drift back toward the usual figure each year, and metal
+  // and crops rise while the player's king is at war in Europe.
+  var EUROPE_PRICE = { goods: 1 / 2, metal: 1 / 6, wood: 1 / 12, food: 1 / 20 },
+    MARKET_FLOOR = 0.45,
+    MARKET_CEIL = 2.2,
+    MARKET_DEPTH = 80;
   function coastalColony(e, c) {
     for (let dy = -2; dy <= 2; dy++)
       for (let dx = -2; dx <= 2; dx++) {
@@ -2187,8 +2192,55 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function europeTurns(e, c) {
     return coastalColony(e, c) ? 2 : 3;
   }
-  function europeValue(r, t) {
-    return Math.floor(t * (EUROPE_PRICE[r] || 0));
+  function marketOf(e) {
+    let m = e.market;
+    (!m || !m.europe) && (m = e.market = { europe: {} });
+    for (let k of Object.keys(EUROPE_PRICE)) typeof m.europe[k] != "number" && (m.europe[k] = 1);
+    return m;
+  }
+  function europeQuote(e, r) {
+    let base = EUROPE_PRICE[r] || 0;
+    if (!base) return 0;
+    let m = marketOf(e).europe[r];
+    return base * Math.max(MARKET_FLOOR, Math.min(MARKET_CEIL, m));
+  }
+  // How many units of this to one gold piece, for the colony card.
+  function goldEach(q) {
+    if (!(q > 0)) return "nothing";
+    return q >= 1 ? `${q < 10 ? q.toFixed(1) : Math.round(q)} gold each` : `1 gold per ${Math.max(1, Math.round(1 / q))}`;
+  }
+  function europePriceNote(e) {
+    return Object.keys(EUROPE_PRICE)
+      .map((k) => {
+        let q = europeQuote(e, k),
+          usual = EUROPE_PRICE[k],
+          word = q > usual * 1.12 ? ", high" : q < usual * 0.88 ? ", low" : "";
+        return `${Ne[k].toLowerCase()} ${goldEach(q)}${word}`;
+      })
+      .join("; ");
+  }
+  // A sale pulls the price down, a purchase pulls it up. One deal can move
+  // a price by about a third at most, so a single ship does not empty the market.
+  function nudgeMarket(e, r, amount, buying) {
+    if (!EUROPE_PRICE[r] || !(amount > 0)) return;
+    let m = marketOf(e),
+      shift = Math.min(0.35, amount / MARKET_DEPTH),
+      cur = m.europe[r];
+    m.europe[r] = Math.max(MARKET_FLOOR, Math.min(MARKET_CEIL, buying ? cur * (1 + shift) : cur * (1 - shift)));
+  }
+  // Each year the market walks part of the way back to the usual price.
+  // A war in Europe keeps metal and crops dear.
+  function marketTurn(e) {
+    let m = marketOf(e),
+      hum = e.players.find((p) => p.isHuman),
+      war = !!(hum && e.players.some((p) => p !== hum && !isNatNation(p) && europeAt(e, hum, p) === "war"));
+    for (let k of Object.keys(EUROPE_PRICE)) {
+      let cur = m.europe[k],
+        back = cur + (1 - cur) * 0.18;
+      war && (k === "metal" || k === "food") && (back *= 1.06);
+      war && k === "goods" && (back *= 1.03);
+      m.europe[k] = Math.max(MARKET_FLOOR, Math.min(MARKET_CEIL, back));
+    }
   }
   function sellEurope(e, n, r, i) {
     return be(e, () => {
@@ -2203,10 +2255,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (s.stock[r] < t)
         return { ok: !1, error: `${s.name} has only ${s.stock[r]} ${Ne[r].toLowerCase()}.` };
       let own = ce(e, s.owner) || {},
-        g = Math.floor(europeValue(r, t) * (own.mother && own.mother.independent ? 1.6 : 1) * (r === "goods" && hasSkill(own, "craftsman") ? 1.25 : 1) * (hasSkill(own, "merchant") ? 1.15 : 1));
+        g = Math.floor(t * europeQuote(e, r) * (own.mother && own.mother.independent ? 1.6 : 1) * (r === "goods" && hasSkill(own, "craftsman") ? 1.25 : 1) * (hasSkill(own, "merchant") ? 1.15 : 1));
       if (g < 1)
-        return { ok: !1, error: `That much ${Ne[r].toLowerCase()} is not worth a gold piece. Send at least ${Math.ceil(1 / EUROPE_PRICE[r])}.` };
+        return { ok: !1, error: `That much ${Ne[r].toLowerCase()} is not worth a gold piece. Send at least ${Math.ceil(1 / europeQuote(e, r))}.` };
       s.stock[r] -= t;
+      nudgeMarket(e, r, t, !1);
       let l = europeTurns(e, s);
       return (
         e.shipments || (e.shipments = []),
@@ -2247,9 +2300,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!EUROPE_BUY[r]) return { ok: !1, error: "Europe does not sell that." };
       let t = Math.floor(Number(i));
       if (!(t > 0)) return { ok: !1, error: "Buy at least 1." };
-      let cost = Math.max(1, Math.ceil(t * EUROPE_BUY[r]));
+      let cost = Math.max(1, Math.ceil(t * europeQuote(e, r) * 3));
       if (c.stock.gold < cost) return { ok: !1, error: `${t} ${Ne[r].toLowerCase()} costs ${cost} gold; ${c.name} has ${c.stock.gold}.` };
-      (c.stock.gold -= cost), noteTrade(e, c.owner, cost);
+      (c.stock.gold -= cost), noteTrade(e, c.owner, cost), nudgeMarket(e, r, t, !0);
       let l = europeTurns(e, c);
       (e.shipments || (e.shipments = [])).push({ from: "europe", to: c.id, resource: r, amount: t, arrives: e.year + l });
       return { ok: !0, discoveries: [], note: `Bought ${t} ${Ne[r].toLowerCase()} for ${cost} gold. It reaches ${c.name} in ${l} turns.` };
@@ -3571,19 +3624,29 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // Computer nations explore with their ship and explorers, name what they
   // reach first, bring their storeship to a good stretch of coast, found
   // colonies there and further inland, and run them with the colony governor.
+  // A nation knows a square only when its own chart marks it. Its own
+  // colonies are known without that, because it built them.
+  function charted(e, pid, x, y) {
+    let p = ce(e, pid);
+    return !!(p && p.explored && p.explored[C(x, y, e.map.width)] === "1");
+  }
   // A computer nation keeps twice the usual spacing from any other
-  // nation's colony, yours included; its own colonies may sit closer.
+  // nation's colony it has actually seen; its own colonies may sit closer.
+  // A town, landing, or village that is not on its chart does not exist
+  // for this choice. Founding can still fail on arrival if the square
+  // turns out to be too close to something it had not charted.
   function rivalSiteOk(e, s, n) {
     if (!s) return !1;
-    let t = se(e, s.x, s.y);
+    let t = se(e, s.x, s.y),
+      knows = (x, y) => n == null || charted(e, n, x, y);
     return (
       !!t &&
       Ho(t.terrain) &&
       !ln(e, s.x, s.y) &&
-      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < (n != null && c.owner !== n ? 2 : 1) * $.colonySpacing) &&
-      // nor from a landing another nation has already picked out
-      !(n != null && e.players.some((o) => o.id !== n && o.siteA && Math.max(Math.abs(o.siteA.x - s.x), Math.abs(o.siteA.y - s.y)) < 2 * $.colonySpacing)) &&
-      !natives(e).villages.some((v) => Math.max(Math.abs(v.x - s.x), Math.abs(v.y - s.y)) <= 3)
+      !e.colonies.some((c) => Math.max(Math.abs(c.x - s.x), Math.abs(c.y - s.y)) < (n != null && c.owner !== n ? 2 : 1) * $.colonySpacing && (c.owner === n || knows(c.x, c.y))) &&
+      // nor from a landing it can see that another nation has already picked out
+      !(n != null && e.players.some((o) => o.id !== n && o.siteA && knows(o.siteA.x, o.siteA.y) && Math.max(Math.abs(o.siteA.x - s.x), Math.abs(o.siteA.y - s.y)) < 2 * $.colonySpacing)) &&
+      !natives(e).villages.some((v) => knows(v.x, v.y) && Math.max(Math.abs(v.x - s.x), Math.abs(v.y - s.y)) <= 3)
     );
   }
   function rivalSite(e, n, cx, cy, coastal, avoid, wide) {
@@ -3676,13 +3739,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     if (store && e.units.some((s) => s.aboard === store.id && s.kind === "settler")) {
-      rivalSiteOk(e, p.siteA, n) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, null));
+      rivalSiteOk(e, p.siteA, n) || (p.siteA = rivalSite(e, n, store.x, store.y, !0, p.badSites || null));
       let s = p.siteA;
       if (s && Xe(e, store.id).some(([a, b]) => a === s.x && b === s.y)) {
         let aboard = e.units.filter((q) => q.aboard === store.id),
           settlers = aboard.filter((q) => q.kind === "settler");
         for (let q of aboard) xo(e, q.id, s.x, s.y);
-        settlers[0] && !settlers[0].aboard && rivalFound(e, settlers[0]);
+        if (settlers[0] && !settlers[0].aboard && !rivalFound(e, settlers[0])) (p.badSites || (p.badSites = [])).push(s), p.badSites.length > 12 && p.badSites.shift();
         p.siteA = null;
       } else if (s) {
         let water = Z(s.x, s.y, w, h)
@@ -3715,7 +3778,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // Somebody else's men standing on the spot, or another nation's
       // settlers headed there, mean looking elsewhere.
       // The settler that set out first keeps a contested spot.
-      let rivalsS = e.units.filter((o) => o.kind === "settler" && o.owner !== n && o.site),
+      let rivalsS = e.units.filter((o) => o.kind === "settler" && o.owner !== n && o.site && charted(e, n, o.site.x, o.site.y)),
         theirs = rivalsS.map((o) => o.site);
       if (q.site) {
         let near = rivalsS.filter((o) => Math.max(Math.abs(o.site.x - q.site.x), Math.abs(o.site.y - q.site.y)) < $.colonySpacing),
@@ -3728,11 +3791,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         q.site = rivalSite(e, n, q.x, q.y, !1, others) || ((q.stuck || 0) % 4 === 1 ? rivalSite(e, n, q.x, q.y, !1, others, !0) : null);
       }
       if (!q.site) continue;
-      q.x === q.site.x && q.y === q.site.y ? rivalFound(e, q) : (q.dest = { x: q.site.x, y: q.site.y });
+      if (q.x === q.site.x && q.y === q.site.y) {
+        if (!rivalFound(e, q)) (p.badSites || (p.badSites = [])).push(q.site), p.badSites.length > 12 && p.badSites.shift(), (q.site = null);
+      } else q.dest = { x: q.site.x, y: q.site.y };
     }
     PF("rm.mr", () => mr(e, n)), PF("rm.cr", () => cr(e, n));
     for (let q of e.units.filter((u) => u.owner === n && u.kind === "settler" && !u.aboard && u.site))
-      q.x === q.site.x && q.y === q.site.y && rivalFound(e, q);
+      if (q.x === q.site.x && q.y === q.site.y && !rivalFound(e, q)) (p.badSites || (p.badSites = [])).push(q.site), p.badSites.length > 12 && p.badSites.shift(), (q.site = null);
     // Rivals name what they reach first straight away.
     for (let it of e.pendingNames.filter((q) => q.ownerId === n)) Jo(e, it.kind, it.id, Vo(e, it.kind, n), n);
   }
@@ -4570,8 +4635,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   function villageOffer(e, v) {
     let r = (k) => z(v.id * 13 + k, e.year, (e.seed >>> 0) + 1777),
       want = NATIVE_WANTS[Math.floor(r(1) * 3)],
-      base = { goods: 0.5, metal: 0.25, wood: 0.12 }[want],
-      price = base * (0.6 + r(2) * 1.6);
+      hum = e.players.find((p) => p.isHuman),
+      att = hum ? (((nationOf(e, v) || {}).att || {})[hum.id] || 0) : 0,
+      // Quoted against what Europe pays today, so a village can beat a glutted market or fall short of a dear one.
+      price = europeQuote(e, want) * (0.75 + r(2) * 0.9) * (1 + Math.max(-0.2, Math.min(0.25, att / 400)));
     return { want, price };
   }
   function nativeTrade(e, colId, vId, amount) {
@@ -5778,10 +5845,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (hum && prey.owner === hum.id) || sees(prey.x, prey.y) ? pushEvent(e, msg, prey.x, prey.y) : e.battleNews && e.battleNews.pop();
         continue;
       }
-      // hunt: a warship goes after the nearest enemy sail within reach,
-      // ships carrying men first
+      // hunt: a warship goes after the nearest enemy sail it has charted,
+      // ships carrying men first. A sail it has not seen is not a target.
       let near = foes
-        .filter((u) => Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 16)
+        .filter((u) => charted(e, r.owner, u.x, u.y) && Math.max(Math.abs(u.x - r.x), Math.abs(u.y - r.y)) <= 16)
         .sort((a, b) => (e.units.some((q) => q.aboard === b.id) - e.units.some((q) => q.aboard === a.id)) || Math.hypot(a.x - r.x, a.y - r.y) - Math.hypot(b.x - r.x, b.y - r.y))[0];
       near && ((r.dest = { x: near.x, y: near.y }), (r.autoExplore = !1));
     }
@@ -5838,7 +5905,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     for (let a of ais)
       for (let b of ais) {
         if (a.id >= b.id) continue;
-        let near = e.colonies.some((c) => c.owner === a.id && e.colonies.some((d) => d.owner === b.id && Math.max(Math.abs(c.x - d.x), Math.abs(c.y - d.y)) <= 30)),
+        let near = e.colonies.some((c) => c.owner === a.id && charted(e, b.id, c.x, c.y) && e.colonies.some((d) => d.owner === b.id && charted(e, a.id, d.x, d.y) && Math.max(Math.abs(c.x - d.x), Math.abs(c.y - d.y)) <= 30)),
           r = z(a.id * 31 + b.id, e.year, (e.seed >>> 0) + 4501);
         near && shiftRel(e, a.id, b.id, -1);
         if (!atWar(e, a.id, b.id)) {
@@ -5892,7 +5959,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (r.isHuman) continue;
       let crowd = 0;
       for (let c of e.colonies)
-        c.owner === hum.id && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 20) && crowd++;
+        c.owner === hum.id && charted(e, r.id, c.x, c.y) && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 20) && crowd++;
       shiftRel(e, hum.id, r.id, -0.5 - crowd * 1.5);
       // A rival follows its crown: at war in Europe, at war here once met.
       if (!atWar(e, hum.id, r.id) && pol(e).met[r.id] && europeAt(e, hum, r) === "war") {
@@ -5903,7 +5970,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // Only a neighbour picks a fight of its own accord, and not in the
       // first years, when nobody has the men for it.
       let v = relOf(e, hum.id, r.id),
-        neighbour = e.colonies.some((c) => c.owner === hum.id && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 30));
+        neighbour = e.colonies.some((c) => c.owner === hum.id && charted(e, r.id, c.x, c.y) && e.colonies.some((o) => o.owner === r.id && Math.max(Math.abs(o.x - c.x), Math.abs(o.y - c.y)) <= 30));
       if (e.year - $.startYear >= 25 && neighbour && !atWar(e, hum.id, r.id) && v < DIPLO[2].min && (pol(e).pool[r.id] || 0) >= 3 && z(r.id, e.year, (e.seed >>> 0) + 2207) < 0.15)
         ((pol(e).blame || (pol(e).blame = {}))[r.id] = "them"), setRel(e, hum.id, r.id, -100), pushEvent(e, `${nationName(r)} declares war on you!`);
     }
@@ -5977,9 +6044,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         probe = { id: 0, owner: r.id, leader: { name: "probe", attacks: 3 + lvl, charisma: lvl, rep: 0 }, troops },
         consider = (from, to, score, extra) => (!best || score < best.score) && (best = { from, to, score, ...extra }),
         nearOf = (x, y) => cols.reduce((b, c) => (!b || Math.hypot(c.x - x, c.y - y) < Math.hypot(b.x - x, b.y - y) ? c : b), null);
+      let seenR = (x, y) => charted(e, r.id, x, y);
       for (let m of e.colonies) {
         let own = m.owner === r.id;
-        if (own ? !m.occupied : !atWar(e, r.id, m.owner)) continue;
+        // Its own occupied towns it already knows. An enemy town is a
+        // target only once that square is on this nation's chart.
+        if (own) {
+          if (!m.occupied) continue;
+        } else if (!atWar(e, r.id, m.owner) || !seenR(m.x, m.y)) continue;
         let c = own ? nearOf(m.x, m.y) : nearOf(m.x, m.y),
           d = Math.hypot(c.x - m.x, c.y - m.y);
         if (d > 90 || (own && c === m)) continue;
@@ -5997,7 +6069,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let villagesFirst = isNatNation(r);
       if (!best && !villagesFirst)
         for (let sp of e.map.specials || []) {
-          if (sp.foundBy == null || sp.foundBy === r.id || !(atWar(e, r.id, sp.foundBy) || z(sp.id, e.year, (e.seed >>> 0) + 4471) < 0.15)) continue;
+          if (sp.foundBy == null || sp.foundBy === r.id || !seenR(sp.x, sp.y) || !(atWar(e, r.id, sp.foundBy) || z(sp.id, e.year, (e.seed >>> 0) + 4471) < 0.15)) continue;
           let c = nearOf(sp.x, sp.y),
             d = Math.hypot(c.x - sp.x, c.y - sp.y);
           d <= 30 && consider(c, { x: sp.x, y: sp.y, id: sp.id }, 1 + d / 100, { kind: "landmark" });
@@ -6005,7 +6077,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       if (!best && e.natives)
         for (let v of e.natives.villages) {
           let nt = nationOf(e, v);
-          if (v.fed === r.id || !nt || (nt.att[r.id] || 0) > (isNatNation(r) ? 0 : -30)) continue;
+          if (!seenR(v.x, v.y) || v.fed === r.id || !nt || (nt.att[r.id] || 0) > (isNatNation(r) ? 0 : -30)) continue;
           let c = nearOf(v.x, v.y),
             d = Math.hypot(c.x - v.x, c.y - v.y);
           if (d > (isNatNation(r) ? 70 : 30)) continue;
@@ -6013,7 +6085,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         }
       if (!best && villagesFirst)
         for (let sp of e.map.specials || []) {
-          if (sp.foundBy == null || sp.foundBy === r.id || !atWar(e, r.id, sp.foundBy)) continue;
+          if (sp.foundBy == null || sp.foundBy === r.id || !seenR(sp.x, sp.y) || !atWar(e, r.id, sp.foundBy)) continue;
           let c = nearOf(sp.x, sp.y),
             d = Math.hypot(c.x - sp.x, c.y - sp.y);
           d <= 30 && consider(c, { x: sp.x, y: sp.y, id: sp.id }, 1 + d / 100, { kind: "landmark" });
@@ -6335,9 +6407,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // a kind turned away stays quiet until the year it was silenced to
       let give = keys.filter((k) => !(muted[k] > e.year) && tot[k] >= 8 && fill[k] >= 0.25 && netK[k] >= 0).sort((a, b) => score[b] - score[a])[0];
       if (!give) continue;
-      let value = TRADE_VAL,
-        n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
+      let n = Math.max(5, Math.min(40, Math.floor(tot[give] * 0.25))),
         fair = 0.8 + z(r.id + 9, e.year, (e.seed >>> 0) + 2219) * 0.5,
+        // Ask in today's Europe prices, so a glut or a war changes what they want in return.
         // only ask for what one of your colonies can actually pay
         most = (k) => Math.max(0, ...e.colonies.filter((c) => c.owner === hum.id).map((c) => c.stock[k] || 0)),
         opts = keys.filter((k) => k !== give).sort((a, b) => score[a] - score[b]),
@@ -6345,7 +6417,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ask = 0;
       for (let q = 0; q < opts.length && !want; q++) {
         let k = opts[q],
-          a2 = Math.max(1, Math.round((n * value[give] * fair) / value[k]));
+          a2 = Math.max(1, Math.round((n * europeQuote(e, give) * fair) / Math.max(1e-4, europeQuote(e, k))));
         hasSkill(hum, "merchant") && (a2 = Math.max(1, Math.round(a2 * 0.87)));
         most(k) >= a2 && ((want = k), (ask = a2));
       }
@@ -6365,8 +6437,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   // whether its storehouse would simply overflow, so a "good price" for
   // something a colony already makes plenty of is not called a good deal.
   function tradeAdvice(e, offer, pay, get) {
-    let VAL = TRADE_VAL,
-      gName = Ne[offer.give].toLowerCase(),
+    let gName = Ne[offer.give].toLowerCase(),
       wName = Ne[offer.want].toLowerCase(),
       why = [],
       block = !1;
@@ -6384,7 +6455,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // what still fits once this year's own output is in
       room = Math.max(0, storeCap(get, gk) - gHave - Math.max(0, inNet)),
       kept = Math.min(offer.n, room),
-      market = (offer.n * VAL[gk]) / Math.max(0.01, offer.ask * VAL[wk]),
+      market = (offer.n * europeQuote(e, gk)) / Math.max(1e-4, offer.ask * europeQuote(e, wk)),
       fGet = 1,
       fPay = 1;
     why.push(market >= 1.1 ? `At Europe's prices you get about ${Math.round((market - 1) * 100)}% more than you pay.` : market >= 0.9 ? "At Europe's prices it is about even." : `At Europe's prices you pay about ${Math.round((1 / market - 1) * 100)}% more than you get.`);
@@ -6402,7 +6473,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     else if (left + 5 * Math.min(0, outNet) < { food: 30, wood: 20, metal: 12, goods: 6 }[wk]) (fPay = 1.6), why.push(`${pay.name} would be left short of ${wName}${outNet < 0 ? `, losing ${-outNet} a year` : ""}.`);
     else if (outNet > 0 && outNet * 2 >= offer.ask) (fPay = 0.75), why.push(`${pay.name} makes that much ${wName} back in ${Math.max(1, Math.ceil(offer.ask / outNet))} year${Math.ceil(offer.ask / outNet) > 1 ? "s" : ""}.`);
     why.push("Trading also warms relations with them a little.");
-    let ratio = (kept * VAL[gk] * fGet) / Math.max(0.01, offer.ask * VAL[wk] * fPay),
+    let ratio = (kept * europeQuote(e, gk) * fGet) / Math.max(1e-4, offer.ask * europeQuote(e, wk) * fPay),
       verdict = block || kept === 0 ? "poor" : ratio >= 1.25 ? "good" : ratio >= 0.85 ? "fair" : "poor";
     return { verdict, head: verdict === "good" ? "Worth taking" : verdict === "fair" ? "A fair trade, if you want it" : "Better to decline", why };
   }
@@ -8288,6 +8359,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       pendingNames: e.pendingNames,
       pendingSpecials: e.pendingSpecials || [],
       shipments: e.shipments || [],
+      market: e.market ? JSON.parse(JSON.stringify(e.market)) : null,
       natives: e.natives || null,
       pendingRaids: e.pendingRaids || [],
       battleNews: (e.battleNews || []).slice(),
@@ -8334,6 +8406,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (e.pendingNames = o.pendingNames),
       (e.pendingSpecials = o.pendingSpecials || []),
       (e.shipments = o.shipments || []),
+      (e.market = o.market || null),
       o.natives && (e.natives = o.natives),
       (e.pendingRaids = o.pendingRaids || []), (e.battleNews = o.battleNews || []), o.politics && (e.politics = o.politics);
     for (let r of o.specials || []) {
@@ -8702,7 +8775,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let quiet = e.log.length;
       PF("Oo", () => Oo(e, r.id)), PF("er", () => er(e, r.id)), PF("rivalMoves", () => rivalMoves(e, r.id)), PF("fed", () => rivalFederate(e, r)), PF("study", () => aiStudy(e, r)), (e.log.length = quiet);
     }
-    PF("hold", () => holdTurn(e)), PF("sea", () => seaTurn(e)), PF("crownWar", () => crownWarTurn(e)), PF("pairs", () => rivalPairsTurn(e)), PF("alli", () => allianceTurn(e)), PF("meet", () => meetTurn(e)), PF("europe", () => europeTurn(e)), PF("mood", () => rivalMoodTurn(e)), PF("army", () => rivalArmyTurn(e)), PF("offers", () => tradeOffersTurn(e));
+    PF("hold", () => holdTurn(e)), PF("sea", () => seaTurn(e)), PF("crownWar", () => crownWarTurn(e)), PF("pairs", () => rivalPairsTurn(e)), PF("alli", () => allianceTurn(e)), PF("meet", () => meetTurn(e)), PF("europe", () => europeTurn(e)), PF("market", () => marketTurn(e)), PF("mood", () => rivalMoodTurn(e)), PF("army", () => rivalArmyTurn(e)), PF("offers", () => tradeOffersTurn(e));
     PF("crown", () => crownTurn(e)), PF("demand", () => crownDemandTurn(e));
     let nt = nativesTurn(e);
     (e.pendingRaids = (e.pendingRaids || []).concat(nt.human)),
@@ -8826,6 +8899,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         pendingNames: e.pendingNames,
         pendingSpecials: e.pendingSpecials || [],
         shipments: e.shipments || [],
+        market: e.market || null,
         natives: e.natives || null,
         pendingRaids: e.pendingRaids || [],
         battleNews: e.battleNews || [],
@@ -8857,6 +8931,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (o.arrivedThisTurn = o.arrivedThisTurn || []),
       (o.pendingSpecials = o.pendingSpecials || []),
       (o.shipments = o.shipments || []),
+      marketOf(o),
       (o.pendingRaids = o.pendingRaids || []),
       (o.pendingArmies = o.pendingArmies || []),
       o.map.specials || (o.map.specials = []);
@@ -16869,7 +16944,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         ${fedP ? `<p class="find-stat">Federated with ${fedP === me_ ? "your empire" : G(nationName(fedP))}.</p>` : ""}
         ${isNatNation(me_) && P.fed == null ? `<p class="muted">${canInvite ? "Your leader is here: you can ask them to join your federation." : att >= 30 ? "Friendly: send a leader here to ask them to join your federation." : "Not friendly enough to join you freely. Win them over with gifts and trade, or bring them in by force with an army."}</p>${canInvite ? '<div class="row"><button type="button" id="fed-invite" class="primary">Invite into the federation</button></div>' : ""}` : ""}
         <p>A village of the ${G(nt.name)}, a ${G(nt.temper)} people. <span class="att ${word}">${word}</span> toward you (${att}).</p>
-        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}.`}</p>
+        <p class="muted">About ${P.warriors} warriors. ${word === "hostile" ? "It will not trade, and may raid your colonies nearby." : `This year it wants ${Ne[of.want].toLowerCase()}: ${per}. Europe pays ${goldEach(europeQuote(t, of.want))} for the same.`}</p>
         ${dealHtml}
         <p class="muted">Drag soldiers onto the village to raid or destroy it.</p>
         <div class="row">${go}</div>`;
@@ -18195,7 +18270,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <input id="sell-amount" type="number" min="1" value="10">
         <button type="button" id="sell-send">Ship</button>
       </div>
-      <p class="muted">Europe drives a hard bargain: 1 gold per 2 goods, 6 metal, 12 wood, or 20 crops. The gold comes back in ${eu} turns${eu > 2 ? ", since it is hauled to the coast first" : ""}.</p>
+      <p class="muted">Europe pays now: ${europePriceNote(t)}. Selling a lot of one thing makes the next cargo of it worth less. The gold comes back in ${eu} turns${eu > 2 ? ", since it is hauled to the coast first" : ""}. Independence, a merchant, and a craftsman still raise what you are paid.</p>
       ${onWay.length ? `<ul class="underway">${onWay.map((E) => `<li>${E.amount} ${Ne[E.resource].toLowerCase()} at sea: ${E.gold} gold due in ${E.arrives - t.year} turn${E.arrives - t.year === 1 ? "" : "s"}</li>`).join("")}</ul>` : ""}
       <h3 class="side-sub">Buy from Europe</h3>
       <div class="transfer">
@@ -18205,7 +18280,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <input id="buy-amount" type="number" min="1" value="10">
         <button type="button" id="buy-send">Buy</button>
       </div>
-      <p class="muted">Europe sells dear: 3 gold for 2 goods, 1 gold for 2 metal, 4 wood, or about 7 crops. Paid from this colony's gold; it arrives in ${eu} turns.</p>
+      <p class="muted">Europe sells at three times what it pays: ${Object.keys(EUROPE_BUY).map((E) => `${Ne[E].toLowerCase()} ${goldEach(europeQuote(t, E) * 3)}`).join("; ")}. Buying a lot makes the next purchase dearer. Paid from this colony's gold; it arrives in ${eu} turns.</p>
       ${coastalColony(t, f) ? `<h3 class="side-sub">Hire mercenaries</h3>
       <div class="row merc">${Object.keys(MERC_COST).map((E) => `<button type="button" class="merc-hire" data-k="${E}" ${f.stock.gold >= MERC_COST[E] && f.mercYear !== t.year ? "" : "disabled"}>${MERC_NAME[E].replace("Mercenary ", "").replace(/^./, (c) => c.toUpperCase())} \xB7 ${MERC_COST[E]} gold</button>`).join("")}</div>
       <p class="muted">Seasoned men from Europe, level 2. They land here next year. One hire a year per colony.</p>` : ""}
