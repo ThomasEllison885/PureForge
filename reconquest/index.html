@@ -116,6 +116,21 @@ button.ghost { background: transparent; color: var(--paper); border-color: #3d51
 #setup .skill { background: #f7f0e0; color: var(--ink); border-color: #c8b89a; }
 #setup .skill.on { border-color: #8c6a2f; background: #efe3c8; }
 #setup .skill small { color: #5c5144; }
+#setup .focus-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+#setup .focus-row {
+  display: grid;
+  grid-template-columns: 32px 2.4rem 32px 1fr;
+  gap: 6px;
+  align-items: center;
+  background: #f7f0e0;
+  border: 1px solid #c8b89a;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--ink);
+}
+#setup .focus-row b { text-align: center; font-weight: 600; }
+#setup .focus-row small { display: block; color: #5c5144; font-family: "Source Sans 3", "Segoe UI", sans-serif; font-weight: 400; }
+#setup .focus-row button { padding: 2px 0; min-width: 0; }
 #setup button.ghost, #setup label.ghost {
   background: transparent; color: var(--ink); border-color: #c8b89a;
 }
@@ -270,7 +285,6 @@ ul.colony-list small { color: #5c5144; }
 .trades-card { width: min(640px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 60px); overflow-y: auto; }
 .trade-row { border-top: 1px solid #d8c9a6; padding: 8px 0 4px; }
 .trade-row > p { margin: 2px 0; }
-.trade-row.done { opacity: 0.7; }
 .trade-picks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
 .trade-picks select { max-width: 100%; }
 .trade-row .advice { margin: 6px 0 2px; padding: 5px 10px; }
@@ -418,6 +432,7 @@ ul.natives li { margin: 6px 0; font: 13px "Segoe UI", sans-serif; }
 .lead-stats tr.hint td { color: #7a6a52; font-size: 11.5px; padding: 0 4px 4px; border-bottom: 1px solid rgba(120, 100, 70, 0.18); }
 .lead-stats button.train { padding: 1px 8px; font-size: 12px; }
 button.find-link.inline.rename { font-size: 12px; font-weight: 400; margin-left: 6px; }
+button.find-link.inline.town-next { font-size: 20px; line-height: 1; text-decoration: none; padding: 0 6px; margin-left: 2px; }
 button.find-link.inline { display: inline; padding: 0; text-decoration: underline; font: inherit; color: #6a4a1e; }
 ul.hints { padding-left: 18px; margin: 8px 0 12px; }
 ul.hints li { font: 14px/1.45 "Segoe UI", sans-serif; margin: 4px 0; }
@@ -561,7 +576,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.25";
+    "1.26";
   var on = [
       {
         id: "spain",
@@ -713,71 +728,80 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       {
         id: "pacifist",
         name: "Pacifist",
-        cost: 2,
+        cost: 10,
         effect: "Defence research costs 40% less",
       },
       {
         id: "craftsman",
         name: "Craftsman",
-        cost: 2,
+        cost: 10,
         effect: "Goods sell for a quarter more in Europe",
       },
       {
         id: "cartographer",
         name: "Cartographer",
-        cost: 2,
+        cost: 10,
         effect: "Land units move farther",
       },
       {
         id: "navigator",
         name: "Navigator",
-        cost: 2,
+        cost: 10,
         effect: "Ships move farther",
       },
       {
         id: "admiral",
         name: "Admiral",
-        cost: 2,
+        cost: 10,
         effect: "Your ships fight a level above their own",
       },
       {
         id: "conqueror",
         name: "Conqueror",
-        cost: 2,
+        cost: 10,
         effect: "Every leader commands two more men",
       },
       {
         id: "missionary",
         name: "Missionary",
-        cost: 2,
+        cost: 10,
         effect: "Churches near native villages slowly win their goodwill",
       },
       {
         id: "merchant",
         name: "Merchant",
-        cost: 2,
+        cost: 10,
         effect: "Europe pays more, and traders ask less",
       },
       {
         id: "smuggler",
         name: "Smuggler",
-        cost: 2,
+        cost: 10,
         effect: "A third of your gold slips past the crown's tax",
       },
       {
         id: "diplomat",
         name: "Diplomat",
-        cost: 2,
+        cost: 10,
         effect: "Friendship with tribes and other nations builds 50% faster",
       },
       {
         id: "spymaster",
         name: "Spymaster",
-        cost: 2,
+        cost: 10,
         effect: "Spies cost less and succeed more often",
       },
     ],
     Zn = Object.fromEntries(Xn.map((e) => [e.id, e])),
+    // The same 40 points also go on the score, one point for one percent.
+    // Diplomacy here is a village joining the federation: that is the
+    // diplomacy this game scores. A European nation cannot earn it.
+    FOCUS = [
+      { id: "colony", name: "Colonies", kinds: ["colonies"], effect: "One percent more score from your colonies, each point." },
+      { id: "explore", name: "Exploration", kinds: ["explore", "finds"], effect: "One percent more from land you chart first, and from finds." },
+      { id: "combat", name: "Combat", kinds: ["battles"], effect: "One percent more from battles." },
+      { id: "diplomacy", name: "Diplomacy", kinds: ["federation"], effect: "One percent more when a village joins your federation. Only the native power can do that." },
+    ],
     mn = {
       ocean: {
         id: "ocean",
@@ -1635,7 +1659,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       yearsPerTurn: 1,
       storeshipTurn: 6,
       zoom: { start: 1.25, min: 0.3, max: 2, colony: 1.55 },
-      skillPoints: 6,
+      skillPoints: 40,
       invasionScale: { easy: 0.4, normal: 0.6, hard: 0.8, ruthless: 1 },
       move: {
         // Men marching on their own are slow; a leader keeps a column
@@ -7187,8 +7211,49 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Score is kept by source, for the breakdown.
   var SCORE_KINDS = { explore: "Exploring", colonies: "Colonies", finds: "Finds and wonders", battles: "Battles", federation: "Federation", crown: "Independence" };
+  function emptyFocus() {
+    return { colony: 0, explore: 0, combat: 0, diplomacy: 0 };
+  }
+  function focusOf(f) {
+    let o = emptyFocus();
+    if (!f) return o;
+    for (let c of FOCUS) o[c.id] = Math.max(0, f[c.id] | 0);
+    return o;
+  }
+  function pointsSpent(skills, focus) {
+    let n = (skills || []).reduce((s, id) => s + ((Zn[id] && Zn[id].cost) || 0), 0);
+    for (let c of FOCUS) n += (focus && focus[c.id]) || 0;
+    return n;
+  }
+  // A computer nation spends the whole pool on the score. Diplomacy only
+  // pays the native power, so the European nations leave it at zero.
+  function rivalFocus(nation) {
+    return nation && nation.native
+      ? { colony: 10, explore: 6, combat: 10, diplomacy: 14 }
+      : { colony: 14, explore: 14, combat: 12, diplomacy: 0 };
+  }
+  function focusNote(p) {
+    if (!p || !p.focus) return "";
+    let bits = FOCUS.filter((c) => p.focus[c.id]).map((c) => `${p.focus[c.id]} percent more from ${c.name.toLowerCase()}`);
+    return bits.length ? `Your points at the start add ${bits.join(", ")}.` : "";
+  }
+  function focusPct(p, kind) {
+    let f = p && p.focus;
+    if (!f) return 0;
+    for (let c of FOCUS) if (c.kinds.includes(kind)) return f[c.id] || 0;
+    return 0;
+  }
   function addScore(p, kind, n) {
     if (!p || !n) return;
+    let pct = focusPct(p, kind);
+    // Keep the fraction, so the bonus on small awards (10 a square
+    // charted) adds up instead of rounding away.
+    if (pct) {
+      let bf = p.focusFrac || (p.focusFrac = {}),
+        raw = (n * pct) / 100 + (bf[kind] || 0),
+        whole = Math.floor(raw);
+      (bf[kind] = raw - whole), (n += whole);
+    }
     (p.score = (p.score || 0) + n), ((p.scoreBy || (p.scoreBy = {}))[kind] = (p.scoreBy[kind] || 0) + n);
   }
   function Hs(e) {
@@ -8174,6 +8239,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     nationId: e,
     difficulty: n,
     skills: o,
+    focus: foc,
     seed: r,
     rivals: i = 5,
     length: GL = 200,
@@ -8216,7 +8282,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         arrivedThisTurn: [],
         undo: [],
       },
-      c = yr(u, s, !0, o || []);
+      c = yr(u, s, !0, o || [], foc);
     u.players.push(c);
     let h = [],
       p = lo(a, (y) => y > a.width * 0.58, h, 4) || lo(a, (y) => y > a.width * 0.4, h, 2) || lo(a, () => !0, h, 1) || lo(a, () => !0, h);
@@ -8230,7 +8296,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       nativeStart(u, c, home, h);
     } else Fi(u, c, p, h);
     d.forEach((y) => {
-        let S = yr(u, y, !1, []);
+        let S = yr(u, y, !1, [], rivalFocus(y));
         u.players.push(S);
         if (y.native) {
           let M = inlandStart(a, p, h);
@@ -8266,12 +8332,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         u.log.push(`One ship, with your leader, a few soldiers to guard the landing, and three explorers. Find good ground for colonies first. The storeship with your settlers, another explorer and a second leader is due in ${vr()}.`),
         u);
   }
-  function yr(e, n, o, r) {
+  function yr(e, n, o, r, focus) {
     return {
       id: e.players.length,
       nationId: n.id,
       isHuman: o,
       skills: [...r],
+      focus: focusOf(focus),
       explored: "0".repeat(e.map.width * e.map.height),
       nextLeader: 1,
       nextColony: 0,
@@ -8650,16 +8717,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let r = e.units.find((s) => s.id === n);
       if (!r || (r.kind !== "explorer" && r.kind !== "ship"))
         return { ok: !1, error: "Only explorers and ships can explore." };
-      if (
-        ((r.autoExplore = !!o),
-        !o || (r.aboard && r.kind !== "explorer") || r.mp <= 0)
-      )
-        return { ok: !0, discoveries: [] };
+      // The box is an order for the turns ahead. Spent movement this turn
+      // does not refuse it, and does not turn it back off.
+      r.autoExplore = !!o;
+      if (!o) return { ok: !0, discoveries: [] };
+      let later = { ok: !0, discoveries: [], note: `${r.name} will explore at the start of the next turn.` };
+      if ((r.aboard && r.kind !== "explorer") || r.mp <= 0) return later;
       let i = Mn(e, n);
+      if (i.ok)
+        return {
+          ok: !0,
+          discoveries: i.discoveries || [],
+          path: i.path,
+          ids: i.ids,
+          fromShip: i.fromShip,
+        };
+      let spent = !r.aboard && kn(e, r.id).size === 0;
+      if (spent || /movement left/.test(i.error || "")) {
+        r.autoExplore = !0;
+        return later;
+      }
       return {
         ok: !0,
         discoveries: i.discoveries || [],
-        note: i.ok ? "" : i.error,
+        note: i.error,
         path: i.path,
         ids: i.ids,
         fromShip: i.fromShip,
@@ -15263,13 +15344,15 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           nationId: "england",
           difficulty: "normal",
           skills: ["navigator", "cartographer"],
+          focus: emptyFocus(),
           seed: Math.floor(Math.random() * 999983),
           length: 200,
           rivals: 5,
         },
         g = () => {
-          let k = f.skills.reduce((b, w) => b + Zn[w].cost, 0),
-            v = $.skillPoints - k;
+          let v = $.skillPoints - pointsSpent(f.skills, f.focus),
+            ready = v === 0,
+            sail = ee[f.nationId].native ? "Begin" : "Set sail";
           (n.querySelector("#title-sheet").innerHTML = `
         <p class="kicker">A private campaign</p>
         <h1 class="mast">ReConquest of the New World</h1>
@@ -15283,18 +15366,28 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <div class="row">${qo.map((b) => `<button type="button" class="choice ${f.difficulty === b.id ? "on" : ""}" data-diff="${b.id}">${b.label}</button>`).join("")}</div>
         <p class="sub">Rivals are always out for your land; harder settings give them bigger armies sooner.</p>
         <p class="sub">Every game runs 200 years against all five other nations. The best score when the years run out wins.</p>
-        <h2>Skills <span class="sub">${v} points left</span></h2>
-        <div class="skills">${Xn.map((b) => `<button type="button" class="skill ${f.skills.includes(b.id) ? "on" : ""}" data-skill="${b.id}"><b>${b.name}</b> \xB7 ${b.cost}<small>${b.effect}</small></button>`).join("")}</div>
+        <h2>Skills <span class="sub">${v} point${v === 1 ? "" : "s"} left</span></h2>
+        <p class="sub">An ability costs 10. A point on a score adds one percent to what that work earns. ${ready ? "Every point is spent." : ee[f.nationId].native ? "You cannot begin until every point is spent." : "The ship stays until every point is spent."}</p>
+        <div class="focus-list">${FOCUS.map((b) => {
+          let dipLocked = b.id === "diplomacy" && !ee[f.nationId].native;
+          return `<div class="focus-row"><button type="button" data-focus="${b.id}" data-dir="-1" ${(f.focus[b.id] || 0) > 0 ? "" : "disabled"} aria-label="Fewer points on ${b.name}">\u2212</button><b>${f.focus[b.id] || 0}</b><button type="button" data-focus="${b.id}" data-dir="1" ${v > 0 && !dipLocked ? "" : "disabled"} aria-label="Another point on ${b.name}">+</button><span><b>${b.name}</b><small>${b.effect}</small></span></div>`;
+        }).join("")}</div>
+        <div class="skills">${Xn.map((b) => `<button type="button" class="skill ${f.skills.includes(b.id) ? "on" : ""}" data-skill="${b.id}" ${f.skills.includes(b.id) || v >= b.cost ? "" : "disabled"}><b>${b.name}</b> \xB7 ${b.cost}<small>${b.effect}</small></button>`).join("")}</div>
         <h2>Map seed</h2>
         <div class="row"><input id="seed" type="number" value="${f.seed}"><button type="button" id="reseed" class="ghost">Another map</button></div>
         <div class="row">
-          <button type="button" id="start" class="primary">${ee[f.nationId].native ? "Begin" : "Set sail"}</button>
+          <button type="button" id="start" class="primary" ${ready ? "" : "disabled"} title="${ready ? "" : "Spend every point first."}">${sail}</button>
           <button type="button" id="continue" class="ghost" ${savedYear() ? "" : "disabled"}>${savedYear() ? `Continue saved game · ${savedYear()}` : "No saved game yet"}</button>
           <button type="button" id="practice" class="ghost">Dice preview</button>
         </div>`),
             n.querySelectorAll("[data-nation]").forEach((b) => {
               b.onclick = () => {
-                (f.nationId = b.dataset.nation), g();
+                f.nationId = b.dataset.nation;
+                // Diplomacy score is a village joining the federation, and
+                // only the native power can earn that. Points put there
+                // come back when a European nation is chosen.
+                ee[f.nationId].native || (f.focus.diplomacy = 0);
+                g();
               };
             }),
             n.querySelectorAll("[data-riv]").forEach((b) => {
@@ -15321,13 +15414,27 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
                   g();
               };
             }),
+            n.querySelectorAll("[data-focus]").forEach((b) => {
+              b.onclick = () => {
+                let id = b.dataset.focus,
+                  dir = +b.dataset.dir;
+                if (!FOCUS.some((c) => c.id === id)) return;
+                if (id === "diplomacy" && dir > 0 && !ee[f.nationId].native) return;
+                if (dir > 0 && v <= 0) return;
+                if (dir < 0 && !(f.focus[id] > 0)) return;
+                (f.focus[id] = (f.focus[id] || 0) + dir), g();
+              };
+            }),
             (n.querySelector("#seed").onchange = (b) => {
               f.seed = Number(b.target.value) || 1;
             }),
             (n.querySelector("#reseed").onclick = () => {
               (f.seed = Math.floor(Math.random() * 999983)), g();
             }),
-            (n.querySelector("#start").onclick = () => N(ho(f))),
+            (n.querySelector("#start").onclick = () => {
+              if (pointsSpent(f.skills, f.focus) !== $.skillPoints) return;
+              N(ho(f));
+            }),
             (n.querySelector("#continue").onclick = () => {
               let b = null;
               try {
@@ -16373,8 +16480,14 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         });
       let D = s.querySelector("#explore");
       D && (D.onclick = () => ne(f.id, () => po(t, f.id)));
-      let L = s.querySelector("#keep");
-      L && (L.onchange = () => ne(f.id, () => Mr(t, f.id, L.checked)));
+      let L = s.querySelector("label.keep");
+      // The label's own click would toggle the box again after the card
+      // is redrawn, so the check never stuck. The order is the source.
+      L &&
+        (L.onclick = (ev) => {
+          ev.preventDefault();
+          ne(f.id, () => Mr(t, f.id, !f.autoExplore));
+        });
       let K = s.querySelector("#ashore");
       K && (K.onclick = () => ne(f.id, () => Pr(t, f.id)));
       let un = s.querySelector("#unload");
@@ -16621,7 +16734,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // The year's events print at the top of the paper, the urgent first,
       // in place of a separate card after it. Taken once, when first read.
       let P = t.politics && pol(t);
-      P && f.year === t.year && !f.news && (sfx("paper"), (t.log || []).slice(-80).some((q) => / is now level \d/.test(q) && t.colonies.some((c) => c.owner === V(t).id && q.startsWith(c.name + " is now level"))) && setTimeout(() => sfx("bell"), 500));
+      P && f.year === t.year && !f.news && sfx("paper");
       P && f.year === t.year && !f.news && ((f.news = P.events.filter((q) => q.urgent).concat(P.events.filter((q) => !q.urgent))), P.events.length && (P.lastEvents = P.events.slice()), (P.events = []), (P.showSummary = !1));
       let news = f.news || [],
         top = news.length
@@ -17107,7 +17220,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       let i = mine.findIndex((c) => c.id === y),
         n = mine[(i < 0 ? 0 : i + 1) % mine.length];
       (y = n.id), (T = null), (S = null), (l = null), (pin = null), (cardFor = null), (h = "");
-      R();
+      R(), requestAnimationFrame(() => frameColony(n));
     }
     // Bring a colony's whole land into the part of the map the card does
     // not cover, as close as it will fit.
@@ -18087,9 +18200,9 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       };
       a.querySelector("#of-no").onclick = () => done(`You declined ${nationName(r)}'s offer.`);
     }
-    // Every trade offer at once: one row each, with where to pay from and
-    // deliver to, the advice, and Accept or Decline. The card stays open
-    // until you are done; offers left unanswered are declined.
+    // Every trade offer at once. Accept or Decline settles that row, and
+    // the card stays only while another offer is still open. The last
+    // answer closes it. Offers left unanswered are declined.
     function tradesPrompt() {
       let P = pol(t),
         me = V(t),
@@ -18105,7 +18218,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           for (let of of list) res.has(of.id) || t.log.push(`You declined ${nationName(t.players.find((r) => r.id === of.from))}'s offer.`);
           let ids = new Set(list.map((q) => q.id));
           (P.offers = P.offers.filter((q) => !ids.has(q.id))), (p = !1), (a.hidden = !0), (H = null), R();
-        };
+        },
+        settle = () => (list.some((q) => !res.has(q.id)) ? draw() : close());
       if (!list.length) return (P.offers = P.offers.filter((q) => q.kind !== "trade")), R();
       for (let of of list)
         sel.set(of.id, {
@@ -18115,12 +18229,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       p = !0;
       a.hidden = !1;
       let draw = () => {
-        let rows = list
+        let open = list.filter((q) => !res.has(q.id)),
+          rows = open
           .map((of) => {
             let r = t.players.find((q) => q.id === of.from),
-              head = `<b>${G(nationName(r))}</b> offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()} <span class="muted">· ${G(diploLevel(relOf(t, me.id, r.id)).name)}</span>`;
-            if (res.has(of.id)) return `<div class="trade-row done"><p>${head}</p><p class="muted">${G(res.get(of.id))}</p></div>`;
-            let sv = sel.get(of.id),
+              head = `<b>${G(nationName(r))}</b> offers ${of.n} ${Ne[of.give].toLowerCase()} for ${of.ask} ${Ne[of.want].toLowerCase()} <span class="muted">· ${G(diploLevel(relOf(t, me.id, r.id)).name)}</span>`,
+              sv = sel.get(of.id),
               pc = mine.find((c) => c.id === sv.pay),
               gc = mine.find((c) => c.id === sv.get),
               ad = tradeAdvice(t, of, pc, gc),
@@ -18134,13 +18248,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             </div>`;
           })
           .join("");
-        let left = list.filter((q) => !res.has(q.id)).length;
         a.innerHTML = `
       <div class="card trades-card">
         <p class="find-kicker">Trade offers · ${t.year}</p>
-        <h2>${list.length} offer${list.length === 1 ? "" : "s"} this year</h2>
+        <h2>${open.length} offer${open.length === 1 ? "" : "s"} ${res.size ? "left" : "this year"}</h2>
         ${rows}
-        <div class="row"><button type="button" id="tr-done" class="${left ? "" : "primary"}">${left ? `Decline the rest and close` : "Done"}</button></div>
+        <div class="row"><button type="button" id="tr-done">Decline the rest and close</button></div>
       </div>`;
         a.querySelectorAll(".trade-row[data-of]").forEach((el) => {
           let of = list.find((q) => q.id === +el.dataset.of),
@@ -18149,7 +18262,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           el.querySelector(".tr-get").onchange = (ev) => ((sv.get = +ev.target.value), draw());
           el.querySelector(".tr-yes").onclick = () => {
             let r0 = acceptTrade(t, of, sv.pay, sv.get);
-            r0.ok ? (res.set(of.id, r0.note), t.log.push(r0.note), draw()) : (el.querySelector(".tr-err").textContent = r0.error);
+            r0.ok ? (res.set(of.id, r0.note), t.log.push(r0.note), settle()) : (el.querySelector(".tr-err").textContent = r0.error);
           };
           el.querySelector(".tr-mute").onclick = () => {
             (P.muteGive || (P.muteGive = {}))[of.give] = t.year + 20;
@@ -18159,11 +18272,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
                 let msg = `You declined ${nationName(t.players.find((r) => r.id === q.from))}'s offer.`;
                 res.set(q.id, msg), t.log.push(msg);
               }
-            draw();
+            settle();
           };
           el.querySelector(".tr-no").onclick = () => {
             let msg = `You declined ${nationName(t.players.find((r) => r.id === of.from))}'s offer.`;
-            res.set(of.id, msg), t.log.push(msg), draw();
+            res.set(of.id, msg), t.log.push(msg), settle();
           };
         });
         a.querySelector("#tr-done").onclick = close;
@@ -18300,6 +18413,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <table class="stock"><tr><th></th>${kinds.map((k) => `<th class="num">${SCORE_KINDS[k]}</th>`).join("")}<th class="num">Total</th></tr>
         ${list.map((q) => `<tr><td>${q === me ? "<b>You</b>" : G(nationName(q))}</td>${kinds.map((k) => `<td class="num">${Es(((q.scoreBy || {})[k]) || 0)}</td>`).join("")}<td class="num"><b>${Es(q.score || 0)}</b></td></tr>`).join("")}</table>
         <p class="muted">Only nations you have met are shown. The best score when the years run out wins: ${Math.max(0, P.length - (t.year - $.startYear))} years remain.</p>
+        ${focusNote(me) ? `<p class="muted">${focusNote(me)}</p>` : ""}
         <div class="row"><button type="button" id="score-close" class="primary">Close</button></div>
       </div>`);
       a.querySelector("#score-close").onclick = () => ((p = !1), (a.hidden = !0), R());
@@ -18572,12 +18686,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (s.innerHTML = `
       <button type="button" class="card-x" id="card-x" aria-label="Close">\u00d7</button>
       <p class="muted">${T ? "Move over the pale squares to place it." : "Click a building to see it, or pick something to build."}</p>
-      <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button>${t.colonies.filter((E) => E.owner === k.id).length > 1 ? ` <button type="button" class="find-link inline" id="town-over" title="The next town, on its center. The map stays where it is.">Over</button>` : ""}</h2>
+      <h2>${G(f.name)} \xB7 level ${f.level} <button type="button" class="find-link inline rename" id="rename-col">Rename</button>${t.colonies.filter((E) => E.owner === k.id).length > 1 ? ` <button type="button" class="find-link inline rename town-next" id="town-over" title="Next town" aria-label="Next town">›</button>` : ""}</h2>
       <p class="people">${f.population} people \xB7 room for ${g.housing}${g.staffing < 0.995 ? ` \xB7 <span class="down" title="Not enough people to work every building: output falls with it.">${Math.round(g.staffing * 100)}% of buildings worked</span>` : ""}</p>
       <table class="stock"><tr><th></th><th class="num">Stock</th><th class="num">Next turn</th></tr>${b}</table>
       ${!T && te ? `${te}<div class="row"><button type="button" id="pick-done">Back to the town</button></div>` : ""}
       <div class="town-rest"${!T && te ? " hidden" : ""}>
       ${troopsBox(f)}
+      ${trainBox(f)}
       <div class="auto ${Ae ? "on" : ""}">
         <button type="button" id="auto-toggle" class="${Ae ? "primary" : ""}">Auto Colony: ${Ae ? "On" : "Off"}</button>
         <div class="goals">${Object.entries(Ze)
@@ -18821,7 +18936,30 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
           .join("")}
         </div></div>`;
     }
+    // Your leaders in this town, with their points to spend: the same
+    // training as on a leader's own card.
+    function trainBox(f) {
+      let me_ = V(t),
+        lds = t.units.filter((q) => q.owner === me_.id && q.kind === "leader" && !q.aboard && inColony(f, q));
+      if (!lds.length) return "";
+      let names = { attacks: "Actions", charisma: "Charisma", cmd: "Organization", move: "Movement" };
+      return `<div class="train-leaders"><h3 class="side-sub">Train leaders</h3>${lds
+        .map((u) => {
+          let L = leaderStats(u),
+            pts = u.pts || 0,
+            cells = Object.keys(names)
+              .map((k) => {
+                let val = k === "move" ? L.move : L[k],
+                  can = pts >= LEAD_COST[k] && val < LEAD_CAP[k];
+                return `<tr><th>${names[k]}</th><td class="num">${k === "move" ? "+" + val : val}</td><td>${can ? `<button type="button" class="train" data-tl="${u.id}" data-k="${k}" title="Costs ${LEAD_COST[k]} point${LEAD_COST[k] === 1 ? "" : "s"}">+${LEAD_STEP[k]} · ${LEAD_COST[k]} pt</button>` : ""}</td></tr>`;
+              })
+              .join("");
+          return `<p><b>${G(u.name)}</b> <span class="muted">· ${pts ? `${pts} point${pts === 1 ? "" : "s"} to spend` : `no points yet (${Math.floor(u.xp || 0)} of ${5 + 3 * (u.earned || 0)} experience to the next)`}</span></p><table class="lead-stats">${cells}</table>`;
+        })
+        .join("")}<p class="muted">Leaders earn points in battle. Actions cost 3, movement 2, charisma and organization 1.</p></div>`;
+    }
     function wireTroops() {
+      s.querySelectorAll("[data-tl]").forEach((E) => (E.onclick = () => (x(trainLeader(t, +E.dataset.tl, E.dataset.k)), R())));
       let move = (mid, to) => {
         troopPick = null;
         x(assignMan(t, mid, to === "" ? null : +to)), R();
