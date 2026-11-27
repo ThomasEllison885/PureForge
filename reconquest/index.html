@@ -557,7 +557,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.23";
+    "1.24";
   var on = [
       {
         id: "spain",
@@ -2090,7 +2090,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         for (let s of ["goods", "metal", "wood", "food"]) {
           let over = r.stock[s] - Math.floor(storeReserve(r, s) * 0.75),
             g = over > 0 ? Math.floor(over * europeQuote(e, s) * (1 + 0.15 * (cu - 1)) * ind) : 0;
-          g >= 1 && ((r.stock[s] -= over), (sold += g), nudgeMarket(e, s, over, !1));
+          // Your sales move the price at once. Rivals' sales are pooled and
+          // weigh on it once a year, gently (see marketTurn), so five nations
+          // dumping surplus do not pin every price at the floor.
+          g >= 1 && ((r.stock[s] -= over), (sold += g), (ce(e, r.owner) || {}).isHuman ? nudgeMarket(e, s, over, !1) : rivalSold(e, s, over));
         }
         sold && noteTrade(e, r.owner, sold);
         sold && ((r.stock.gold += sold), o.push(`${r.name}'s customs house sold its surplus in Europe for ${sold} gold.`));
@@ -2228,11 +2231,21 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       cur = m.europe[r];
     m.europe[r] = Math.max(MARKET_FLOOR, Math.min(MARKET_CEIL, buying ? cur * (1 + shift) : cur * (1 - shift)));
   }
+  // What rival nations sold in Europe this year, by good.
+  function rivalSold(e, r, amount) {
+    let m = marketOf(e);
+    (m.rival || (m.rival = {}))[r] = (m.rival[r] || 0) + amount;
+  }
+  // Rivals' surplus together lowers a price by at most 6% a year. Against
+  // the yearly walk back, a good every rival dumps settles near 80% of usual.
+  var RIVAL_PRESSURE = 0.06;
   // Each year the market walks part of the way back to the usual price.
   // A war in Europe keeps metal and crops dear.
   function marketTurn(e) {
-    let m = marketOf(e),
-      hum = e.players.find((p) => p.isHuman),
+    let m = marketOf(e);
+    for (let k of Object.keys(m.rival || {})) m.europe[k] != null && (m.europe[k] = Math.max(MARKET_FLOOR, m.europe[k] * (1 - Math.min(RIVAL_PRESSURE, m.rival[k] / (MARKET_DEPTH * 10)))));
+    m.rival = {};
+    let hum = e.players.find((p) => p.isHuman),
       war = !!(hum && e.players.some((p) => p !== hum && !isNatNation(p) && europeAt(e, hum, p) === "war"));
     for (let k of Object.keys(EUROPE_PRICE)) {
       let cur = m.europe[k],
@@ -16698,9 +16711,12 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
               return;
             }
           }
-          if (!O && !pict && sel && sel.kind === "ship") {
+          // A loaded ship lands its men where you click, your own town
+          // included: a click on the town's picture counts as its square.
+          let land = pict && !(sel && sel.kind === "ship" && t.units.some((q) => q.aboard === sel.id)) ? null : pict || b;
+          if (!O && land && sel && sel.kind === "ship") {
             let spot = Xe(t, sel.id).find(
-              ([sx, sy]) => sx === b.x && sy === b.y,
+              ([sx, sy]) => sx === land.x && sy === land.y,
             );
             if (spot) {
               let res = kr(t, sel.id, spot[0], spot[1]);
