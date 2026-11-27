@@ -523,6 +523,10 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 }
 .sheet-close { justify-content: center; margin-top: 8px; }
 .sheet p.news .headline { font-variant: small-caps; letter-spacing: 0.04em; }
+.sheet .headlines { grid-column: 1 / -1; }
+.sheet .headlines ul.summary li { font: 15px/1.4 Georgia, serif; }
+.sheet .headlines ul.summary li.urgent span { font-weight: 600; color: #7a1a10; }
+.sheet .headlines ul.summary li button { font-size: 12px; padding: 2px 8px; }
 
 .grid3 {
   display: grid;
@@ -557,7 +561,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.24";
+    "1.25";
   var on = [
       {
         id: "spain",
@@ -5234,6 +5238,111 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
   }
   // Urgent news (a war on you, an army at your gates) is marked; the year's summary opens after every turn that has news.
   var EVENT_URGENT = /declares war on you|an ultimatum|marching on|has reached|will attack next year|lands to retake|declare their independence|Independence is won|commonwealth is agreed|Peace with the crown|has taken|burned .* to the ground|Raiders/;
+  // ---- Sound: every effect is made here with Web Audio, no files. ----
+  // Starts on the first click (browsers require that) and remembers on/off.
+  var SND = { ctx: null, out: null, amb: null, on: true, noise: null };
+  try { SND.on = localStorage.getItem("rcq-sound") !== "off"; } catch (_) {}
+  function sndCtx() {
+    if (!SND.on) return null;
+    if (!SND.ctx) {
+      let C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      let c = (SND.ctx = new C());
+      (SND.out = c.createGain()), (SND.out.gain.value = 0.55), SND.out.connect(c.destination);
+      let len = c.sampleRate * 2,
+        b = c.createBuffer(1, len, c.sampleRate),
+        d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      SND.noise = b;
+    }
+    SND.ctx.state === "suspended" && SND.ctx.resume();
+    return SND.ctx;
+  }
+  function sndNoise(c, t0, dur, type, freq, q, peak, at) {
+    let src = c.createBufferSource(),
+      f = c.createBiquadFilter(),
+      g = c.createGain();
+    (src.buffer = SND.noise), (f.type = type), (f.frequency.value = freq), (f.Q.value = q || 0.7);
+    g.gain.setValueAtTime(0.0001, t0), g.gain.exponentialRampToValueAtTime(peak, t0 + (at || 0.005)), g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f), f.connect(g), g.connect(SND.out), src.start(t0, Math.random()), src.stop(t0 + dur + 0.05);
+  }
+  function sndTone(c, t0, freq, dur, peak, type, slideTo) {
+    let o = c.createOscillator(),
+      g = c.createGain();
+    (o.type = type || "sine"), o.frequency.setValueAtTime(freq, t0), slideTo && o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0), g.gain.exponentialRampToValueAtTime(peak, t0 + 0.004), g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g), g.connect(SND.out), o.start(t0), o.stop(t0 + dur + 0.05);
+  }
+  // A bell: a few inharmonic partials that ring out.
+  function sndBell(c, t0, f, dur, peak) {
+    [[1, 1], [2, 0.5], [2.76, 0.35], [5.4, 0.15], [0.5, 0.3]].forEach(([m, a]) => sndTone(c, t0, f * m, dur * (m > 2 ? 0.5 : 1), peak * a));
+  }
+  var SFX = {
+    musket: (c, t) => {
+      for (let k = 0; k < 3; k++) {
+        let t1 = t + k * 0.05 + Math.random() * 0.03;
+        sndNoise(c, t1, 0.18, "bandpass", 1400 + Math.random() * 600, 0.8, 0.5), sndNoise(c, t1, 0.3, "lowpass", 300, 0.7, 0.35);
+      }
+    },
+    cannon: (c, t) => {
+      sndTone(c, t, 90, 0.7, 0.9, "sine", 32), sndNoise(c, t, 1.4, "lowpass", 500, 0.7, 0.8, 0.01), sndNoise(c, t + 0.02, 0.25, "bandpass", 1200, 1, 0.25);
+    },
+    charge: (c, t) => {
+      for (let k = 0; k < 10; k++) {
+        let t1 = t + k * 0.09 + (k % 3 === 2 ? 0.05 : 0);
+        sndNoise(c, t1, 0.06, "bandpass", 500 + Math.random() * 200, 2, 0.35), sndTone(c, t1, 110, 0.06, 0.2);
+      }
+    },
+    bell: (c, t) => (sndBell(c, t, 330, 2.6, 0.22), sndBell(c, t + 0.9, 330, 2.6, 0.16)),
+    land: (c, t) => (sndNoise(c, t, 0.7, "lowpass", 900, 0.7, 0.25, 0.08), sndBell(c, t + 0.15, 880, 1.2, 0.12), sndBell(c, t + 0.45, 880, 1.2, 0.1)),
+    coins: (c, t) => {
+      for (let k = 0; k < 6; k++) {
+        let t1 = t + k * 0.06 + Math.random() * 0.04;
+        sndTone(c, t1, 2400 + Math.random() * 1600, 0.25, 0.07, "triangle"), sndTone(c, t1, 5200 + Math.random() * 1200, 0.12, 0.03);
+      }
+    },
+    paper: (c, t) => {
+      for (let k = 0; k < 5; k++) sndNoise(c, t + k * 0.06 + Math.random() * 0.03, 0.09, "highpass", 2500 + Math.random() * 2000, 0.7, 0.12);
+    },
+  };
+  var sndLast = {};
+  function sfx(name) {
+    try {
+      let c = sndCtx();
+      if (!c || !SFX[name]) return;
+      let now = performance.now();
+      if (now - (sndLast[name] || 0) < 120) return;
+      (sndLast[name] = now), SFX[name](c, c.currentTime + 0.01), sndAmbient();
+    } catch (_) {}
+  }
+  // Wind and surf under everything, very quiet.
+  function sndAmbient() {
+    let c = SND.ctx;
+    if (!c || SND.amb || !SND.on) return;
+    let src = c.createBufferSource(),
+      f = c.createBiquadFilter(),
+      g = c.createGain(),
+      lfo = c.createOscillator(),
+      lg = c.createGain();
+    (src.buffer = SND.noise), (src.loop = !0), (f.type = "lowpass"), (f.frequency.value = 420), (g.gain.value = 0.05);
+    (lfo.frequency.value = 0.11), (lg.gain.value = 0.035), lfo.connect(lg), lg.connect(g.gain);
+    src.connect(f), f.connect(g), g.connect(SND.out), src.start(), lfo.start();
+    SND.amb = { src, lfo };
+  }
+  // The surf starts with the first click; it rests while the tab is hidden.
+  document.addEventListener("pointerdown", function first() {
+    document.removeEventListener("pointerdown", first, !0);
+    try { sndCtx() && sndAmbient(); } catch (_) {}
+  }, !0);
+  document.addEventListener("visibilitychange", () => {
+    SND.ctx && (document.hidden ? SND.ctx.suspend() : SND.on && SND.ctx.resume());
+  });
+  function setSound(on) {
+    SND.on = !!on;
+    try { localStorage.setItem("rcq-sound", on ? "on" : "off"); } catch (_) {}
+    SND.out && (SND.out.gain.value = on ? 0.55 : 0);
+    on && (sndCtx(), sndAmbient());
+  }
   function pushEvent(e, text, x, y) {
     let P = pol(e);
     P.events.push({ text, x: x == null ? null : x, y: y == null ? null : y, urgent: EVENT_URGENT.test(text) });
@@ -8110,7 +8219,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       c = yr(u, s, !0, o || []);
     u.players.push(c);
     let h = [],
-      p = lo(a, (y) => y > a.width * 0.58, h) || lo(a, () => !0, h);
+      p = lo(a, (y) => y > a.width * 0.58, h, 4) || lo(a, (y) => y > a.width * 0.4, h, 2) || lo(a, () => !0, h, 1) || lo(a, () => !0, h);
     if (!p) throw new Error("This seed has no coast to land on.");
     if (s.native) {
       // The empire starts on its own ground, west of where the strangers land.
@@ -8131,7 +8240,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         // Rivals land on your stretch of coast, near enough to fight over
         // but some way off: 64 to 124 squares from you and 60 from each
         // other, closer only when the coast runs out.
-        let M = nearStart(a, p, h, 64, 124, 90, 60) || nearStart(a, p, h, 48, 150, 90, 45) || nearStart(a, p, h) || nearStart(a, p, h, 26, 90, 55, 24) || lo(a, (P) => P < a.width * 0.42, h);
+        let M = nearStart(a, p, h, 64, 124, 90, 60) || nearStart(a, p, h, 48, 150, 90, 45) || nearStart(a, p, h) || nearStart(a, p, h, 26, 90, 55, 24) || nearStart(a, p, h, 16, 220, 70, 14) || lo(a, () => !0, h, 2) || nearStart(a, p, h, 26, 150, 60, 24, 0) || lo(a, (P) => P < a.width * 0.42, h);
         M && Gi(u, S, M, h);
       }),
       Dn(u);
@@ -8254,13 +8363,49 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     };
     return e.units.push(a), a;
   }
-  function lo(e, n, o = []) {
-    let r = [];
+  // Water joined to the map's edge: the open sea a ship from Europe can
+  // reach. Lakes and landlocked inlets are left out. Worked out once a map.
+  // With east set, only water joined to the eastern edge, the way in from
+  // Europe.
+  function openSea(M, east) {
+    let key = east ? "_seaE" : "_sea";
+    if (M[key] && M[key].length === M.width * M.height) return M[key];
+    let { width: w, height: h, tiles } = M,
+      wet = (k) => tiles[k].terrain === "ocean" || tiles[k].terrain === "coast",
+      sea = new Uint8Array(w * h),
+      q = [];
+    if (!east) for (let x = 0; x < w; x++) for (let y of [0, h - 1]) wet(y * w + x) && !sea[y * w + x] && ((sea[y * w + x] = 1), q.push(y * w + x));
+    for (let y = 0; y < h; y++) for (let x of east ? [w - 1] : [0, w - 1]) wet(y * w + x) && !sea[y * w + x] && ((sea[y * w + x] = 1), q.push(y * w + x));
+    for (let k = 0; k < q.length; k++) {
+      let c = q[k];
+      for (let [x, y] of Z(c % w, (c / w) | 0, w, h)) {
+        let n = y * w + x;
+        sea[n] || !wet(n) || ((sea[n] = 1), q.push(n));
+      }
+    }
+    // A map walled in by land all round: every water square counts.
+    if (!q.length) for (let k = 0; k < w * h; k++) wet(k) && (sea[k] = 1);
+    return Object.defineProperty(M, key, { value: sea, enumerable: !1, configurable: !0 }), sea;
+  }
+  // A landing that faces Europe: on water joined to the eastern edge, with
+  // open water for a few squares due east, so the land is not in the way.
+  function facesEurope(M, x, y, reach) {
+    let sea = openSea(M, !0),
+      w = M.width;
+    if (!sea[y * w + x]) return !1;
+    for (let k = 1; k <= reach; k++) if (x + k < w && !sea[y * w + x + k]) return !1;
+    return !0;
+  }
+  function lo(e, n, o = [], face = 0) {
+    let r = [],
+      sea = openSea(e);
     for (let i = 1; i < e.height - 1; i++)
       for (let s = 1; s < e.width - 1; s++) {
         if (
           o.some(([l, d]) => Math.abs(l - s) + Math.abs(d - i) < 4) ||
           e.tiles[C(s, i, e.width)].terrain !== "coast" ||
+          !sea[C(s, i, e.width)] ||
+          (face && !facesEurope(e, s, i, face)) ||
           !n(s, i)
         )
           continue;
@@ -8326,7 +8471,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       (d.leaderId = a.id), (d.strength = 3), (d.maxStr = 3);
     }
   }
-  function nearStart(M, home, taken, dMin = 32, dMax = 62, dBest = 45, gap = 30) {
+  function nearStart(M, home, taken, dMin = 32, dMax = 62, dBest = 45, gap = 30, face = 2) {
     let { width: w, height: h, tiles } = M,
       isLand = (k) => mn[tiles[k].terrain].pass === "land",
       seed = Z(home[0], home[1], w, h).map(([x, y]) => y * w + x).find(isLand);
@@ -8342,10 +8487,11 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       }
     }
     let best = null,
-      bs = 1 / 0;
+      bs = 1 / 0,
+      sea = openSea(M);
     for (let y = 1; y < h - 1; y++)
       for (let x = 1; x < w - 1; x++) {
-        if (tiles[y * w + x].terrain !== "coast") continue;
+        if (tiles[y * w + x].terrain !== "coast" || !sea[y * w + x] || (face && !facesEurope(M, x, y, face))) continue;
         let d = Math.hypot(x - home[0], y - home[1]);
         if (d < dMin || d > dMax) continue;
         if (taken.some(([a, b]) => Math.hypot(a - x, b - y) < gap)) continue;
@@ -14661,6 +14807,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         <button type="button" id="undo" class="ghost">Undo</button>
         <button type="button" id="cols-btn" class="ghost" title="Your colonies">Colonies</button>
         <button type="button" id="diplo" class="ghost" title="Relations with the other nations and the crown">Diplomacy</button>
+        <button type="button" id="sound-btn" class="ghost" title="Sound on or off">Sound</button>
         <button type="button" id="year-sum" class="ghost" title="What happened this year">This year</button>
         <button type="button" id="score-btn" class="ghost" title="Standings and where the points come from">Score</button>
         <button type="button" id="end" class="primary">End turn</button>
@@ -16353,6 +16500,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function x(f) {
       h = f && f.ok ? "" : (f && f.error) || "";
+      f && f.ok && (f.landed && f.landed.length ? sfx("land") : /shipped to Europe|^Sold|sold .* for \d+ gold/i.test(f.note || "") && sfx("coins"));
     }
     function en(f) {
       let g = (t.map.specials || []).find((v) => v.id === f.id),
@@ -16470,7 +16618,16 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
     }
     function de(f) {
       (p = !1), (H = null), (a.hidden = !1);
-      let g = f.sections
+      // The year's events print at the top of the paper, the urgent first,
+      // in place of a separate card after it. Taken once, when first read.
+      let P = t.politics && pol(t);
+      P && f.year === t.year && !f.news && (sfx("paper"), (t.log || []).slice(-80).some((q) => / is now level \d/.test(q) && t.colonies.some((c) => c.owner === V(t).id && q.startsWith(c.name + " is now level"))) && setTimeout(() => sfx("bell"), 500));
+      P && f.year === t.year && !f.news && ((f.news = P.events.filter((q) => q.urgent).concat(P.events.filter((q) => !q.urgent))), P.events.length && (P.lastEvents = P.events.slice()), (P.events = []), (P.showSummary = !1));
+      let news = f.news || [],
+        top = news.length
+          ? `<section class="headlines"><h3>This year</h3><ul class="summary">${news.map((q, k) => `<li${q.urgent ? ' class="urgent"' : ""}><span>${G(q.text)}</span>${q.x != null && chartedNear(q.x, q.y) ? `<button type="button" data-k="${k}">Show me</button>` : ""}</li>`).join("")}</ul></section>`
+          : "";
+      let g = top + f.sections
         .map(
           (k) => `
       <section${k.id === "score" ? ' class="standings"' : ""}>
@@ -16490,6 +16647,13 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
         (a.querySelector("#close-paper").onclick = () => {
           (m = !1), R();
         });
+      a.querySelectorAll(".headlines button").forEach(
+        (el) =>
+          (el.onclick = () => {
+            let q = news[+el.dataset.k];
+            (m = !1), glide(q.x, q.y), (u = { x: q.x, y: q.y }), R();
+          }),
+      );
     }
     function G(f) {
       return String(f).replace(
@@ -17322,6 +17486,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             if (playing && now - playing.t0 >= fxDur(playing.ev)) playing = null;
             if (playing || !queue.length) break;
             playing = { ev: queue.shift(), t0: playing ? playing.t0 + fxDur(playing.ev) : now };
+            playing.ev && playing.ev.t === "shot" && sfx(playing.ev.from.some((q) => q.cls === "gun") ? "cannon" : playing.ev.from.some((q) => q.charge) ? "charge" : "musket");
           }
           let ev = playing && playing.ev,
             p = ev ? Math.max(0, Math.min(1, (now - playing.t0) / fxDur(ev))) : 1,
@@ -18740,6 +18905,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       });
     })(),
     (e.querySelector("#diplo").onclick = () => t && diploScreen()),
+    (e.querySelector("#sound-btn").onclick = (ev) => (setSound(!SND.on), (ev.currentTarget.textContent = SND.on ? "Sound" : "Sound off"), SND.on && sfx("bell"))),
+    (e.querySelector("#sound-btn").textContent = SND.on ? "Sound" : "Sound off"),
     (e.querySelector("#year-sum").onclick = () => t && summaryBox(pol(t).events.length ? pol(t).events : pol(t).lastEvents || [], !0)),
     (e.querySelector("#end").onclick = () => ie()),
       (e.querySelector("#undo").onclick = () => {
@@ -18862,6 +19029,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
             fight: { battleNew, bAutoFinish, colonyDefence, resolveColonyAttack, resolveUnitAttack, fieldForce, bankLoot, storeCap, yn },
             site: { Ve, rn, rivalSiteOk, ye, an, jn, hasBld, buyEurope, hireMerc, resCost, gov: ui, ci, Ze, gameProg, answerDemand, crownDemandTurn, order: hr, field: Pn, In, towardUnknown, tradeAdvice, tradeOffersTurn },
             paper: () => t.paper && de(t.paper),
+            sfx,
             select: (f) => {
               (l = f), R();
             },
