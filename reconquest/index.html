@@ -576,7 +576,7 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
 <script>
 (() => {
   /* Title version. Step by one hundredth on every publish: 1.01, 1.02, 1.03. */ var Rv =
-    "1.26";
+    "1.27";
   var on = [
       {
         id: "spain",
@@ -16734,7 +16734,8 @@ button.danger { background: #7a2e24; color: #fff4e8; border-color: #5a1e18; }
       // The year's events print at the top of the paper, the urgent first,
       // in place of a separate card after it. Taken once, when first read.
       let P = t.politics && pol(t);
-      P && f.year === t.year && !f.news && sfx("paper");
+      // The paper rustles; a bell rings if one of your own towns grew a level.
+      P && f.year === t.year && !f.news && (sfx("paper"), (t.log || []).slice(-80).some((q) => / is now level \d/.test(q) && t.colonies.some((c) => c.owner === V(t).id && q.startsWith(c.name + " is now level"))) && setTimeout(() => sfx("bell"), 500));
       P && f.year === t.year && !f.news && ((f.news = P.events.filter((q) => q.urgent).concat(P.events.filter((q) => !q.urgent))), P.events.length && (P.lastEvents = P.events.slice()), (P.events = []), (P.showSummary = !1));
       let news = f.news || [],
         top = news.length
