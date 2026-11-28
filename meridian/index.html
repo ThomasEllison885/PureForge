@@ -517,6 +517,10 @@
       .tile-blurb { min-height: 0; }
     }
 
+    .loading { text-align: center; color: var(--muted); margin-top: 20vh; font-family: "Cormorant Garamond", serif; font-size: 1.4rem; }
+    .load-fail { max-width: 440px; margin: 16vh auto 0; text-align: center; padding: 1.6rem; border-radius: 16px; background: var(--panel); border: 1px solid var(--brass); }
+    .load-fail h2 { margin: 0 0 0.4rem; font-family: "Cormorant Garamond", serif; color: var(--brass-hi); font-size: 1.8rem; }
+
     /* ---------- Narrow screens ---------- */
     @media (max-width: 1100px) {
       .stage { grid-template-columns: 44px minmax(0, 1fr); grid-template-areas: "track foe" "track map" "track you" "helm helm" "hand hand"; }
@@ -560,8 +564,23 @@
       <span id="account" class="account"></span>
     </div>
   </header>
-  <main id="table"></main>
+  <main id="table"><p class="loading">Setting up the table…</p></main>
   <div id="cover" hidden></div>
-  <script type="module" src="table.js"></script>
+  <script>
+    // If the game fails to start, say so plainly instead of leaving a dead page.
+    (function () {
+      var shown = false;
+      function fail() {
+        if (shown) return;
+        shown = true;
+        var box = document.getElementById("table");
+        if (box) box.innerHTML = '<div class="load-fail"><h2>The table didn\u2019t load.</h2><p>This usually means part of an update was still on its way. Reload to get the latest version.</p><button type="button" class="brass" onclick="location.reload()">Reload</button></div>';
+      }
+      window.addEventListener("error", function (e) { if (!window.__meridianReady) fail(); });
+      window.addEventListener("unhandledrejection", function () { if (!window.__meridianReady) fail(); });
+      setTimeout(function () { if (!window.__meridianReady) fail(); }, 15000);
+    })();
+  </script>
+  <script type="module" src="table.js?v=037f9f8afc"></script>
 </body>
 </html>

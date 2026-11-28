@@ -10698,6 +10698,7 @@ function showAccount(user) {
   });
 }
 async function start() {
+  window.__meridianReady = true;
   if (AUTH_REQUIRED) {
     let user = null;
     try {
