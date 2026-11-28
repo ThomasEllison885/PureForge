@@ -5584,7 +5584,7 @@ function commandActions(state2, player) {
     if (crew.where.zone === "harbor") {
       for (let index = 0; index < 5; index++) {
         const region = state2.regions[index];
-        if (forbidsHarbor(region.regionId) || !roomFor(state2, player, index)) continue;
+        if (region.faceUp && forbidsHarbor(region.regionId) || !roomFor(state2, player, index)) continue;
         out.push(act({ type: "march", iid: crew.iid, dest: { zone: "region", index } }));
       }
     } else {
@@ -5712,11 +5712,7 @@ function applyFx(state2, fx, events) {
   if (fx.op === "draw") draw(state2, fx.player, fx.amount, events);
   else if (fx.op === "stowDeck") {
     const cardId = state2.players[fx.player].deck.shift();
-    if (!cardId) {
-      const foe = other(fx.player);
-      state2.players[foe].renown += 2;
-      events.push({ type: "deckout", player: fx.player }, { type: "renown", player: foe, amount: 2, reason: "deck" });
-    } else state2.players[fx.player].stores.push({ iid: mint(state2), cardId, exhausted: false });
+    if (cardId) state2.players[fx.player].stores.push({ iid: mint(state2), cardId, exhausted: false });
   } else if (fx.op === "extraStow") state2.players[fx.player].stowLeft += fx.amount;
   else if (fx.op === "beginSurvey") {
     const options = surveyOptions(state2);
@@ -5878,7 +5874,7 @@ function openAmbush(state2) {
   const player = claim.priority;
   const probe = { ...state2, decision: { type: "ambush", player, region: claim.region } };
   const canPlay = getLegalActions(probe, player).some((legal) => legal.kind === "act" && legal.action.type === "play");
-  if (canPlay) {
+  if (canPlay || state2.players[player].hand.length > 0) {
     state2.decision = { type: "ambush", player, region: claim.region };
     return;
   }
@@ -6095,9 +6091,12 @@ function allowed(state2, player, action) {
     const spec = legal.find((item) => item.kind === "assign");
     if (!spec || spec.kind !== "assign") throw new Error("No damage to assign.");
     const keys = Object.keys(action.hits);
-    if (keys.some((key) => !spec.targets.includes(key))) throw new Error("Assign damage only to enemy crews there.");
+    if (keys.some((key2) => !spec.targets.includes(key2))) throw new Error("Assign damage only to enemy crews there.");
     const sum = spec.targets.reduce((total, iid) => total + (action.hits[iid] ?? 0), 0);
-    if (sum !== spec.amount || spec.targets.some((iid) => (action.hits[iid] ?? 0) < 0)) throw new Error("Assign all of the damage.");
+    if (Object.values(action.hits).some((value) => !Number.isInteger(value) || value < 0)) {
+      throw new Error("Damage comes in whole points.");
+    }
+    if (sum !== spec.amount) throw new Error("Assign all of the damage.");
     return;
   }
   if (action.type === "mulligan" || action.type === "discard") {
@@ -6112,8 +6111,17 @@ function allowed(state2, player, action) {
     if (!subsetFits(spec, action.indices)) throw new Error("Those Regions cannot be chosen.");
     return;
   }
-  const match = legal.some((item) => item.kind === "act" && JSON.stringify(item.action) === JSON.stringify(action));
+  const key = canonical(action);
+  const match = legal.some((item) => item.kind === "act" && canonical(item.action) === key);
   if (!match) throw new Error("That is not a legal action.");
+}
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, v]) => v !== void 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 function actorOf(state2, action) {
   if (action.type === "concede") return action.player;
@@ -6188,6 +6196,8 @@ function perform(state2, action, events) {
     return;
   }
   if (action.type === "surveyLook") {
+    const seen = state2.peeked[player];
+    for (const index of action.indices) if (!seen.includes(index)) seen.push(index);
     state2.decision = { type: "surveyFlip", player, options: action.indices };
     return;
   }
@@ -6275,6 +6285,11 @@ function march(state2, player, iid, dest, events) {
   if (!crew || crew.owner !== player || crew.marchesLeft <= 0) throw new Error("That crew cannot March.");
   const fromHarbor = crew.where.zone === "harbor";
   crew.marchesLeft -= 1;
+  if (dest.zone === "region" && fromHarbor && forbidsHarbor(state2.regions[dest.index].regionId)) {
+    state2.queue.push({ op: "flip", index: dest.index, player });
+    drain(state2, events);
+    return;
+  }
   crew.where = dest;
   if (dest.zone !== "region") return;
   const region = state2.regions[dest.index];
@@ -6356,7 +6371,8 @@ function createGame(options = {}) {
     queue: [],
     claim: null,
     over: null,
-    extraRound: false
+    extraRound: false,
+    peeked: [[], []]
   };
   if (options.shuffleDecks !== false) {
     shuffle(state2.players[0].deck, state2);
@@ -6441,7 +6457,7 @@ function getPlayerView(state2, viewer) {
     stowLeft: you.stowLeft,
     crews: state2.crews,
     regions: state2.regions.map((region, index) => {
-      const known = region.faceUp || scoutSees(state2, viewer, index);
+      const known = region.faceUp || scoutSees(state2, viewer, index) || state2.peeked[viewer].includes(index);
       return {
         index,
         faceUp: region.faceUp,
