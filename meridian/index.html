@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meridian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0e1621;
+      color: #efe7d6;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    header, main, .cover-card { width: min(1180px, calc(100% - 1.5rem)); margin-inline: auto; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      align-items: end;
+      padding: 1.25rem 0 0.75rem;
+    }
+    h1 {
+      margin: 0;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-weight: 500;
+      font-size: 2.6rem;
+      line-height: 0.9;
+    }
+    .kicker, .status { margin: 0; }
+    .kicker { color: #c9a44c; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.72rem; }
+    .status { color: #d5dbe2; }
+    .tools { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-left: auto; }
+    label { color: #b7c0c7; font-size: 0.85rem; }
+    input, button { font: inherit; color: inherit; }
+    input {
+      width: 7rem;
+      background: #16202d;
+      border: 1px solid rgba(201, 164, 76, 0.45);
+      border-radius: 8px;
+      padding: 0.35rem 0.5rem;
+    }
+    button {
+      background: #243044;
+      border: 1px solid rgba(239, 231, 214, 0.25);
+      border-radius: 8px;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+    }
+    button:hover { border-color: #c9a44c; }
+    button:disabled { opacity: 0.45; cursor: default; }
+    button.primary { background: #c9a44c; color: #1a1408; border-color: #c9a44c; font-weight: 600; }
+    button.danger { color: #f0b4af; border-color: rgba(200, 65, 59, 0.7); }
+    button.quiet { background: transparent; border-color: transparent; color: #b7c0c7; }
+    .how { margin: 0 0 1rem; color: #b7c0c7; }
+    .how summary { cursor: pointer; color: #c9a44c; }
+    .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+    .region, .panel, .card, .crew, .cover-card, .log {
+      background: rgba(22, 32, 45, 0.92);
+      border: 1px solid rgba(201, 164, 76, 0.28);
+      border-radius: 12px;
+    }
+    .region, .panel, .card { padding: 0.7rem; }
+    .region h2, .panel h2, .card h3, .crew h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+    .region p, .panel p, .card p, .crew p { margin: 0.2rem 0; }
+    .region.hazard { border-color: rgba(200, 65, 59, 0.65); }
+    .region.yours { box-shadow: inset 0 0 0 1px rgba(201, 164, 76, 0.45); }
+    .muted { color: #b7c0c7; }
+    .small { font-size: 0.82rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
+    .owner-0 { border-color: rgba(201, 164, 76, 0.8); }
+    .owner-1 { border-color: rgba(28, 122, 120, 0.9); }
+    .crew { padding: 0.45rem 0.55rem; margin-top: 0.4rem; }
+    .hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.5rem; margin-top: 0.75rem; }
+    .card.picked { outline: 2px solid #c9a44c; }
+    .card .actions, .crew .actions, .bar { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+    .bar { align-items: center; }
+    .log { margin: 0.75rem 0 2rem; padding: 0.7rem 1rem; }
+    .log li { margin: 0.15rem 0; }
+    .alert { color: #f0b4af; }
+    #cover {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 12, 18, 0.94);
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+    }
+    #cover[hidden] { display: none; }
+    .cover-card { padding: 2rem 1.5rem; text-align: center; }
+    .cover-card h2 {
+      margin: 0.2rem 0 0.4rem;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 3.2rem;
+      font-weight: 500;
+    }
+    @media (max-width: 800px) {
+      .board, .row { grid-template-columns: 1fr; }
+      .tools { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="kicker">Set 1 · First Landing</p>
+      <h1>Meridian</h1>
+      <p class="status" id="status"></p>
+    </div>
+    <div class="tools">
+      <label>Seed <input id="seed" inputmode="numeric" value="1" /></label>
+      <button type="button" id="new">New game</button>
+      <button type="button" id="replay" class="quiet">Copy replay</button>
+    </div>
+  </header>
+  <main id="table"></main>
+  <div id="cover" hidden></div>
+  <script type="module" src="/meridian/table.js"></script>
+</body>
+</html>
