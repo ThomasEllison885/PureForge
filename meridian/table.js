@@ -1,8 +1,650 @@
 var __defProp = Object.defineProperty;
-var __export = (target, all) => {
+var __export = (target2, all) => {
   for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+    __defProp(target2, name, { get: all[name], enumerable: true });
 };
+
+// packages/cards/src/basics.ts
+var BASICS = [
+  {
+    id: "deckhand",
+    set: "basic",
+    name: "Deckhand",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["sailor"],
+    cost: { supply: 1, goods: [] },
+    might: 1,
+    endurance: 1,
+    keywords: [],
+    abilities: [{ on: "onDeploy", effects: [{ do: "extraStow", amount: 1 }] }],
+    text: "When you deploy Deckhand, you may Stow 1 additional card this turn.",
+    flavor: "Someone has to haul the rope."
+  },
+  {
+    id: "musketeer",
+    set: "basic",
+    name: "Musketeer",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["soldier"],
+    cost: { supply: 2, goods: [] },
+    might: 3,
+    endurance: 2,
+    keywords: [],
+    abilities: [],
+    text: ""
+  },
+  {
+    id: "pikeman",
+    set: "basic",
+    name: "Pikeman",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["soldier"],
+    cost: { supply: 2, goods: [] },
+    might: 1,
+    endurance: 3,
+    keywords: ["entrench"],
+    abilities: [],
+    text: "Entrench"
+  },
+  {
+    id: "dispatch-rider",
+    set: "basic",
+    name: "Dispatch Rider",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["scout"],
+    cost: { supply: 2, goods: [] },
+    might: 2,
+    endurance: 1,
+    keywords: ["swift"],
+    abilities: [],
+    text: "Swift"
+  },
+  {
+    id: "pathfinder",
+    set: "basic",
+    name: "Pathfinder",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["scout"],
+    cost: { supply: 2, goods: [] },
+    might: 2,
+    endurance: 2,
+    keywords: ["scout"],
+    abilities: [],
+    text: "Scout"
+  },
+  {
+    id: "ox-cart-teamsters",
+    set: "basic",
+    name: "Ox-Cart Teamsters",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["merchant"],
+    cost: { supply: 2, goods: [] },
+    might: 0,
+    endurance: 3,
+    keywords: [],
+    abilities: [{ on: "onDeploy", effects: [{ do: "stowFromDeck", amount: 1 }] }],
+    text: "When you deploy Ox-Cart Teamsters, put the top card of your deck into your Stores."
+  },
+  {
+    id: "hired-guide",
+    set: "basic",
+    name: "Hired Guide",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["mercenary"],
+    cost: { supply: 3, goods: [] },
+    might: 2,
+    endurance: 2,
+    keywords: [],
+    abilities: [{ on: "onDeploy", effects: [{ do: "survey", n: 1 }] }],
+    text: "When you deploy Hired Guide, Survey 1."
+  },
+  {
+    id: "veteran-marine",
+    set: "basic",
+    name: "Veteran Marine",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["soldier", "sailor"],
+    cost: { supply: 3, goods: [] },
+    might: 3,
+    endurance: 4,
+    keywords: [],
+    abilities: [],
+    text: ""
+  },
+  {
+    id: "field-surgeon",
+    set: "basic",
+    name: "Field Surgeon",
+    faction: "basic",
+    rarity: "basic",
+    type: "crew",
+    subtypes: ["scholar"],
+    cost: { supply: 3, goods: [] },
+    might: 1,
+    endurance: 3,
+    keywords: [],
+    abilities: [{ on: "static", aura: { aura: "keyword", keyword: "hardy", scope: "otherFriendlyHere" } }],
+    text: "Your other crews in this Region have Hardy."
+  },
+  {
+    id: "forced-march",
+    set: "basic",
+    name: "Forced March",
+    faction: "basic",
+    rarity: "basic",
+    type: "order",
+    subtypes: [],
+    cost: { supply: 1, goods: [] },
+    keywords: [],
+    abilities: [{ on: "onPlay", effects: [{ do: "extraMarch", target: { t: "chosenCrew", filter: { owner: "you", where: "anywhere" } } }] }],
+    text: "Target crew of yours may March again this turn."
+  },
+  {
+    id: "salted-provisions",
+    set: "basic",
+    name: "Salted Provisions",
+    faction: "basic",
+    rarity: "basic",
+    type: "order",
+    subtypes: [],
+    cost: { supply: 1, goods: [] },
+    keywords: [],
+    abilities: [{ on: "onPlay", effects: [{ do: "draw", amount: 1 }] }],
+    text: "Draw a card."
+  },
+  {
+    id: "rally-the-banners",
+    set: "basic",
+    name: "Rally the Banners",
+    faction: "basic",
+    rarity: "basic",
+    type: "order",
+    subtypes: [],
+    cost: { supply: 1, goods: [] },
+    keywords: ["ambush"],
+    abilities: [
+      { on: "onPlay", effects: [{ do: "modifyStats", might: 1, until: "round", target: { t: "crewsInChosenRegion", owner: "you", region: { yourCrewThere: true } } }] }
+    ],
+    text: "Ambush. Your crews in one Region get +1 Might until end of round."
+  },
+  {
+    id: "musket-volley",
+    set: "basic",
+    name: "Musket Volley",
+    faction: "basic",
+    rarity: "basic",
+    type: "order",
+    subtypes: [],
+    cost: { supply: 2, goods: [] },
+    keywords: ["ambush"],
+    abilities: [{ on: "onPlay", effects: [{ do: "damage", amount: 2, target: { t: "chosenCrew", filter: { owner: "any", where: "contested" } } }] }],
+    text: "Ambush. Deal 2 damage to a crew in a Region where both players have crews."
+  },
+  {
+    id: "stockade",
+    set: "basic",
+    name: "Stockade",
+    faction: "basic",
+    rarity: "basic",
+    type: "outpost",
+    subtypes: [],
+    cost: { supply: 2, goods: ["timber"] },
+    keywords: [],
+    abilities: [{ on: "static", aura: { aura: "keyword", keyword: "entrench", scope: "friendlyHere" } }],
+    text: "Your crews here have Entrench."
+  },
+  {
+    id: "plant-the-flag",
+    set: "basic",
+    name: "Plant the Flag",
+    faction: "basic",
+    rarity: "basic",
+    type: "venture",
+    subtypes: [],
+    cost: { supply: 1, goods: [] },
+    keywords: [],
+    abilities: [{ on: "atClaim", if: { if: "controlAtLeast", n: 3 }, effects: [{ do: "gainRenown", amount: 3 }] }],
+    text: "At Claim, if you control 3 or more Regions, gain 3 Renown."
+  }
+];
+
+// packages/cards/src/deck.ts
+var FORMATS = {
+  standard: { name: "Standard", deckSize: 40, maxFactions: 2, copies: 3, legendaryCopies: 1 },
+  draft: { name: "Expedition Draft", deckSize: 30, maxFactions: null, copies: 99, legendaryCopies: 99 }
+};
+function validateDeck(ids, lookup, format = FORMATS.standard) {
+  const problems = [];
+  if (ids.length !== format.deckSize) problems.push(`A ${format.name} deck has exactly ${format.deckSize} cards (this one has ${ids.length}).`);
+  const counts = /* @__PURE__ */ new Map();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const factions2 = /* @__PURE__ */ new Set();
+  for (const [id, count] of counts) {
+    const card = lookup(id);
+    if (card.faction !== "basic" && card.faction !== "neutral") factions2.add(card.faction);
+    if (card.rarity === "basic") continue;
+    const limit = card.rarity === "legendary" ? format.legendaryCopies : format.copies;
+    if (count > limit) problems.push(`${card.name}: at most ${limit} ${limit === 1 ? "copy" : "copies"}.`);
+  }
+  if (format.maxFactions != null && factions2.size > format.maxFactions) problems.push(`Use at most ${format.maxFactions} factions (this deck has ${factions2.size}).`);
+  return problems;
+}
+function expand(list) {
+  return list.flatMap(([id, count]) => Array.from({ length: count }, () => id));
+}
+function basicDeck() {
+  return expand([
+    ["deckhand", 4],
+    ["musketeer", 4],
+    ["pikeman", 4],
+    ["dispatch-rider", 4],
+    ["pathfinder", 4],
+    ["ox-cart-teamsters", 3],
+    ["hired-guide", 2],
+    ["veteran-marine", 2],
+    ["field-surgeon", 2],
+    ["forced-march", 2],
+    ["salted-provisions", 2],
+    ["rally-the-banners", 2],
+    ["musket-volley", 2],
+    ["stockade", 2],
+    ["plant-the-flag", 1]
+  ]);
+}
+var STARTER_DECKS = [
+  {
+    id: "iron-tide",
+    name: "Iron Tide",
+    faction: "castavar",
+    rare: "bastion-of-the-crown",
+    plan: "Hold ground; Entrench and Escort.",
+    blurb: "Big crews that dig in and never leave. The easiest deck to learn.",
+    keyCards: ["tercio-square", "conquistador-captain", "bastion-of-the-crown"],
+    cards: expand([
+      ["musketeer", 3],
+      ["pikeman", 3],
+      ["veteran-marine", 2],
+      ["field-surgeon", 1],
+      ["rally-the-banners", 2],
+      ["musket-volley", 1],
+      ["stockade", 2],
+      ["castavar-halberdier", 3],
+      ["tercio-square", 2],
+      ["hold-the-line", 2],
+      ["conquistador-captain", 2],
+      ["royal-decree", 1],
+      ["bastion-of-the-crown", 1],
+      ["rodela-swordsman", 2],
+      ["crown-arquebusier", 2],
+      ["fever-hardened-veteran", 2],
+      ["vanguard-pioneers", 2],
+      ["banner-bearer", 2],
+      ["shield-wall", 1],
+      ["presidio", 1],
+      ["veteran-of-the-old-wars", 1],
+      ["free-company-pikes", 2]
+    ])
+  },
+  {
+    id: "ledger-and-lead",
+    name: "Ledger and Lead",
+    faction: "hollen",
+    rare: "hostile-buyout",
+    plan: "Goods and extra Supply.",
+    blurb: "A slow start, then more Supply than anyone. Win the Goods and you win the coast.",
+    keyCards: ["concern-musketeers", "charter-of-monopoly", "hostile-buyout"],
+    cards: expand([
+      ["deckhand", 3],
+      ["musketeer", 2],
+      ["pikeman", 2],
+      ["ox-cart-teamsters", 3],
+      ["hired-guide", 1],
+      ["salted-provisions", 2],
+      ["musket-volley", 1],
+      ["company-factor", 3],
+      ["concern-musketeers", 2],
+      ["trading-post", 2],
+      ["company-clerk", 3],
+      ["spice-porters", 2],
+      ["warehouse-watch", 2],
+      ["company-surgeon", 1],
+      ["dividend-payment", 2],
+      ["market-day", 1],
+      ["charter-of-monopoly", 1],
+      ["quarterly-dividend", 1],
+      ["ledger-keeper", 2],
+      ["monopoly-agent", 1],
+      ["hostile-buyout", 1],
+      ["letter-from-home", 1],
+      ["frontier-woodsmen", 1]
+    ])
+  },
+  {
+    id: "first-chart",
+    name: "First Chart",
+    faction: "aldmoor",
+    rare: "observatory",
+    plan: "Survey and Ventures.",
+    blurb: "Fast, clever and fragile. Map the coast first and win on Ventures before the fighting matters.",
+    keyCards: ["survey-cutter-crew", "naturalist-s-expedition", "observatory"],
+    cards: expand([
+      ["deckhand", 2],
+      ["dispatch-rider", 2],
+      ["pathfinder", 3],
+      ["hired-guide", 2],
+      ["veteran-marine", 2],
+      ["forced-march", 1],
+      ["salted-provisions", 1],
+      ["rally-the-banners", 1],
+      ["admiralty-cartographer", 3],
+      ["survey-cutter-crew", 3],
+      ["chart-the-unknown", 2],
+      ["royal-marines", 2],
+      ["midshipman-lookout", 2],
+      ["ship-s-boat-party", 2],
+      ["fair-winds", 2],
+      ["log-of-discoveries", 1],
+      ["base-camp", 1],
+      ["naturalist-s-expedition", 2],
+      ["swift-packet", 2],
+      ["royal-society-fellow", 1],
+      ["observatory", 1],
+      ["shipwreck-survivors", 2]
+    ])
+  },
+  {
+    id: "red-flag-rising",
+    name: "Red Flag Rising",
+    faction: "captains",
+    rare: "night-raid",
+    plan: "Swift pressure and Raid.",
+    blurb: "Hit early, steal their Stores, and be gone before the counterattack.",
+    keyCards: ["boarding-party", "black-market", "night-raid"],
+    cards: expand([
+      ["musketeer", 2],
+      ["dispatch-rider", 3],
+      ["deckhand", 2],
+      ["pikeman", 1],
+      ["veteran-marine", 2],
+      ["rally-the-banners", 2],
+      ["musket-volley", 2],
+      ["shoals-cutthroat", 3],
+      ["boarding-party", 2],
+      ["cutlass-crew", 3],
+      ["bilge-rats", 2],
+      ["smuggler-sloop-crew", 2],
+      ["cut-and-run", 2],
+      ["pistol-shot", 2],
+      ["plunder", 1],
+      ["prize-money", 1],
+      ["black-market", 1],
+      ["articles-of-the-shoals", 1],
+      ["sea-wolf", 2],
+      ["mutiny", 1],
+      ["night-raid", 1],
+      ["hired-musket", 2]
+    ])
+  }
+];
+
+// packages/cards/src/factions.ts
+var FACTIONS = [
+  {
+    id: "castavar",
+    name: "Kingdom of Castavar",
+    short: "Castavar",
+    plan: "Take Regions and never give them back.",
+    color: "#9E1B32",
+    accent: "#C9A44C"
+  },
+  {
+    id: "hollen",
+    name: "The Hollen Concern",
+    short: "Hollen",
+    plan: "Control Goods and squeeze the opponent's economy.",
+    color: "#E39B2D",
+    accent: "#1B2A41"
+  },
+  {
+    id: "aldmoor",
+    name: "Aldmoor Admiralty",
+    short: "Aldmoor",
+    plan: "Explore fast and complete Ventures.",
+    color: "#1F3A68",
+    accent: "#EFE7D6"
+  },
+  {
+    id: "captains",
+    name: "Free Captains",
+    short: "Free Captains",
+    plan: "Raid Stores and disrupt.",
+    color: "#1C7A78",
+    accent: "#1A1A1A"
+  }
+];
+
+// packages/cards/src/regions.ts
+var REGIONS = [
+  {
+    id: "pearl-lagoon",
+    name: "Pearl Lagoon",
+    renown: 1,
+    goods: ["spice"],
+    hazard: false,
+    tags: ["Coastal"],
+    traits: [{ kind: "whenRevealed", effects: [{ do: "draw", amount: 1 }] }],
+    text: "When revealed, the player who revealed it draws a card."
+  },
+  {
+    id: "mangrove-delta",
+    name: "Mangrove Delta",
+    renown: 1,
+    goods: ["timber"],
+    hazard: false,
+    tags: ["Coastal", "River"],
+    traits: [{ kind: "marchPlus", distance: 2 }],
+    text: "Crews here can March to a Region 2 positions away."
+  },
+  {
+    id: "highland-mines",
+    name: "Highland Mines",
+    renown: 2,
+    goods: ["gold"],
+    hazard: false,
+    tags: ["Mountain"],
+    traits: [{ kind: "cantEnterFromHarbor" }],
+    text: "Crews can't enter from a Harbor."
+  },
+  {
+    id: "fever-marsh",
+    name: "Fever Marsh",
+    renown: 1,
+    goods: ["spice"],
+    hazard: true,
+    tags: [],
+    traits: [{ kind: "atClaimDamageEach", amount: 1 }],
+    text: "At Claim, deal 1 damage to each crew here."
+  },
+  {
+    id: "storm-cape",
+    name: "Storm Cape",
+    renown: 2,
+    goods: [],
+    hazard: true,
+    tags: ["Coastal"],
+    traits: [{ kind: "enterFromHarborDamage", amount: 1 }],
+    text: "Crews that enter from a Harbor take 1 damage."
+  },
+  {
+    id: "cedar-ridge",
+    name: "Cedar Ridge",
+    renown: 1,
+    goods: ["timber"],
+    hazard: false,
+    tags: [],
+    traits: [{ kind: "outpostDiscount", amount: 1 }],
+    text: "Outposts here cost 1 less Supply."
+  },
+  {
+    id: "golden-savanna",
+    name: "Golden Savanna",
+    renown: 1,
+    goods: ["gold"],
+    hazard: false,
+    tags: [],
+    traits: [],
+    text: "No trait. Open, easy ground."
+  },
+  {
+    id: "ruins-of-the-first-builders",
+    name: "Ruins of the First Builders",
+    renown: 2,
+    goods: [],
+    hazard: false,
+    tags: [],
+    traits: [
+      { kind: "whenRevealed", effects: [{ do: "survey", n: 1 }] },
+      { kind: "firstControl", effects: [{ do: "draw", amount: 2 }] }
+    ],
+    text: "When revealed, the revealing player Surveys 1. The first player to control it draws 2 cards."
+  },
+  {
+    id: "whispering-falls",
+    name: "Whispering Falls",
+    renown: 1,
+    goods: ["timber", "spice"],
+    hazard: false,
+    tags: ["River"],
+    traits: [{ kind: "crewCap", n: 3 }],
+    text: "Each player may have at most 3 crews here."
+  },
+  {
+    id: "smugglers-cove",
+    name: "Smugglers' Cove",
+    renown: 1,
+    goods: ["gold"],
+    hazard: false,
+    tags: ["Coastal"],
+    traits: [{ kind: "raidExtra", extra: 1 }],
+    text: "Raid here takes 2 cards instead of 1."
+  },
+  {
+    id: "jaguar-wilds",
+    name: "Jaguar Wilds",
+    renown: 1,
+    goods: ["timber"],
+    hazard: true,
+    tags: [],
+    traits: [{ kind: "atClaimDamageLowest", amount: 1 }],
+    text: "At Claim, each player's crew with the lowest Endurance here takes 1 damage."
+  },
+  {
+    id: "spice-terraces",
+    name: "Spice Terraces",
+    renown: 2,
+    goods: ["spice"],
+    hazard: false,
+    tags: ["Mountain"],
+    traits: [{ kind: "loseControlWithoutCrew" }],
+    text: "You lose control at Claim unless you have a crew here."
+  },
+  {
+    id: "great-river-mouth",
+    name: "Great River Mouth",
+    renown: 1,
+    goods: ["timber"],
+    hazard: false,
+    tags: ["Coastal", "River"],
+    traits: [{ kind: "marchAnywhere" }],
+    text: "Crews here count as adjacent to every Region."
+  },
+  {
+    id: "smoking-peak",
+    name: "Smoking Peak",
+    renown: 3,
+    goods: ["gold"],
+    hazard: true,
+    tags: ["Mountain"],
+    traits: [{ kind: "atClaimDamageEach", amount: 2 }],
+    text: "At Claim, deal 2 damage to each crew here."
+  },
+  {
+    id: "coral-reefs",
+    name: "Coral Reefs",
+    renown: 1,
+    goods: ["gold"],
+    hazard: true,
+    tags: ["Coastal"],
+    traits: [{ kind: "cantEnterFromHarbor" }],
+    text: "Crews can't enter from a Harbor."
+  },
+  {
+    id: "sandbar-haven",
+    name: "Sandbar Haven",
+    renown: 1,
+    goods: [],
+    hazard: false,
+    tags: ["Coastal"],
+    traits: [{ kind: "deployWithoutControl" }],
+    text: "You may deploy crews here even if you don't control it."
+  },
+  {
+    id: "fog-banks",
+    name: "Fog Banks",
+    renown: 1,
+    goods: ["spice"],
+    hazard: false,
+    tags: ["Coastal"],
+    traits: [{ kind: "hiddenFromScout" }],
+    text: "Scout and Survey can't look at or flip this Region. Only entering reveals it."
+  },
+  {
+    id: "old-fortress",
+    name: "Old Fortress",
+    renown: 2,
+    goods: ["timber"],
+    hazard: false,
+    tags: [],
+    traits: [{ kind: "grantEntrenchToController" }],
+    text: "The controller's crews here have Entrench."
+  },
+  {
+    id: "tidal-flats",
+    name: "Tidal Flats",
+    renown: 1,
+    goods: ["spice"],
+    hazard: false,
+    tags: ["Coastal"],
+    traits: [{ kind: "strikeMightPenalty", amount: 1 }],
+    text: "During Strike, each player's total Might here is reduced by 1."
+  },
+  {
+    id: "gilded-valley",
+    name: "The Gilded Valley",
+    renown: 3,
+    goods: ["gold", "timber"],
+    hazard: false,
+    tags: [],
+    traits: [{ kind: "controlMargin", margin: 2 }],
+    text: "To take control here, you need at least 2 more Might than your opponent."
+  }
+];
 
 // node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
 var external_exports = {};
@@ -929,8 +1571,8 @@ var ZodType = class {
       description
     });
   }
-  pipe(target) {
-    return ZodPipeline.create(this, target);
+  pipe(target2) {
+    return ZodPipeline.create(this, target2);
   }
   readonly() {
     return ZodReadonly.create(this);
@@ -3565,7 +4207,7 @@ var ZodEffects = class extends ZodType {
   }
   _parse(input) {
     const { status, ctx } = this._processInputParams(input);
-    const effect = this._def.effect || null;
+    const effect2 = this._def.effect || null;
     const checkCtx = {
       addIssue: (arg) => {
         addIssueToContext(ctx, arg);
@@ -3580,8 +4222,8 @@ var ZodEffects = class extends ZodType {
       }
     };
     checkCtx.addIssue = checkCtx.addIssue.bind(checkCtx);
-    if (effect.type === "preprocess") {
-      const processed = effect.transform(ctx.data, checkCtx);
+    if (effect2.type === "preprocess") {
+      const processed = effect2.transform(ctx.data, checkCtx);
       if (ctx.common.async) {
         return Promise.resolve(processed).then(async (processed2) => {
           if (status.value === "aborted")
@@ -3616,9 +4258,9 @@ var ZodEffects = class extends ZodType {
         return result;
       }
     }
-    if (effect.type === "refinement") {
+    if (effect2.type === "refinement") {
       const executeRefinement = (acc) => {
-        const result = effect.refinement(acc, checkCtx);
+        const result = effect2.refinement(acc, checkCtx);
         if (ctx.common.async) {
           return Promise.resolve(result);
         }
@@ -3651,7 +4293,7 @@ var ZodEffects = class extends ZodType {
         });
       }
     }
-    if (effect.type === "transform") {
+    if (effect2.type === "transform") {
       if (ctx.common.async === false) {
         const base = this._def.schema._parseSync({
           data: ctx.data,
@@ -3660,7 +4302,7 @@ var ZodEffects = class extends ZodType {
         });
         if (!isValid(base))
           return INVALID;
-        const result = effect.transform(base.value, checkCtx);
+        const result = effect2.transform(base.value, checkCtx);
         if (result instanceof Promise) {
           throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
         }
@@ -3669,21 +4311,21 @@ var ZodEffects = class extends ZodType {
         return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
           if (!isValid(base))
             return INVALID;
-          return Promise.resolve(effect.transform(base.value, checkCtx)).then((result) => ({
+          return Promise.resolve(effect2.transform(base.value, checkCtx)).then((result) => ({
             status: status.value,
             value: result
           }));
         });
       }
     }
-    util.assertNever(effect);
+    util.assertNever(effect2);
   }
 };
-ZodEffects.create = (schema, effect, params) => {
+ZodEffects.create = (schema, effect2, params) => {
   return new ZodEffects({
     schema,
     typeName: ZodFirstPartyTypeKind.ZodEffects,
-    effect,
+    effect: effect2,
     ...processCreateParams(params)
   });
 };
@@ -4045,505 +4687,143 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// packages/cards/src/basics.ts
-var BASICS = [
-  {
-    id: "deckhand",
-    set: "basic",
-    name: "Deckhand",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["sailor"],
-    cost: { supply: 1, goods: [] },
-    might: 1,
-    endurance: 1,
-    keywords: [],
-    abilities: [{ trigger: "onDeploy", effects: [{ do: "extraStow", amount: 1 }] }],
-    text: "When you deploy Deckhand, you may Stow 1 additional card this turn.",
-    flavor: "Someone has to haul the rope."
-  },
-  {
-    id: "musketeer",
-    set: "basic",
-    name: "Musketeer",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["soldier"],
-    cost: { supply: 2, goods: [] },
-    might: 3,
-    endurance: 2,
-    keywords: [],
-    abilities: [],
-    text: ""
-  },
-  {
-    id: "pikeman",
-    set: "basic",
-    name: "Pikeman",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["soldier"],
-    cost: { supply: 2, goods: [] },
-    might: 1,
-    endurance: 3,
-    keywords: ["entrench"],
-    abilities: [],
-    text: "Entrench"
-  },
-  {
-    id: "dispatch-rider",
-    set: "basic",
-    name: "Dispatch Rider",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["scout"],
-    cost: { supply: 2, goods: [] },
-    might: 2,
-    endurance: 1,
-    keywords: ["swift"],
-    abilities: [],
-    text: "Swift"
-  },
-  {
-    id: "pathfinder",
-    set: "basic",
-    name: "Pathfinder",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["scout"],
-    cost: { supply: 2, goods: [] },
-    might: 2,
-    endurance: 2,
-    keywords: ["scout"],
-    abilities: [],
-    text: "Scout"
-  },
-  {
-    id: "ox-cart-teamsters",
-    set: "basic",
-    name: "Ox-Cart Teamsters",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["merchant"],
-    cost: { supply: 2, goods: [] },
-    might: 0,
-    endurance: 3,
-    keywords: [],
-    abilities: [{ trigger: "onDeploy", effects: [{ do: "stowFromDeck" }] }],
-    text: "When deployed, put the top card of your deck into your Stores."
-  },
-  {
-    id: "hired-guide",
-    set: "basic",
-    name: "Hired Guide",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["mercenary"],
-    cost: { supply: 3, goods: [] },
-    might: 2,
-    endurance: 2,
-    keywords: [],
-    abilities: [{ trigger: "onDeploy", effects: [{ do: "survey", n: 1 }] }],
-    text: "When deployed, Survey 1."
-  },
-  {
-    id: "veteran-marine",
-    set: "basic",
-    name: "Veteran Marine",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["soldier", "sailor"],
-    cost: { supply: 3, goods: [] },
-    might: 3,
-    endurance: 4,
-    keywords: [],
-    abilities: [],
-    text: ""
-  },
-  {
-    id: "field-surgeon",
-    set: "basic",
-    name: "Field Surgeon",
-    faction: "basic",
-    rarity: "basic",
-    type: "crew",
-    subtypes: ["scholar"],
-    cost: { supply: 3, goods: [] },
-    might: 1,
-    endurance: 3,
-    keywords: [],
-    abilities: [{ trigger: "static", keyword: "hardy", scope: "otherFriendlies" }],
-    text: "Your other crews in this Region have Hardy."
-  },
-  {
-    id: "forced-march",
-    set: "basic",
-    name: "Forced March",
-    faction: "basic",
-    rarity: "basic",
-    type: "order",
-    subtypes: [],
-    cost: { supply: 1, goods: [] },
-    keywords: [],
-    abilities: [{ trigger: "onPlay", effects: [{ do: "extraMarch" }] }],
-    text: "Target crew of yours may March again this turn."
-  },
-  {
-    id: "salted-provisions",
-    set: "basic",
-    name: "Salted Provisions",
-    faction: "basic",
-    rarity: "basic",
-    type: "order",
-    subtypes: [],
-    cost: { supply: 1, goods: [] },
-    keywords: [],
-    abilities: [{ trigger: "onPlay", effects: [{ do: "draw", amount: 1 }] }],
-    text: "Draw a card."
-  },
-  {
-    id: "rally-the-banners",
-    set: "basic",
-    name: "Rally the Banners",
-    faction: "basic",
-    rarity: "basic",
-    type: "order",
-    subtypes: [],
-    cost: { supply: 1, goods: [] },
-    keywords: ["ambush"],
-    abilities: [{ trigger: "onPlay", effects: [{ do: "buffYourCrews", might: 1, until: "round" }] }],
-    text: "Ambush. Your crews in one Region get +1 Might until end of round."
-  },
-  {
-    id: "musket-volley",
-    set: "basic",
-    name: "Musket Volley",
-    faction: "basic",
-    rarity: "basic",
-    type: "order",
-    subtypes: [],
-    cost: { supply: 2, goods: [] },
-    keywords: ["ambush"],
-    abilities: [{ trigger: "onPlay", effects: [{ do: "damageCrew", amount: 2 }] }],
-    text: "Ambush. Deal 2 damage to a crew in a Region where both players have crews."
-  },
-  {
-    id: "stockade",
-    set: "basic",
-    name: "Stockade",
-    faction: "basic",
-    rarity: "basic",
-    type: "outpost",
-    subtypes: [],
-    cost: { supply: 2, goods: ["timber"] },
-    keywords: [],
-    abilities: [{ trigger: "static", keyword: "entrench", scope: "yourCrews" }],
-    text: "Your crews here have Entrench."
-  },
-  {
-    id: "plant-the-flag",
-    set: "basic",
-    name: "Plant the Flag",
-    faction: "basic",
-    rarity: "basic",
-    type: "venture",
-    subtypes: [],
-    cost: { supply: 1, goods: [] },
-    keywords: [],
-    abilities: [{ trigger: "atClaim", if: { youControlAtLeast: 3 }, gain: 3 }],
-    text: "At Claim, if you control 3 or more Regions, gain 3 Renown."
-  }
-];
-
-// packages/cards/src/deck.ts
-function basicDeck() {
-  const copies = [
-    ["deckhand", 4],
-    ["musketeer", 4],
-    ["pikeman", 4],
-    ["dispatch-rider", 4],
-    ["pathfinder", 4],
-    ["ox-cart-teamsters", 3],
-    ["hired-guide", 2],
-    ["veteran-marine", 2],
-    ["field-surgeon", 2],
-    ["forced-march", 2],
-    ["salted-provisions", 2],
-    ["rally-the-banners", 2],
-    ["musket-volley", 2],
-    ["stockade", 2],
-    ["plant-the-flag", 1]
-  ];
-  return copies.flatMap(([id, count]) => Array.from({ length: count }, () => id));
-}
-
-// packages/cards/src/regions.ts
-var REGIONS = [
-  {
-    id: "pearl-lagoon",
-    name: "Pearl Lagoon",
-    renown: 1,
-    goods: ["spice"],
-    hazard: false,
-    tags: ["Coastal"],
-    traits: [{ kind: "whenRevealed", effects: [{ do: "draw", amount: 1 }] }],
-    text: "When revealed, the player who revealed it draws a card."
-  },
-  {
-    id: "mangrove-delta",
-    name: "Mangrove Delta",
-    renown: 1,
-    goods: ["timber"],
-    hazard: false,
-    tags: ["Coastal", "River"],
-    traits: [{ kind: "marchPlus", distance: 2 }],
-    text: "Crews here can March to a Region 2 positions away."
-  },
-  {
-    id: "highland-mines",
-    name: "Highland Mines",
-    renown: 2,
-    goods: ["gold"],
-    hazard: false,
-    tags: ["Mountain"],
-    traits: [{ kind: "cantEnterFromHarbor" }],
-    text: "Crews can't enter from a Harbor."
-  },
-  {
-    id: "fever-marsh",
-    name: "Fever Marsh",
-    renown: 1,
-    goods: ["spice"],
-    hazard: true,
-    tags: [],
-    traits: [{ kind: "atClaimDamageEach", amount: 1 }],
-    text: "At Claim, deal 1 damage to each crew here."
-  },
-  {
-    id: "storm-cape",
-    name: "Storm Cape",
-    renown: 2,
-    goods: [],
-    hazard: true,
-    tags: ["Coastal"],
-    traits: [{ kind: "enterFromHarborDamage", amount: 1 }],
-    text: "Crews that enter from a Harbor take 1 damage."
-  },
-  {
-    id: "cedar-ridge",
-    name: "Cedar Ridge",
-    renown: 1,
-    goods: ["timber"],
-    hazard: false,
-    tags: [],
-    traits: [{ kind: "outpostDiscount", amount: 1 }],
-    text: "Outposts here cost 1 less Supply."
-  },
-  {
-    id: "golden-savanna",
-    name: "Golden Savanna",
-    renown: 1,
-    goods: ["gold"],
-    hazard: false,
-    tags: [],
-    traits: [],
-    text: "No trait. Open, easy ground."
-  },
-  {
-    id: "ruins-of-the-first-builders",
-    name: "Ruins of the First Builders",
-    renown: 2,
-    goods: [],
-    hazard: false,
-    tags: [],
-    traits: [
-      { kind: "whenRevealed", effects: [{ do: "survey", n: 1 }] },
-      { kind: "firstControl", effects: [{ do: "draw", amount: 2 }] }
-    ],
-    text: "When revealed, the revealing player Surveys 1. The first player to control it draws 2 cards."
-  },
-  {
-    id: "whispering-falls",
-    name: "Whispering Falls",
-    renown: 1,
-    goods: ["timber", "spice"],
-    hazard: false,
-    tags: ["River"],
-    traits: [{ kind: "crewCap", n: 3 }],
-    text: "Each player may have at most 3 crews here."
-  },
-  {
-    id: "smugglers-cove",
-    name: "Smugglers' Cove",
-    renown: 1,
-    goods: ["gold"],
-    hazard: false,
-    tags: ["Coastal"],
-    traits: [{ kind: "raidExtra", extra: 1 }],
-    text: "Raid here takes 2 cards instead of 1."
-  },
-  {
-    id: "jaguar-wilds",
-    name: "Jaguar Wilds",
-    renown: 1,
-    goods: ["timber"],
-    hazard: true,
-    tags: [],
-    traits: [{ kind: "atClaimDamageLowest", amount: 1 }],
-    text: "At Claim, each player's crew with the lowest Endurance here takes 1 damage."
-  },
-  {
-    id: "spice-terraces",
-    name: "Spice Terraces",
-    renown: 2,
-    goods: ["spice"],
-    hazard: false,
-    tags: ["Mountain"],
-    traits: [{ kind: "loseControlWithoutCrew" }],
-    text: "You lose control at Claim unless you have a crew here."
-  },
-  {
-    id: "great-river-mouth",
-    name: "Great River Mouth",
-    renown: 1,
-    goods: ["timber"],
-    hazard: false,
-    tags: ["Coastal", "River"],
-    traits: [{ kind: "marchAnywhere" }],
-    text: "Crews here count as adjacent to every Region."
-  },
-  {
-    id: "smoking-peak",
-    name: "Smoking Peak",
-    renown: 3,
-    goods: ["gold"],
-    hazard: true,
-    tags: ["Mountain"],
-    traits: [{ kind: "atClaimDamageEach", amount: 2 }],
-    text: "At Claim, deal 2 damage to each crew here."
-  },
-  {
-    id: "coral-reefs",
-    name: "Coral Reefs",
-    renown: 1,
-    goods: ["gold"],
-    hazard: true,
-    tags: ["Coastal"],
-    traits: [{ kind: "cantEnterFromHarbor" }],
-    text: "Crews can't enter from a Harbor."
-  },
-  {
-    id: "sandbar-haven",
-    name: "Sandbar Haven",
-    renown: 1,
-    goods: [],
-    hazard: false,
-    tags: ["Coastal"],
-    traits: [{ kind: "deployWithoutControl" }],
-    text: "You may deploy crews here even if you don't control it."
-  },
-  {
-    id: "fog-banks",
-    name: "Fog Banks",
-    renown: 1,
-    goods: ["spice"],
-    hazard: false,
-    tags: ["Coastal"],
-    traits: [{ kind: "hiddenFromScout" }],
-    text: "Scout and Survey can't look at or flip this Region. Only entering reveals it."
-  },
-  {
-    id: "old-fortress",
-    name: "Old Fortress",
-    renown: 2,
-    goods: ["timber"],
-    hazard: false,
-    tags: [],
-    traits: [{ kind: "grantEntrenchToController" }],
-    text: "The controller's crews here have Entrench."
-  },
-  {
-    id: "tidal-flats",
-    name: "Tidal Flats",
-    renown: 1,
-    goods: ["spice"],
-    hazard: false,
-    tags: ["Coastal"],
-    traits: [{ kind: "strikeMightPenalty", amount: 1 }],
-    text: "During Strike, each player's total Might here is reduced by 1."
-  },
-  {
-    id: "gilded-valley",
-    name: "The Gilded Valley",
-    renown: 3,
-    goods: ["gold", "timber"],
-    hazard: false,
-    tags: [],
-    traits: [{ kind: "controlMargin", margin: 2 }],
-    text: "To take control here, you need at least 2 more Might than your opponent."
-  }
-];
-
-// packages/cards/src/index.ts
-var effectSchema = external_exports.discriminatedUnion("do", [
-  external_exports.object({ do: external_exports.literal("draw"), amount: external_exports.number().int().positive() }),
-  external_exports.object({ do: external_exports.literal("stowFromDeck") }),
-  external_exports.object({ do: external_exports.literal("extraStow"), amount: external_exports.number().int().positive() }),
-  external_exports.object({ do: external_exports.literal("survey"), n: external_exports.number().int().positive() }),
-  external_exports.object({ do: external_exports.literal("extraMarch") }),
-  external_exports.object({
-    do: external_exports.literal("buffYourCrews"),
-    might: external_exports.number().int().optional(),
-    endurance: external_exports.number().int().optional(),
-    until: external_exports.enum(["turn", "round"])
-  }),
-  external_exports.object({ do: external_exports.literal("damageCrew"), amount: external_exports.number().int().positive() })
+// packages/cards/src/schema.ts
+var GOODS = ["gold", "timber", "spice"];
+var KEYWORDS = ["swift", "entrench", "hardy", "raid", "scout", "escort", "ambush"];
+var FACTIONS2 = ["castavar", "hollen", "aldmoor", "captains", "neutral", "basic"];
+var RARITIES = ["basic", "common", "uncommon", "rare", "legendary"];
+var CARD_TYPES = ["crew", "order", "outpost", "venture"];
+var SUBTYPES = ["soldier", "sailor", "scout", "merchant", "scholar", "officer", "rogue", "mercenary"];
+var REGION_TAGS = ["Coastal", "River", "Mountain"];
+var good = external_exports.enum(GOODS);
+var keyword = external_exports.enum(KEYWORDS);
+var subtype = external_exports.enum(SUBTYPES);
+var until = external_exports.enum(["turn", "round", "permanent"]);
+var owner = external_exports.enum(["you", "opponent", "any"]);
+var crewFilter = external_exports.object({
+  owner,
+  /** here = the source's Region; contested = a Region where both players have crews; controlled = a Region you control. */
+  where: external_exports.enum(["here", "anywhere", "contested", "controlled", "harbor", "map"]),
+  subtype: subtype.optional(),
+  keyword: keyword.optional(),
+  /** Leave out the card itself. */
+  other: external_exports.boolean().optional()
+});
+var regionFilter = external_exports.object({
+  controller: external_exports.enum(["you", "opponent", "none", "notYou"]).optional(),
+  yourCrewThere: external_exports.boolean().optional(),
+  contested: external_exports.boolean().optional(),
+  opponentMightAtMost: external_exports.number().int().min(0).optional(),
+  noEnemyOutpost: external_exports.boolean().optional()
+});
+var target = external_exports.discriminatedUnion("t", [
+  /** The source crew itself. */
+  external_exports.object({ t: external_exports.literal("self") }),
+  /** The crew that just entered (for "Whenever another crew of yours enters..."). */
+  external_exports.object({ t: external_exports.literal("entering") }),
+  /** One crew the player chooses (when the card is played, or when the ability triggers). */
+  external_exports.object({ t: external_exports.literal("chosenCrew"), filter: crewFilter }),
+  /** Every crew that matches. */
+  external_exports.object({ t: external_exports.literal("allCrews"), filter: crewFilter }),
+  /** One Region the player chooses; the effect touches the chosen owner's crews there. */
+  external_exports.object({ t: external_exports.literal("crewsInChosenRegion"), owner: external_exports.enum(["you", "opponent"]), region: regionFilter }),
+  /** One Region the player chooses (for effects that act on the Region itself). */
+  external_exports.object({ t: external_exports.literal("chosenRegion"), region: regionFilter })
 ]);
-var abilitySchema = external_exports.discriminatedUnion("trigger", [
-  external_exports.object({
-    trigger: external_exports.enum(["onDeploy", "onPlay", "landing"]),
-    effects: external_exports.array(effectSchema)
-  }),
-  external_exports.object({
-    trigger: external_exports.literal("static"),
-    keyword: external_exports.enum(["hardy", "entrench"]),
-    scope: external_exports.enum(["otherFriendlies", "yourCrews"])
-  }),
-  external_exports.object({
-    trigger: external_exports.literal("atClaim"),
-    if: external_exports.object({ youControlAtLeast: external_exports.number().int().positive() }),
-    gain: external_exports.number().int().positive()
-  })
+var condition = external_exports.discriminatedUnion("if", [
+  external_exports.object({ if: external_exports.literal("controlAtLeast"), n: external_exports.number().int().positive() }),
+  /** Positions are 1 to 5, as printed on the table. */
+  external_exports.object({ if: external_exports.literal("controlPositions"), positions: external_exports.array(external_exports.number().int().min(1).max(5)).min(1) }),
+  external_exports.object({ if: external_exports.literal("outpostRegions"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("goodsAtLeast"), n: external_exports.number().int().min(1).max(3) }),
+  external_exports.object({ if: external_exports.literal("crewsInRegions"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("takenAtLeast"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("controlHere") }),
+  external_exports.object({ if: external_exports.literal("controlHereWithGood") }),
+  external_exports.object({ if: external_exports.literal("crewsHere"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("hazardsControlled"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("faceUpRegions"), n: external_exports.number().int().positive() }),
+  external_exports.object({ if: external_exports.literal("behind") }),
+  external_exports.object({ if: external_exports.literal("hasFactionCrew"), faction: external_exports.enum(["castavar", "hollen", "aldmoor", "captains"]) })
+]);
+var effect = external_exports.lazy(
+  () => external_exports.discriminatedUnion("do", [
+    external_exports.object({ do: external_exports.literal("draw"), amount: external_exports.number().int().positive(), who: external_exports.enum(["you", "opponent"]).optional() }),
+    external_exports.object({ do: external_exports.literal("stowFromDeck"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("extraStow"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("readyStores"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("survey"), n: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("damage"), amount: external_exports.number().int().positive(), target }),
+    external_exports.object({ do: external_exports.literal("modifyStats"), might: external_exports.number().int().optional(), endurance: external_exports.number().int().optional(), until, target }),
+    external_exports.object({ do: external_exports.literal("grantKeyword"), keyword, until, target }),
+    external_exports.object({ do: external_exports.literal("returnToHarbor"), target }),
+    external_exports.object({ do: external_exports.literal("extraMarch"), target }),
+    external_exports.object({ do: external_exports.literal("takeFromStores"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("discardFromStores"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("discardFromHand"), amount: external_exports.number().int().positive() }),
+    external_exports.object({ do: external_exports.literal("gainRenown"), amount: external_exports.number().int().positive(), per: external_exports.enum(["good", "regionControlled", "crewHere"]).optional() }),
+    external_exports.object({ do: external_exports.literal("takeControl"), target }),
+    external_exports.object({ do: external_exports.literal("chooseOne"), options: external_exports.array(external_exports.array(effect).min(1)).min(2) })
+  ])
+);
+var TRIGGERS = [
+  "onDeploy",
+  "onPlay",
+  "landing",
+  "atClaim",
+  "startOfTurn",
+  "onDefeated",
+  "onControlGained",
+  "onRaid",
+  "onFlip",
+  "onFriendlyEnter"
+];
+var auraScope = external_exports.object({
+  /** self, your other crews here, all your crews here, or all your crews anywhere. */
+  scope: external_exports.enum(["self", "otherFriendlyHere", "friendlyHere", "yourCrews"]),
+  subtype: subtype.optional()
+});
+var aura = external_exports.discriminatedUnion("aura", [
+  auraScope.extend({ aura: external_exports.literal("keyword"), keyword }),
+  auraScope.extend({ aura: external_exports.literal("stats"), might: external_exports.number().int().optional(), endurance: external_exports.number().int().optional() }),
+  /** Outposts: your opponent pays this much Supply for each crew that enters this Region. */
+  external_exports.object({ aura: external_exports.literal("taxEntry"), amount: external_exports.number().int().positive() }),
+  /** Outposts: you keep this Region unless your opponent has this much more Might. */
+  external_exports.object({ aura: external_exports.literal("holdMargin"), margin: external_exports.number().int().positive() }),
+  /** You may Stow this many more cards each turn. */
+  external_exports.object({ aura: external_exports.literal("stowLimit"), amount: external_exports.number().int().positive() }),
+  /** Cards you take with Raid can be played from your Stores as if they were in your hand. */
+  external_exports.object({ aura: external_exports.literal("playTakenFromStores") })
+]);
+var ability = external_exports.union([
+  external_exports.object({ on: external_exports.enum(TRIGGERS), if: condition.optional(), effects: external_exports.array(effect).min(1) }),
+  external_exports.object({ on: external_exports.literal("static"), if: condition.optional(), aura })
 ]);
 var cardSchema = external_exports.object({
   id: external_exports.string().min(1),
+  /** Collector number, e.g. FL-047. Basics have none. */
+  number: external_exports.string().regex(/^FL-\d{3}$/).optional(),
   set: external_exports.enum(["FL", "basic"]),
   name: external_exports.string().min(1),
-  faction: external_exports.enum(["castavar", "hollen", "aldmoor", "captains", "neutral", "basic"]),
-  rarity: external_exports.enum(["basic", "common", "uncommon", "rare", "legendary"]),
-  type: external_exports.enum(["crew", "order", "outpost", "venture"]),
-  subtypes: external_exports.array(external_exports.enum(["soldier", "sailor", "scout", "merchant", "scholar", "officer", "rogue", "mercenary"])),
-  cost: external_exports.object({
-    supply: external_exports.number().int().min(0),
-    goods: external_exports.array(external_exports.enum(["gold", "timber", "spice"]))
-  }),
+  faction: external_exports.enum(FACTIONS2),
+  rarity: external_exports.enum(RARITIES),
+  type: external_exports.enum(CARD_TYPES),
+  subtypes: external_exports.array(subtype).max(2),
+  cost: external_exports.object({ supply: external_exports.number().int().min(0), goods: external_exports.array(good) }),
   might: external_exports.number().int().min(0).optional(),
   endurance: external_exports.number().int().min(1).optional(),
-  keywords: external_exports.array(external_exports.enum(["swift", "entrench", "hardy", "raid", "scout", "escort", "ambush"])),
-  abilities: external_exports.array(abilitySchema),
+  keywords: external_exports.array(keyword),
+  abilities: external_exports.array(ability),
   text: external_exports.string(),
-  flavor: external_exports.string().optional()
+  flavor: external_exports.string().optional(),
+  /** Two-faction archetype this card rewards (section 9). */
+  pair: external_exports.enum(["castavar", "hollen", "aldmoor", "captains"]).optional(),
+  art: external_exports.string().optional(),
+  artist: external_exports.string().optional()
 });
+var effectList = external_exports.array(effect);
 var traitSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("whenRevealed"), effects: external_exports.array(effectSchema) }),
+  external_exports.object({ kind: external_exports.literal("whenRevealed"), effects: effectList }),
   external_exports.object({ kind: external_exports.literal("marchPlus"), distance: external_exports.number().int().positive() }),
   external_exports.object({ kind: external_exports.literal("marchAnywhere") }),
   external_exports.object({ kind: external_exports.literal("cantEnterFromHarbor") }),
@@ -4559,36 +4839,1887 @@ var traitSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({ kind: external_exports.literal("grantEntrenchToController") }),
   external_exports.object({ kind: external_exports.literal("strikeMightPenalty"), amount: external_exports.number().int().positive() }),
   external_exports.object({ kind: external_exports.literal("controlMargin"), margin: external_exports.number().int().positive() }),
-  external_exports.object({ kind: external_exports.literal("firstControl"), effects: external_exports.array(effectSchema) })
+  external_exports.object({ kind: external_exports.literal("firstControl"), effects: effectList })
 ]);
 var regionSchema = external_exports.object({
   id: external_exports.string().min(1),
   name: external_exports.string().min(1),
   renown: external_exports.union([external_exports.literal(1), external_exports.literal(2), external_exports.literal(3)]),
-  goods: external_exports.array(external_exports.enum(["gold", "timber", "spice"])),
+  goods: external_exports.array(good),
   hazard: external_exports.boolean(),
-  tags: external_exports.array(external_exports.enum(["Coastal", "River", "Mountain"])),
+  tags: external_exports.array(external_exports.enum(REGION_TAGS)),
   traits: external_exports.array(traitSchema),
   text: external_exports.string()
 });
+
+// packages/cards/src/text.ts
+var cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+var plural = (n, one, many = `${one}s`) => n === 1 ? one : many;
+var FACTION_NAME = { castavar: "Castavar", hollen: "Hollen", aldmoor: "Aldmoor", captains: "Free Captains" };
+var SUBTYPE_PLURAL = {
+  soldier: "Soldiers",
+  sailor: "Sailors",
+  scout: "Scouts",
+  merchant: "Merchants",
+  scholar: "Scholars",
+  officer: "Officers",
+  rogue: "Rogues",
+  mercenary: "Mercenaries"
+};
+function duration(until2) {
+  return until2 === "turn" ? " until end of turn" : until2 === "round" ? " until end of round" : " permanently";
+}
+function regionPhrase(region, lead = "a") {
+  let base = lead === "one" ? "one Region" : "a Region";
+  if (region.controller === "you") base = "a Region you control";
+  if (region.controller === "opponent") base = "a Region your opponent controls";
+  if (region.controller === "none") base = "an uncontrolled Region";
+  if (region.controller === "notYou") base = "a Region you don't control";
+  const parts = [];
+  if (region.noEnemyOutpost) parts.push("with no enemy Outpost");
+  if (region.contested) parts.push("where both players have crews");
+  if (region.opponentMightAtMost != null) parts.push(`where your opponent has ${region.opponentMightAtMost} or less total Might`);
+  if (region.yourCrewThere && region.controller == null && lead !== "one") parts.push("where you have a crew");
+  return [base, ...parts].join(" ");
+}
+function whereSuffix(f2) {
+  switch (f2.where) {
+    case "here":
+      return " here";
+    case "contested":
+      return f2.owner === "any" ? " in a Region where both players have crews" : " in a Clash";
+    case "controlled":
+      return " in a Region you control";
+    case "harbor":
+      return f2.owner === "opponent" ? " in your opponent's Harbor" : " in your Harbor";
+    case "map":
+      return " on the map";
+    default:
+      return "";
+  }
+}
+function crewNoun(f2) {
+  const sub = f2.subtype;
+  const kw = f2.keyword ? ` with ${cap(f2.keyword)}` : "";
+  const single = sub ? cap(sub) : "crew";
+  const many = sub ? SUBTYPE_PLURAL[sub] : "crews";
+  return { one: `${single}${kw}`, many: `${many}${kw}` };
+}
+function targetPhrase(t, name) {
+  if (t.t === "self") return { text: name, plural: false };
+  if (t.t === "entering") return { text: "it", plural: false };
+  if (t.t === "chosenRegion") return { text: regionPhrase(t.region), plural: false };
+  if (t.t === "crewsInChosenRegion") {
+    const whose = t.owner === "you" ? "your crews" : "enemy crews";
+    return { text: `${whose} in ${regionPhrase(t.region, "one")}`, plural: true };
+  }
+  const noun = crewNoun(t.filter);
+  const other2 = t.filter.other ? "other " : "";
+  if (t.t === "chosenCrew") {
+    if (t.filter.owner === "you") {
+      if (t.filter.where === "anywhere") return { text: `target ${noun.one} of yours`, plural: false };
+      return { text: `one of your ${other2}${noun.many}${whereSuffix(t.filter)}`, plural: false };
+    }
+    if (t.filter.owner === "opponent") return { text: `an enemy ${noun.one}${whereSuffix(t.filter)}`, plural: false };
+    return { text: `a ${other2}${noun.one}${whereSuffix(t.filter)}`, plural: false };
+  }
+  if (t.filter.owner === "you") return { text: `your ${other2}${noun.many}${whereSuffix(t.filter)}`, plural: true };
+  if (t.filter.owner === "opponent") return { text: `each enemy ${noun.one}${whereSuffix(t.filter)}`, plural: false };
+  return { text: `each ${other2}${noun.one}${whereSuffix(t.filter)}`, plural: false };
+}
+function statPhrase(might, endurance) {
+  const parts = [];
+  if (might) parts.push(`${might > 0 ? "+" : ""}${might} Might`);
+  if (endurance) parts.push(`${endurance > 0 ? "+" : ""}${endurance} Endurance`);
+  return parts.join(" and ");
+}
+function effectText(e, name) {
+  switch (e.do) {
+    case "draw":
+      if (e.who === "opponent") return e.amount === 1 ? "your opponent draws a card" : `your opponent draws ${e.amount} cards`;
+      return e.amount === 1 ? "draw a card" : `draw ${e.amount} cards`;
+    case "stowFromDeck":
+      return e.amount === 1 ? "put the top card of your deck into your Stores" : `put the top ${e.amount} cards of your deck into your Stores`;
+    case "extraStow":
+      return `you may Stow ${e.amount} additional ${plural(e.amount, "card")} this turn`;
+    case "readyStores":
+      return `ready ${e.amount} of your exhausted Stores`;
+    case "survey":
+      return `Survey ${e.n}`;
+    case "damage":
+      return `deal ${e.amount} damage to ${targetPhrase(e.target, name).text}`;
+    case "modifyStats": {
+      const who = targetPhrase(e.target, name);
+      return `${who.text} ${who.plural ? "get" : "gets"} ${statPhrase(e.might, e.endurance)}${e.until === "permanent" ? "" : duration(e.until)}`;
+    }
+    case "grantKeyword": {
+      const who = targetPhrase(e.target, name);
+      return `${who.text} ${who.plural ? "gain" : "gains"} ${cap(e.keyword)}${duration(e.until)}`;
+    }
+    case "returnToHarbor": {
+      const who = targetPhrase(e.target, name);
+      const mine = e.target.t !== "self" && "filter" in e.target && e.target.filter.owner === "you";
+      return `return ${who.text} to ${mine || e.target.t === "self" ? "your" : "its owner's"} Harbor`;
+    }
+    case "extraMarch": {
+      const who = targetPhrase(e.target, name);
+      return `${who.text} may March again this turn`;
+    }
+    case "takeFromStores":
+      return e.amount === 1 ? "take a random card from your opponent's Stores and put it into your Stores exhausted" : `take ${e.amount} random cards from your opponent's Stores and put them into your Stores exhausted`;
+    case "discardFromStores":
+      return `your opponent discards ${e.amount} random ${plural(e.amount, "card")} from their Stores`;
+    case "discardFromHand":
+      return `your opponent discards ${e.amount} random ${plural(e.amount, "card")} from their hand`;
+    case "gainRenown":
+      if (e.per === "good") return `gain ${e.amount} Renown for each different Good you control`;
+      if (e.per === "regionControlled") return `gain ${e.amount} Renown for each Region you control`;
+      if (e.per === "crewHere") return `gain ${e.amount} Renown for each of your crews here`;
+      return `gain ${e.amount} Renown`;
+    case "takeControl":
+      return `choose ${targetPhrase(e.target, name).text}. Return your opponent's crews there to their Harbor and take control of it`;
+    case "chooseOne":
+      return e.options.map((option) => effectsText(option, name)).join(" or ");
+  }
+}
+function effectsText(effects, name) {
+  const said = effects.map((e) => effectText(e, name));
+  if (said.length <= 1) return said[0] ?? "";
+  return said.reduce((all, next, i) => i === 0 ? next : said[i - 1].includes(". ") ? `${all}. ${cap(next)}` : `${all}, then ${next}`, "");
+}
+function conditionText(c) {
+  switch (c.if) {
+    case "controlAtLeast":
+      return `you control ${c.n} or more Regions`;
+    case "controlPositions":
+      return `you control ${c.positions.length === 1 ? "Region" : "Regions"} ${c.positions.join(" and ")}`;
+    case "outpostRegions":
+      return `you control ${c.n} Regions that each have your Outpost`;
+    case "goodsAtLeast":
+      return c.n === 3 ? "you have all three Goods" : `you have ${c.n} or more different Goods`;
+    case "crewsInRegions":
+      return `you have crews in ${c.n} different Regions`;
+    case "takenAtLeast":
+      return `you have taken ${c.n} or more cards from your opponent's Stores this game`;
+    case "controlHere":
+      return "you control this Region";
+    case "controlHereWithGood":
+      return "you control this Region and it produces a Good";
+    case "crewsHere":
+      return `you have ${c.n} or more crews here`;
+    case "hazardsControlled":
+      return `you control ${c.n} or more Hazard Regions`;
+    case "faceUpRegions":
+      return `${c.n} or more Regions are face up`;
+    case "behind":
+      return "you have less Renown than your opponent";
+    case "hasFactionCrew": {
+      const name = FACTION_NAME[c.faction];
+      return `you have ${/^[AEIOU]/.test(name) ? "an" : "a"} ${name} crew in play`;
+    }
+  }
+}
+function auraText(a, name) {
+  if (a.aura === "taxEntry") return `Your opponent must pay ${a.amount} Supply for each crew that enters this Region.`;
+  if (a.aura === "holdMargin") return `You can't lose control of this Region unless your opponent has at least ${a.margin} more Might than you.`;
+  if (a.aura === "stowLimit") return `You may Stow ${a.amount} additional ${plural(a.amount, "card")} each turn.`;
+  if (a.aura === "playTakenFromStores") return "Cards you take with Raid can be played from your Stores as if they were in your hand.";
+  const many = a.subtype ? SUBTYPE_PLURAL[a.subtype] : "crews";
+  const who = a.scope === "self" ? name : a.scope === "otherFriendlyHere" ? `Your other ${many} in this Region` : a.scope === "friendlyHere" ? `Your ${many} here` : `Your ${many}`;
+  const singular = a.scope === "self";
+  if (a.aura === "keyword") return `${who} ${singular ? "has" : "have"} ${cap(a.keyword)}.`;
+  return `${who} ${singular ? "gets" : "get"} ${statPhrase(a.might, a.endurance)}.`;
+}
+function abilityText(ability2, card) {
+  const name = card.name;
+  if (ability2.on === "static") {
+    const body2 = auraText(ability2.aura, name);
+    return ability2.if ? `While ${conditionText(ability2.if)}, ${body2.charAt(0).toLowerCase()}${body2.slice(1)}` : body2;
+  }
+  const body = effectsText(ability2.effects, name);
+  const cond2 = ability2.if ? `if ${conditionText(ability2.if)}, ` : "";
+  switch (ability2.on) {
+    case "onPlay":
+      return `${cap(cond2)}${cond2 ? body : cap(body)}.`;
+    case "onDeploy":
+      return card.type === "outpost" ? `When built, ${cond2}${body}.` : `When you deploy ${name}, ${cond2}${body}.`;
+    case "landing":
+      return `Landing: ${cond2}${body}.`;
+    case "atClaim":
+      return `At Claim, ${cond2}${body}.`;
+    case "startOfTurn":
+      return `At the start of your turn, ${cond2}${body}.`;
+    case "onDefeated":
+      return `When ${name} is defeated, ${cond2}${body}.`;
+    case "onControlGained":
+      return `When you take control of a Region while ${name} is there, ${cond2}${body}.`;
+    case "onRaid":
+      return `Whenever you take a card with Raid, ${cond2}${body}.`;
+    case "onFlip":
+      return `Whenever a Region is flipped, ${cond2}${body}.`;
+    case "onFriendlyEnter":
+      return `Whenever another crew of yours enters ${name}'s Region, ${cond2}${body}.`;
+  }
+}
+function renderText(card) {
+  const keys = card.keywords.map(cap).join(", ");
+  const body = card.abilities.map((a) => abilityText(a, card)).join(" ");
+  if (!keys) return body;
+  return body ? `${keys}. ${body}` : keys;
+}
+
+// packages/cards/src/sets/build.ts
+var RARITY = { C: "common", U: "uncommon", R: "rare", L: "legendary" };
+var slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+function makeSet(faction, specs6) {
+  return specs6.map((s) => {
+    const card = {
+      id: slug(s.name),
+      number: `FL-${String(s.n).padStart(3, "0")}`,
+      set: "FL",
+      name: s.name,
+      faction,
+      rarity: RARITY[s.r],
+      type: s.type,
+      subtypes: s.sub ?? [],
+      cost: { supply: s.cost, goods: s.goods ?? [] },
+      keywords: s.kw ?? [],
+      abilities: s.ab ?? [],
+      text: "",
+      art: `fl-${String(s.n).padStart(3, "0")}.webp`,
+      artist: "Meridian Studio (AI-assisted)"
+    };
+    if (s.type === "crew") {
+      card.might = s.m ?? 0;
+      card.endurance = s.e ?? 1;
+    }
+    if (s.flavor) card.flavor = s.flavor;
+    if (s.pair) card.pair = s.pair;
+    card.text = s.text ?? renderText(card);
+    return card;
+  });
+}
+var on = (trigger, ...effects) => ({ on: trigger, effects });
+var onIf = (trigger, condition2, ...effects) => ({ on: trigger, if: condition2, effects });
+var keywordAura = (keyword2, scope, extra = {}) => ({
+  on: "static",
+  ...extra.if ? { if: extra.if } : {},
+  aura: { aura: "keyword", keyword: keyword2, scope, ...extra.subtype ? { subtype: extra.subtype } : {} }
+});
+var statAura = (might, endurance, scope, extra = {}) => ({
+  on: "static",
+  ...extra.if ? { if: extra.if } : {},
+  aura: { aura: "stats", scope, ...might ? { might } : {}, ...endurance ? { endurance } : {}, ...extra.subtype ? { subtype: extra.subtype } : {} }
+});
+var tax = (amount) => ({ on: "static", aura: { aura: "taxEntry", amount } });
+var hold = (margin) => ({ on: "static", aura: { aura: "holdMargin", margin } });
+var moreStows = (amount) => ({ on: "static", aura: { aura: "stowLimit", amount } });
+var playTaken = () => ({ on: "static", aura: { aura: "playTakenFromStores" } });
+var cond = {
+  control: (n) => ({ if: "controlAtLeast", n }),
+  positions: (...positions) => ({ if: "controlPositions", positions }),
+  outposts: (n) => ({ if: "outpostRegions", n }),
+  goods: (n) => ({ if: "goodsAtLeast", n }),
+  spread: (n) => ({ if: "crewsInRegions", n }),
+  taken: (n) => ({ if: "takenAtLeast", n }),
+  here: () => ({ if: "controlHere" }),
+  hereGood: () => ({ if: "controlHereWithGood" }),
+  crewsHere: (n) => ({ if: "crewsHere", n }),
+  hazards: (n) => ({ if: "hazardsControlled", n }),
+  faceUp: (n) => ({ if: "faceUpRegions", n }),
+  behind: () => ({ if: "behind" }),
+  ally: (faction) => ({ if: "hasFactionCrew", faction })
+};
+var f = (owner2, where, extra = {}) => ({ owner: owner2, where, ...extra });
+var tgt = {
+  self: () => ({ t: "self" }),
+  entering: () => ({ t: "entering" }),
+  yours: (where, extra = {}) => ({ t: "chosenCrew", filter: f("you", where, extra) }),
+  enemy: (where, extra = {}) => ({ t: "chosenCrew", filter: f("opponent", where, extra) }),
+  any: (where, extra = {}) => ({ t: "chosenCrew", filter: f("any", where, extra) }),
+  all: (owner2, where, extra = {}) => ({ t: "allCrews", filter: f(owner2, where, extra) }),
+  inRegion: (owner2, region) => ({ t: "crewsInChosenRegion", owner: owner2, region }),
+  region: (region) => ({ t: "chosenRegion", region })
+};
+var fx = {
+  draw: (amount, who) => who ? { do: "draw", amount, who } : { do: "draw", amount },
+  stow: (amount) => ({ do: "stowFromDeck", amount }),
+  extraStow: (amount) => ({ do: "extraStow", amount }),
+  ready: (amount) => ({ do: "readyStores", amount }),
+  survey: (n) => ({ do: "survey", n }),
+  damage: (amount, target2) => ({ do: "damage", amount, target: target2 }),
+  stats: (might, endurance, until2, target2) => ({ do: "modifyStats", ...might ? { might } : {}, ...endurance ? { endurance } : {}, until: until2, target: target2 }),
+  grant: (keyword2, until2, target2) => ({ do: "grantKeyword", keyword: keyword2, until: until2, target: target2 }),
+  harbor: (target2) => ({ do: "returnToHarbor", target: target2 }),
+  march: (target2) => ({ do: "extraMarch", target: target2 }),
+  take: (amount) => ({ do: "takeFromStores", amount }),
+  burnStores: (amount) => ({ do: "discardFromStores", amount }),
+  burnHand: (amount) => ({ do: "discardFromHand", amount }),
+  renown: (amount, per) => per ? { do: "gainRenown", amount, per } : { do: "gainRenown", amount },
+  takeControl: (region) => ({ do: "takeControl", target: { t: "chosenRegion", region } }),
+  choose: (...options) => ({ do: "chooseOne", options })
+};
+
+// packages/cards/src/sets/aldmoor.ts
+var specs = [
+  /* ----- Commons ----- */
+  {
+    n: 65,
+    name: "Admiralty Cartographer",
+    r: "C",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [on("onDeploy", fx.survey(1))],
+    flavor: "Every line she draws is a line someone else can't."
+  },
+  {
+    n: 66,
+    name: "Survey Cutter Crew",
+    r: "C",
+    type: "crew",
+    sub: ["sailor"],
+    cost: 2,
+    m: 2,
+    e: 1,
+    kw: ["swift"],
+    ab: [on("landing", fx.draw(1))],
+    text: "Swift. Landing: draw a card.",
+    flavor: "First boat in, first to know."
+  },
+  {
+    n: 67,
+    name: "Chart the Unknown",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.survey(2))],
+    text: "Survey 2."
+  },
+  {
+    n: 68,
+    name: "Royal Marines",
+    r: "C",
+    type: "crew",
+    sub: ["soldier", "sailor"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    kw: ["swift"],
+    flavor: "Over the rail and up the beach before the drums stop."
+  },
+  {
+    n: 69,
+    name: "Midshipman Lookout",
+    r: "C",
+    type: "crew",
+    sub: ["sailor", "scout"],
+    cost: 1,
+    m: 1,
+    e: 1,
+    kw: ["scout"],
+    ab: [on("landing", fx.draw(1))],
+    flavor: "Fourteen years old and already the best eyes aboard."
+  },
+  {
+    n: 70,
+    name: "Naturalist's Assistant",
+    r: "C",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 1,
+    m: 0,
+    e: 2,
+    ab: [on("landing", fx.stow(1))],
+    flavor: "Carries the nets, the jars, and the blame."
+  },
+  {
+    n: 71,
+    name: "Ship's Boat Party",
+    r: "C",
+    type: "crew",
+    sub: ["sailor"],
+    cost: 2,
+    m: 2,
+    e: 2,
+    ab: [on("landing", fx.draw(1))]
+  },
+  {
+    n: 72,
+    name: "Mapping Party",
+    r: "C",
+    type: "crew",
+    sub: ["scout", "scholar"],
+    cost: 3,
+    m: 2,
+    e: 4,
+    kw: ["scout"],
+    flavor: "Chain, compass, and blistered feet."
+  },
+  {
+    n: 73,
+    name: "Admiralty Pilot",
+    r: "C",
+    type: "crew",
+    sub: ["sailor"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [on("onDeploy", fx.march(tgt.yours("anywhere")))],
+    flavor: "She knows every sandbar by its first name."
+  },
+  { n: 74, name: "Telescope Watch", r: "C", type: "crew", sub: ["scout"], cost: 2, m: 1, e: 3, kw: ["scout", "hardy"] },
+  {
+    n: 75,
+    name: "Fair Winds",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.march(tgt.yours("anywhere")), fx.draw(1))]
+  },
+  {
+    n: 76,
+    name: "Lighthouse",
+    r: "C",
+    type: "outpost",
+    cost: 2,
+    ab: [onIf("startOfTurn", cond.faceUp(4), fx.draw(1))],
+    flavor: "A light for friends. A landmark for the charts."
+  },
+  {
+    n: 77,
+    name: "Broadside Warning",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(0, 2, "round", tgt.inRegion("you", { yourCrewThere: true })))]
+  },
+  {
+    n: 78,
+    name: "Log of Discoveries",
+    r: "C",
+    type: "venture",
+    cost: 1,
+    ab: [onIf("atClaim", cond.faceUp(5), fx.renown(3))],
+    flavor: "Every page a new name on the map."
+  },
+  {
+    n: 79,
+    name: "Signal Station",
+    r: "C",
+    type: "outpost",
+    cost: 1,
+    ab: [keywordAura("scout", "friendlyHere"), on("onDeploy", fx.draw(1))]
+  },
+  {
+    n: 80,
+    name: "Base Camp",
+    r: "C",
+    type: "outpost",
+    cost: 2,
+    ab: [statAura(0, 1, "friendlyHere")],
+    flavor: "Tents, a flag, and a cook who swears he has seen worse."
+  },
+  /* ----- Uncommons ----- */
+  {
+    n: 81,
+    name: "Naturalist's Expedition",
+    r: "U",
+    type: "venture",
+    cost: 2,
+    ab: [onIf("atClaim", cond.spread(3), fx.renown(3))],
+    text: "At Claim, if you have crews in 3 different Regions, gain 3 Renown."
+  },
+  {
+    n: 82,
+    name: "Admiralty Liaison",
+    r: "U",
+    type: "crew",
+    sub: ["officer"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [onIf("onDeploy", cond.ally("castavar"), fx.survey(2))],
+    pair: "castavar",
+    flavor: "Lend us your swords, and we will tell you where to point them."
+  },
+  {
+    n: 83,
+    name: "Marine Detachment",
+    r: "U",
+    type: "crew",
+    sub: ["soldier", "sailor"],
+    cost: 3,
+    m: 3,
+    e: 2,
+    kw: ["swift"],
+    ab: [statAura(0, 2, "self", { if: cond.ally("castavar") })],
+    pair: "castavar"
+  },
+  {
+    n: 84,
+    name: "Company Mapmaker",
+    r: "U",
+    type: "crew",
+    sub: ["scholar", "merchant"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [onIf("onDeploy", cond.ally("hollen"), fx.draw(2))],
+    pair: "hollen",
+    flavor: "Her maps are accurate. Her invoices, less so."
+  },
+  {
+    n: 85,
+    name: "Privateer Lookout",
+    r: "U",
+    type: "crew",
+    sub: ["sailor", "rogue"],
+    cost: 2,
+    m: 2,
+    e: 1,
+    kw: ["swift", "scout"],
+    ab: [statAura(1, 0, "self", { if: cond.ally("captains") })],
+    pair: "captains"
+  },
+  {
+    n: 86,
+    name: "Smugglers' Charts",
+    r: "U",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.draw(1)), onIf("onPlay", cond.ally("captains"), fx.take(1))],
+    pair: "captains"
+  },
+  {
+    n: 87,
+    name: "Royal Society Fellow",
+    r: "U",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 3,
+    m: 1,
+    e: 3,
+    ab: [on("onFlip", fx.stow(1))],
+    flavor: "Each new coast is a new paper for the Society."
+  },
+  {
+    n: 88,
+    name: "Swift Packet",
+    r: "U",
+    type: "crew",
+    sub: ["sailor"],
+    cost: 3,
+    m: 2,
+    e: 2,
+    kw: ["swift"],
+    ab: [on("onDeploy", fx.draw(1))],
+    flavor: "Carries the post, the orders, and the gossip."
+  },
+  {
+    n: 89,
+    name: "Wind Shift",
+    r: "U",
+    type: "order",
+    cost: 2,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.harbor(tgt.yours("contested")), fx.draw(1))]
+  },
+  /* ----- Rares ----- */
+  {
+    n: 90,
+    name: "Observatory",
+    r: "R",
+    type: "outpost",
+    cost: 3,
+    goods: ["timber"],
+    ab: [on("startOfTurn", fx.choose([fx.survey(1)], [fx.draw(1)]))],
+    text: "At the start of your turn, Survey 1 or draw a card."
+  },
+  {
+    n: 91,
+    name: "Hydrographer Royal",
+    r: "R",
+    type: "crew",
+    sub: ["scholar", "officer"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    kw: ["scout"],
+    ab: [onIf("landing", cond.ally("hollen"), fx.stow(2))],
+    pair: "hollen"
+  },
+  {
+    n: 92,
+    name: "Beyond the Meridian",
+    r: "R",
+    type: "venture",
+    cost: 3,
+    ab: [onIf("atClaim", cond.spread(4), fx.renown(5))],
+    flavor: "Past the last line on the last chart."
+  },
+  {
+    n: 93,
+    name: "Expedition Leader",
+    r: "R",
+    type: "crew",
+    sub: ["officer"],
+    cost: 4,
+    m: 3,
+    e: 4,
+    ab: [statAura(1, 0, "otherFriendlyHere")],
+    flavor: "She has never lost a man to the land. Only to boredom."
+  },
+  {
+    n: 94,
+    name: "Full Sail",
+    r: "R",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.march(tgt.inRegion("you", { yourCrewThere: true })))]
+  },
+  /* ----- Legendaries ----- */
+  {
+    n: 95,
+    name: "Commodore Ada Whitlock",
+    r: "L",
+    type: "crew",
+    sub: ["officer", "sailor"],
+    cost: 4,
+    m: 3,
+    e: 3,
+    kw: ["swift"],
+    ab: [on("landing", fx.survey(2))],
+    flavor: "She sighted Auralis first. She means to chart it first."
+  },
+  {
+    n: 96,
+    name: "Dr. Silas Fenwick, Naturalist",
+    r: "L",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 3,
+    m: 1,
+    e: 4,
+    ab: [on("onFlip", fx.draw(1))],
+    text: "Whenever a Region is flipped, draw a card.",
+    flavor: '"Another beetle no one has named. Splendid."'
+  }
+];
+var ALDMOOR = makeSet("aldmoor", specs);
+
+// packages/cards/src/sets/captains.ts
+var specs2 = [
+  /* ----- Commons ----- */
+  {
+    n: 97,
+    name: "Shoals Cutthroat",
+    r: "C",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 1,
+    m: 2,
+    e: 1,
+    kw: ["swift"],
+    flavor: "In, out, and gone with your purse."
+  },
+  {
+    n: 98,
+    name: "Powder Monkey",
+    r: "C",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 2,
+    m: 1,
+    e: 1,
+    ab: [on("onDefeated", fx.damage(2, tgt.any("here")))],
+    flavor: "Mind the fuse. He doesn't."
+  },
+  {
+    n: 99,
+    name: "Cut and Run",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.harbor(tgt.yours("contested")))],
+    text: "Ambush. Return one of your crews in a Clash to your Harbor."
+  },
+  {
+    n: 100,
+    name: "Boarding Party",
+    r: "C",
+    type: "crew",
+    sub: ["rogue", "sailor"],
+    cost: 3,
+    m: 3,
+    e: 2,
+    kw: ["swift", "raid"],
+    text: "Swift, Raid",
+    flavor: "Grapples, cutlasses, and no plan for the way back."
+  },
+  {
+    n: 101,
+    name: "Bilge Rats",
+    r: "C",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 1,
+    m: 1,
+    e: 1,
+    kw: ["raid"],
+    flavor: "They'll steal the nails out of your stockade."
+  },
+  { n: 102, name: "Cutlass Crew", r: "C", type: "crew", sub: ["rogue", "sailor"], cost: 2, m: 3, e: 1, kw: ["raid"] },
+  {
+    n: 103,
+    name: "Smuggler Sloop Crew",
+    r: "C",
+    type: "crew",
+    sub: ["sailor", "rogue"],
+    cost: 2,
+    m: 2,
+    e: 1,
+    kw: ["swift"],
+    ab: [on("landing", fx.draw(1))],
+    flavor: "Every cove has a secret, and they know most of them."
+  },
+  {
+    n: 104,
+    name: "Marooned Gunners",
+    r: "C",
+    type: "crew",
+    sub: ["mercenary"],
+    cost: 3,
+    m: 4,
+    e: 3,
+    flavor: "Left on a beach with a cannon and a grudge."
+  },
+  {
+    n: 105,
+    name: "Grapeshot",
+    r: "C",
+    type: "order",
+    cost: 2,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.damage(1, tgt.all("opponent", "contested")))]
+  },
+  {
+    n: 106,
+    name: "Plunder",
+    r: "C",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.take(1))],
+    flavor: "Finders keepers."
+  },
+  {
+    n: 107,
+    name: "Pistol Shot",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.damage(1, tgt.enemy("contested")))]
+  },
+  {
+    n: 108,
+    name: "Smugglers' Hideout",
+    r: "C",
+    type: "outpost",
+    cost: 2,
+    ab: [on("onDeploy", fx.take(1))],
+    flavor: "A cave, a lantern, and other people's cargo."
+  },
+  {
+    n: 109,
+    name: "Lookout on the Mast",
+    r: "C",
+    type: "crew",
+    sub: ["sailor", "scout"],
+    cost: 1,
+    m: 1,
+    e: 2,
+    kw: ["scout"],
+    flavor: `"Sail ho! And she's riding low with treasure!"`
+  },
+  {
+    n: 110,
+    name: "Fever-Proof Buccaneer",
+    r: "C",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 3,
+    m: 3,
+    e: 4,
+    kw: ["hardy"],
+    flavor: "Survived the marsh, the scurvy and three hangings."
+  },
+  {
+    n: 111,
+    name: "Prize Money",
+    r: "C",
+    type: "venture",
+    cost: 1,
+    ab: [onIf("atClaim", cond.taken(2), fx.renown(2))],
+    flavor: "Shares by the Articles: one for each hand, two for the captain."
+  },
+  {
+    n: 112,
+    name: "Coast Wreckers",
+    r: "C",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    ab: [on("landing", fx.take(1))],
+    flavor: "False lights on the rocks, and the sea does the rest."
+  },
+  /* ----- Uncommons ----- */
+  {
+    n: 113,
+    name: "Black Market",
+    r: "U",
+    type: "outpost",
+    cost: 2,
+    goods: ["gold"],
+    ab: [on("onRaid", fx.draw(1))],
+    text: "Whenever you take a card with Raid, draw a card."
+  },
+  {
+    n: 114,
+    name: "Articles of the Shoals",
+    r: "U",
+    type: "venture",
+    cost: 1,
+    ab: [onIf("atClaim", cond.taken(3), fx.renown(4))],
+    text: "At Claim, if you have taken 3 or more cards from your opponent's Stores this game, gain 4 Renown."
+  },
+  {
+    n: 115,
+    name: "Turncoat Soldiers",
+    r: "U",
+    type: "crew",
+    sub: ["soldier", "rogue"],
+    cost: 2,
+    m: 2,
+    e: 1,
+    kw: ["swift"],
+    ab: [statAura(0, 2, "self", { if: cond.ally("castavar") })],
+    pair: "castavar",
+    flavor: "Castavari drill, pirate pay."
+  },
+  {
+    n: 116,
+    name: "Contraband Runners",
+    r: "U",
+    type: "crew",
+    sub: ["rogue", "merchant"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    kw: ["swift"],
+    ab: [onIf("landing", cond.ally("hollen"), fx.stow(2))],
+    pair: "hollen"
+  },
+  {
+    n: 117,
+    name: "Fence",
+    r: "U",
+    type: "crew",
+    sub: ["rogue", "merchant"],
+    cost: 2,
+    m: 1,
+    e: 3,
+    ab: [onIf("onRaid", cond.ally("hollen"), fx.ready(2))],
+    pair: "hollen",
+    flavor: "Stolen at noon, sold by supper."
+  },
+  {
+    n: 118,
+    name: "Shadowing Sloop",
+    r: "U",
+    type: "crew",
+    sub: ["sailor", "rogue"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    kw: ["raid"],
+    ab: [keywordAura("swift", "self", { if: cond.ally("aldmoor") })],
+    pair: "aldmoor",
+    flavor: "Follow the Admiralty. They always find the good coves first."
+  },
+  {
+    n: 119,
+    name: "Quartermaster of the Shoals",
+    r: "U",
+    type: "crew",
+    sub: ["rogue", "officer"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    ab: [keywordAura("raid", "otherFriendlyHere")],
+    flavor: "She decides who gets what. Everyone gets something."
+  },
+  {
+    n: 120,
+    name: "Mutiny",
+    r: "U",
+    type: "order",
+    cost: 2,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.harbor(tgt.enemy("contested")))]
+  },
+  { n: 121, name: "Sea Wolf", r: "U", type: "crew", sub: ["rogue", "sailor"], cost: 4, m: 4, e: 3, kw: ["swift", "raid"] },
+  /* ----- Rares ----- */
+  {
+    n: 122,
+    name: "Renegade Hidalgo",
+    r: "R",
+    type: "crew",
+    sub: ["officer", "rogue"],
+    cost: 3,
+    m: 3,
+    e: 3,
+    kw: ["raid"],
+    ab: [onIf("onControlGained", cond.ally("castavar"), fx.renown(2))],
+    pair: "castavar",
+    flavor: "He swore an oath to the Crown once. He swore a better one to the Shoals."
+  },
+  {
+    n: 123,
+    name: "Phantom Fleet",
+    r: "R",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.march(tgt.inRegion("you", { yourCrewThere: true }))), onIf("onPlay", cond.ally("aldmoor"), fx.draw(2))],
+    pair: "aldmoor"
+  },
+  {
+    n: 124,
+    name: "Corsair Captain",
+    r: "R",
+    type: "crew",
+    sub: ["officer", "rogue"],
+    cost: 4,
+    m: 4,
+    e: 4,
+    ab: [statAura(1, 0, "otherFriendlyHere", { subtype: "rogue" })]
+  },
+  {
+    n: 125,
+    name: "Night Raid",
+    r: "R",
+    type: "order",
+    cost: 3,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.damage(2, tgt.enemy("contested")), fx.take(1))]
+  },
+  {
+    n: 126,
+    name: "Treasure Map",
+    r: "R",
+    type: "venture",
+    cost: 2,
+    ab: [onIf("atClaim", cond.taken(5), fx.renown(6))],
+    flavor: "X marks someone else's spot."
+  },
+  /* ----- Legendaries ----- */
+  {
+    n: 127,
+    name: "Red Maren, Queen of the Shoals",
+    r: "L",
+    type: "crew",
+    sub: ["rogue", "officer"],
+    cost: 4,
+    m: 4,
+    e: 3,
+    kw: ["raid"],
+    ab: [playTaken()],
+    text: "Raid. Cards you take with Raid can be played from your Stores as if they were in your hand.",
+    flavor: `"What's yours is mine. What's mine is the Shoals'."`
+  },
+  {
+    n: 128,
+    name: "Old Gallows Jack",
+    r: "L",
+    type: "crew",
+    sub: ["rogue"],
+    cost: 3,
+    m: 3,
+    e: 2,
+    ab: [on("onDefeated", fx.burnStores(2))],
+    flavor: "They hanged him twice. He keeps coming back for the rope."
+  }
+];
+var CAPTAINS = makeSet("captains", specs2);
+
+// packages/cards/src/sets/castavar.ts
+var specs3 = [
+  /* ----- Commons ----- */
+  {
+    n: 1,
+    name: "Castavar Halberdier",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 2,
+    m: 2,
+    e: 3,
+    kw: ["entrench"],
+    flavor: "Plant the butt, lower the blade, and let them come."
+  },
+  {
+    n: 2,
+    name: "Tercio Square",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 4,
+    m: 3,
+    e: 5,
+    kw: ["entrench", "escort"],
+    flavor: "Three hundred pikes, one will."
+  },
+  {
+    n: 3,
+    name: "Hold the Line",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(0, 2, "round", tgt.inRegion("you", { controller: "you", yourCrewThere: true })))],
+    text: "Ambush. Your crews in a Region you control get +2 Endurance until end of round."
+  },
+  {
+    n: 4,
+    name: "Crown Arquebusier",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 3,
+    m: 4,
+    e: 3,
+    flavor: "Slow to load. Never slow to land."
+  },
+  {
+    n: 5,
+    name: "Rodela Swordsman",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 1,
+    m: 1,
+    e: 2,
+    kw: ["entrench"],
+    flavor: "A round shield and a short temper."
+  },
+  {
+    n: 6,
+    name: "Fever-Hardened Veteran",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 3,
+    m: 3,
+    e: 4,
+    kw: ["hardy"],
+    flavor: "He has buried better men in worse marshes."
+  },
+  {
+    n: 7,
+    name: "Mission Friar",
+    r: "C",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 2,
+    m: 1,
+    e: 3,
+    kw: ["hardy"],
+    ab: [on("onDeploy", fx.ready(1))],
+    flavor: "He keeps the ledgers, the stores and the peace."
+  },
+  {
+    n: 8,
+    name: "Lancer Patrol",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 3,
+    m: 3,
+    e: 3,
+    kw: ["swift"],
+    flavor: "The only Castavari in a hurry."
+  },
+  {
+    n: 9,
+    name: "Siege Engineer",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 3,
+    goods: ["timber"],
+    m: 3,
+    e: 5,
+    kw: ["entrench"],
+    flavor: "Give him timber and a week, and the hill is ours forever."
+  },
+  {
+    n: 10,
+    name: "Shield Wall",
+    r: "C",
+    type: "order",
+    cost: 2,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(1, 1, "round", tgt.inRegion("you", { controller: "you", yourCrewThere: true })))]
+  },
+  {
+    n: 11,
+    name: "Dig In",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.grant("entrench", "round", tgt.yours("map")))],
+    flavor: "Spades before supper."
+  },
+  {
+    n: 12,
+    name: "Call to Arms",
+    r: "C",
+    type: "order",
+    cost: 3,
+    ab: [on("onPlay", fx.stats(2, 0, "round", tgt.inRegion("you", { controller: "you", yourCrewThere: true })))]
+  },
+  {
+    n: 13,
+    name: "Vanguard Pioneers",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 2,
+    m: 2,
+    e: 2,
+    ab: [on("landing", fx.grant("entrench", "permanent", tgt.self()))],
+    flavor: "First ashore, first to dig."
+  },
+  {
+    n: 14,
+    name: "Banner Bearer",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [statAura(0, 1, "otherFriendlyHere", { subtype: "soldier" })],
+    flavor: "Where the crimson stands, so do we."
+  },
+  {
+    n: 15,
+    name: "Presidio",
+    r: "C",
+    type: "outpost",
+    cost: 3,
+    ab: [keywordAura("hardy", "friendlyHere")],
+    flavor: "Thick walls, a well, and a priest. Enough to outlast the fever."
+  },
+  {
+    n: 16,
+    name: "Long Garrison",
+    r: "C",
+    type: "venture",
+    cost: 1,
+    ab: [onIf("atClaim", cond.hazards(2), fx.renown(3))],
+    flavor: "Hold the places no one else can stomach."
+  },
+  /* ----- Uncommons ----- */
+  {
+    n: 17,
+    name: "Conquistador Captain",
+    r: "U",
+    type: "crew",
+    sub: ["officer"],
+    cost: 3,
+    goods: ["gold"],
+    m: 3,
+    e: 3,
+    ab: [statAura(1, 0, "otherFriendlyHere", { subtype: "soldier" })],
+    text: "Your other Soldiers in this Region get +1 Might."
+  },
+  {
+    n: 18,
+    name: "Royal Decree",
+    r: "U",
+    type: "venture",
+    cost: 2,
+    ab: [onIf("atClaim", cond.outposts(2), fx.renown(4))],
+    text: "At Claim, if you control 2 Regions that each have your Outpost, gain 4 Renown."
+  },
+  {
+    n: 19,
+    name: "Treasure Fleet Escort",
+    r: "U",
+    type: "crew",
+    sub: ["soldier", "sailor"],
+    cost: 3,
+    goods: ["gold"],
+    m: 2,
+    e: 4,
+    kw: ["escort"],
+    ab: [statAura(2, 0, "self", { if: cond.ally("hollen") })],
+    pair: "hollen",
+    flavor: "The Concern pays well for an honest guard."
+  },
+  {
+    n: 20,
+    name: "Crown Assayer",
+    r: "U",
+    type: "crew",
+    sub: ["merchant", "officer"],
+    cost: 2,
+    m: 1,
+    e: 3,
+    ab: [onIf("atClaim", cond.hereGood(), fx.renown(1))],
+    pair: "hollen",
+    flavor: "Every ounce weighed, every fifth to the Crown."
+  },
+  {
+    n: 21,
+    name: "Spearhead Captain",
+    r: "U",
+    type: "crew",
+    sub: ["officer"],
+    cost: 3,
+    m: 3,
+    e: 3,
+    ab: [statAura(1, 1, "self", { if: cond.faceUp(4) })],
+    pair: "aldmoor",
+    flavor: "Show me the map, and I will take the best of it."
+  },
+  {
+    n: 22,
+    name: "Storm the Breach",
+    r: "U",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.stats(2, 0, "round", tgt.inRegion("you", { controller: "notYou", yourCrewThere: true })))],
+    pair: "captains"
+  },
+  {
+    n: 23,
+    name: "Sackmaster Sergeant",
+    r: "U",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 3,
+    m: 3,
+    e: 3,
+    ab: [onIf("onControlGained", cond.ally("captains"), fx.take(1))],
+    pair: "captains",
+    flavor: "The Crown takes the town. He takes the town's silver."
+  },
+  {
+    n: 24,
+    name: "Star Fort",
+    r: "U",
+    type: "outpost",
+    cost: 3,
+    goods: ["timber"],
+    ab: [statAura(1, 0, "friendlyHere")],
+    flavor: "Five points, no blind angle."
+  },
+  {
+    n: 25,
+    name: "Veteran of the Old Wars",
+    r: "U",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 4,
+    m: 4,
+    e: 4,
+    kw: ["entrench", "hardy"],
+    flavor: "Twenty years of the Old Shore taught him one thing: stay."
+  },
+  /* ----- Rares ----- */
+  {
+    n: 26,
+    name: "Bastion of the Crown",
+    r: "R",
+    type: "outpost",
+    cost: 3,
+    goods: ["timber"],
+    ab: [onIf("atClaim", cond.here(), fx.renown(1))],
+    text: "At Claim, if you control this Region, gain 1 Renown."
+  },
+  {
+    n: 27,
+    name: "Adelantado Serrano",
+    r: "R",
+    type: "crew",
+    sub: ["officer"],
+    cost: 4,
+    m: 3,
+    e: 5,
+    ab: [onIf("landing", cond.ally("aldmoor"), fx.grant("entrench", "permanent", tgt.all("you", "here")))],
+    pair: "aldmoor",
+    flavor: "The Admiralty finds the coast. Castavar keeps it."
+  },
+  {
+    n: 28,
+    name: "Iron Cuirassiers",
+    r: "R",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 5,
+    m: 5,
+    e: 6,
+    kw: ["entrench", "escort"],
+    flavor: "Steel from crown to spur."
+  },
+  {
+    n: 29,
+    name: "Unbroken Square",
+    r: "R",
+    type: "order",
+    cost: 2,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(2, 2, "round", tgt.inRegion("you", { controller: "you", yourCrewThere: true })))]
+  },
+  {
+    n: 30,
+    name: "Charter of Conquest",
+    r: "R",
+    type: "venture",
+    cost: 3,
+    ab: [onIf("atClaim", cond.control(4), fx.renown(5))],
+    flavor: "Signed in the King's own hand, and in the blood of whoever disagrees."
+  },
+  /* ----- Legendaries ----- */
+  {
+    n: 31,
+    name: "Captain-General Ilario Vendaro",
+    r: "L",
+    type: "crew",
+    sub: ["officer", "soldier"],
+    cost: 5,
+    m: 4,
+    e: 5,
+    kw: ["entrench"],
+    ab: [on("onFriendlyEnter", fx.grant("entrench", "permanent", tgt.entering()))],
+    flavor: "Where he stands, Castavar stands."
+  },
+  {
+    n: 32,
+    name: "The Iron Viceroy",
+    r: "L",
+    type: "outpost",
+    cost: 4,
+    goods: ["gold"],
+    ab: [hold(3)],
+    text: "You can't lose control of this Region unless your opponent has at least 3 more Might than you."
+  }
+];
+var CASTAVAR = makeSet("castavar", specs3);
+
+// packages/cards/src/sets/hollen.ts
+var specs4 = [
+  /* ----- Commons ----- */
+  {
+    n: 33,
+    name: "Company Factor",
+    r: "C",
+    type: "crew",
+    sub: ["merchant"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [onIf("atClaim", cond.hereGood(), fx.stow(1))],
+    text: "At Claim, if you control this Region and it produces a Good, put the top card of your deck into your Stores."
+  },
+  {
+    n: 34,
+    name: "Concern Musketeers",
+    r: "C",
+    type: "crew",
+    sub: ["soldier", "mercenary"],
+    cost: 3,
+    goods: ["gold"],
+    m: 4,
+    e: 3,
+    kw: ["escort"],
+    flavor: "Paid monthly. Loyal weekly."
+  },
+  {
+    n: 35,
+    name: "Trading Post",
+    r: "C",
+    type: "outpost",
+    cost: 2,
+    ab: [on("onDeploy", fx.stow(1))],
+    text: "When built, put the top card of your deck into your Stores."
+  },
+  {
+    n: 36,
+    name: "Company Clerk",
+    r: "C",
+    type: "crew",
+    sub: ["merchant"],
+    cost: 1,
+    m: 0,
+    e: 2,
+    ab: [on("onDeploy", fx.stow(1))],
+    flavor: "Ink, quill, and an eye for a short crate."
+  },
+  {
+    n: 37,
+    name: "Contract Pikemen",
+    r: "C",
+    type: "crew",
+    sub: ["mercenary"],
+    cost: 2,
+    goods: ["timber"],
+    m: 2,
+    e: 4,
+    kw: ["entrench"],
+    flavor: "They hold the line exactly as long as the contract says."
+  },
+  {
+    n: 38,
+    name: "Spice Porters",
+    r: "C",
+    type: "crew",
+    sub: ["merchant"],
+    cost: 2,
+    goods: ["spice"],
+    m: 2,
+    e: 3,
+    ab: [on("landing", fx.stow(1))],
+    flavor: "Every sack ashore is a sack sold."
+  },
+  {
+    n: 39,
+    name: "Gold Guard",
+    r: "C",
+    type: "crew",
+    sub: ["soldier", "mercenary"],
+    cost: 4,
+    goods: ["gold"],
+    m: 5,
+    e: 5,
+    flavor: "The best soldiers money can rent."
+  },
+  {
+    n: 40,
+    name: "Warehouse Watch",
+    r: "C",
+    type: "crew",
+    sub: ["soldier"],
+    cost: 2,
+    m: 2,
+    e: 3,
+    kw: ["hardy"],
+    flavor: "Damp, dull, and well paid."
+  },
+  {
+    n: 41,
+    name: "Company Surgeon",
+    r: "C",
+    type: "crew",
+    sub: ["scholar"],
+    cost: 3,
+    m: 1,
+    e: 4,
+    kw: ["hardy"],
+    ab: [keywordAura("hardy", "otherFriendlyHere")],
+    flavor: "Quinine is cheaper than replacements."
+  },
+  {
+    n: 42,
+    name: "Dividend Payment",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.ready(2))],
+    flavor: "The shareholders smile, and the crews eat."
+  },
+  {
+    n: 43,
+    name: "Inventory",
+    r: "C",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.stow(2))]
+  },
+  {
+    n: 44,
+    name: "Market Day",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.draw(1), fx.extraStow(1))]
+  },
+  {
+    n: 45,
+    name: "Paid Escort",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(1, 0, "round", tgt.inRegion("you", { controller: "you", yourCrewThere: true })))]
+  },
+  {
+    n: 46,
+    name: "Counting House",
+    r: "C",
+    type: "outpost",
+    cost: 2,
+    goods: ["gold"],
+    ab: [onIf("atClaim", cond.here(), fx.stow(1))],
+    flavor: "Gold in, ledgers out."
+  },
+  {
+    n: 47,
+    name: "Company Venture",
+    r: "C",
+    type: "venture",
+    cost: 1,
+    ab: [onIf("atClaim", cond.goods(2), fx.renown(2))],
+    flavor: "Two trades are a business. Three are a monopoly."
+  },
+  {
+    n: 48,
+    name: "Coastal Factor",
+    r: "C",
+    type: "crew",
+    sub: ["merchant", "sailor"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    kw: ["swift"],
+    ab: [on("landing", fx.stow(1))],
+    flavor: "First to the beach, first to the bargain."
+  },
+  /* ----- Uncommons ----- */
+  {
+    n: 49,
+    name: "Charter of Monopoly",
+    r: "U",
+    type: "outpost",
+    cost: 3,
+    goods: ["spice"],
+    ab: [tax(1)],
+    text: "Your opponent must pay 1 Supply for each crew that enters this Region."
+  },
+  {
+    n: 50,
+    name: "Quarterly Dividend",
+    r: "U",
+    type: "venture",
+    cost: 2,
+    ab: [onIf("atClaim", cond.goods(3), fx.renown(3), fx.draw(2))]
+  },
+  {
+    n: 51,
+    name: "Ledger Keeper",
+    r: "U",
+    type: "crew",
+    sub: ["merchant", "scholar"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [moreStows(1)],
+    flavor: "Every card has a price, and she knows it."
+  },
+  {
+    n: 52,
+    name: "Bought Commission",
+    r: "U",
+    type: "crew",
+    sub: ["officer", "mercenary"],
+    cost: 3,
+    m: 2,
+    e: 3,
+    kw: ["escort"],
+    ab: [statAura(2, 0, "self", { if: cond.ally("castavar") })],
+    pair: "castavar",
+    flavor: "A Castavari rank, bought with Hollen coin."
+  },
+  {
+    n: 53,
+    name: "Chartered Surveyor",
+    r: "U",
+    type: "crew",
+    sub: ["scout", "merchant"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    kw: ["scout"],
+    ab: [onIf("onDeploy", cond.ally("aldmoor"), fx.survey(1))],
+    pair: "aldmoor",
+    flavor: "The Admiralty draws the map. The Concern prices it."
+  },
+  {
+    n: 54,
+    name: "Joint-Stock Expedition",
+    r: "U",
+    type: "venture",
+    cost: 3,
+    ab: [onIf("atClaim", cond.faceUp(4), fx.renown(3))],
+    pair: "aldmoor"
+  },
+  {
+    n: 55,
+    name: "Smugglers' Broker",
+    r: "U",
+    type: "crew",
+    sub: ["rogue", "merchant"],
+    cost: 2,
+    m: 1,
+    e: 3,
+    ab: [on("onRaid", fx.stow(1))],
+    pair: "captains",
+    flavor: "No questions, fair prices, a cut of everything."
+  },
+  {
+    n: 56,
+    name: "Monopoly Agent",
+    r: "U",
+    type: "crew",
+    sub: ["merchant"],
+    cost: 3,
+    goods: ["spice"],
+    m: 2,
+    e: 4,
+    kw: ["hardy"],
+    ab: [onIf("atClaim", cond.hereGood(), fx.draw(1))]
+  },
+  {
+    n: 57,
+    name: "Embargo",
+    r: "U",
+    type: "order",
+    cost: 2,
+    goods: ["gold"],
+    ab: [on("onPlay", fx.burnStores(2))],
+    flavor: "No ship sails without a Concern stamp."
+  },
+  /* ----- Rares ----- */
+  {
+    n: 58,
+    name: "Hostile Buyout",
+    r: "R",
+    type: "order",
+    cost: 4,
+    goods: ["gold"],
+    ab: [on("onPlay", fx.takeControl({ noEnemyOutpost: true, opponentMightAtMost: 2 }))]
+  },
+  {
+    n: 59,
+    name: "Captain of the Treasure Road",
+    r: "R",
+    type: "crew",
+    sub: ["officer"],
+    cost: 4,
+    goods: ["gold"],
+    m: 4,
+    e: 4,
+    kw: ["escort"],
+    ab: [statAura(0, 1, "friendlyHere", { if: cond.ally("castavar") })],
+    pair: "castavar",
+    flavor: "Castavari steel, Hollen books, and gold all the way to the sea."
+  },
+  {
+    n: 60,
+    name: "Black Ledger",
+    r: "R",
+    type: "order",
+    cost: 3,
+    ab: [onIf("onPlay", cond.ally("captains"), fx.take(2))],
+    pair: "captains",
+    flavor: "Some accounts are never audited."
+  },
+  {
+    n: 61,
+    name: "Concern Admiral",
+    r: "R",
+    type: "crew",
+    sub: ["sailor", "officer"],
+    cost: 5,
+    goods: ["gold"],
+    m: 5,
+    e: 6,
+    ab: [on("onDeploy", fx.ready(2))],
+    flavor: "He commands the fleet, and the fleet's accounts."
+  },
+  {
+    n: 62,
+    name: "Spice Magnate",
+    r: "R",
+    type: "crew",
+    sub: ["merchant"],
+    cost: 3,
+    goods: ["spice"],
+    m: 2,
+    e: 3,
+    ab: [onIf("atClaim", cond.goods(3), fx.renown(2))]
+  },
+  /* ----- Legendaries ----- */
+  {
+    n: 63,
+    name: "Director Pieter Hollenbrandt",
+    r: "L",
+    type: "crew",
+    sub: ["merchant", "officer"],
+    cost: 4,
+    m: 3,
+    e: 4,
+    ab: [on("atClaim", fx.renown(1, "good"))],
+    text: "At Claim, gain 1 Renown for each different Good you control.",
+    flavor: "Seventeen shareholders. One opinion."
+  },
+  {
+    n: 64,
+    name: "The Golden Fluyt",
+    r: "L",
+    type: "outpost",
+    cost: 3,
+    ab: [on("startOfTurn", fx.stow(1))],
+    flavor: "The fattest ship on the coast, and every hold full."
+  }
+];
+var HOLLEN = makeSet("hollen", specs4);
+
+// packages/cards/src/sets/neutral.ts
+var specs5 = [
+  /* ----- Commons ----- */
+  {
+    n: 129,
+    name: "Free Company Pikes",
+    r: "C",
+    type: "crew",
+    sub: ["mercenary"],
+    cost: 4,
+    m: 4,
+    e: 4,
+    kw: ["entrench"],
+    text: "Entrench",
+    flavor: "Every flag pays the same."
+  },
+  {
+    n: 130,
+    name: "Shipwreck Survivors",
+    r: "C",
+    type: "crew",
+    sub: ["sailor"],
+    cost: 2,
+    m: 1,
+    e: 2,
+    ab: [on("landing", fx.stow(1))],
+    text: "Landing: put the top card of your deck into your Stores.",
+    flavor: "They lost the ship. They kept the biscuits."
+  },
+  { n: 131, name: "Hired Musket", r: "C", type: "crew", sub: ["mercenary"], cost: 2, m: 2, e: 2, kw: ["swift"] },
+  {
+    n: 132,
+    name: "Frontier Woodsmen",
+    r: "C",
+    type: "crew",
+    sub: ["scout"],
+    cost: 2,
+    m: 2,
+    e: 3,
+    kw: ["scout"],
+    flavor: "They read the forest like a ledger."
+  },
+  {
+    n: 133,
+    name: "Desperate Stand",
+    r: "C",
+    type: "order",
+    cost: 1,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.stats(0, 3, "round", tgt.yours("contested")))]
+  },
+  {
+    n: 134,
+    name: "Quinine Bark",
+    r: "C",
+    type: "order",
+    cost: 1,
+    ab: [on("onPlay", fx.grant("hardy", "round", tgt.inRegion("you", { yourCrewThere: true })))],
+    flavor: "Bitter as regret, worth its weight in gold."
+  },
+  /* ----- Uncommons ----- */
+  {
+    n: 135,
+    name: "Letter from Home",
+    r: "U",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.draw(2))],
+    text: "Draw 2 cards.",
+    flavor: "News of a world that already feels very far away."
+  },
+  { n: 136, name: "Sellsword Captain", r: "U", type: "crew", sub: ["mercenary", "officer"], cost: 3, m: 3, e: 3, kw: ["escort", "hardy"] },
+  { n: 137, name: "Mercenary Raiders", r: "U", type: "crew", sub: ["mercenary", "rogue"], cost: 3, m: 3, e: 2, kw: ["swift", "raid"] },
+  /* ----- Rares ----- */
+  {
+    n: 138,
+    name: "Guild Chart",
+    r: "R",
+    type: "order",
+    cost: 2,
+    ab: [on("onPlay", fx.survey(2), fx.draw(1))]
+  },
+  {
+    n: 139,
+    name: "Sudden Squall",
+    r: "R",
+    type: "order",
+    cost: 3,
+    kw: ["ambush"],
+    ab: [on("onPlay", fx.harbor(tgt.all("any", "contested")))],
+    flavor: "The sky decides who fights today."
+  },
+  /* ----- Legendary ----- */
+  {
+    n: 140,
+    name: "The Lost Colony",
+    r: "L",
+    type: "venture",
+    cost: 3,
+    ab: [onIf("atClaim", cond.positions(1, 5), fx.renown(6))],
+    text: "At Claim, if you control Regions 1 and 5, gain 6 Renown.",
+    flavor: "They came before any of us. Where did they go?"
+  }
+];
+var NEUTRAL = makeSet("neutral", specs5);
+
+// packages/cards/src/index.ts
 function parseAll(schema, rows, label) {
   return rows.map((row, i) => {
     const parsed = schema.safeParse(row);
     if (!parsed.success) {
-      throw new Error(`${label}[${i}] ${parsed.error.issues.map((q) => q.message).join("; ")}`);
+      const id = row.id ?? i;
+      throw new Error(`${label} ${id}: ${parsed.error.issues.map((q) => `${q.path.join(".")} ${q.message}`).join("; ")}`);
     }
     return parsed.data;
   });
 }
 var basics = parseAll(cardSchema, BASICS, "basic");
+var firstLanding = parseAll(cardSchema, [...CASTAVAR, ...HOLLEN, ...ALDMOOR, ...CAPTAINS, ...NEUTRAL], "card");
+var allCards = [...basics, ...firstLanding];
 var regions = parseAll(regionSchema, REGIONS, "region");
-var cardIds = /* @__PURE__ */ new Set();
-for (const card of basics) {
-  if (cardIds.has(card.id)) throw new Error(`Duplicate card id ${card.id}`);
-  cardIds.add(card.id);
-  if (card.type === "crew" && (card.might == null || card.endurance == null)) {
-    throw new Error(`${card.id} is a crew and needs Might and Endurance`);
-  }
+var factions = FACTIONS;
+var registry = /* @__PURE__ */ new Map();
+for (const card of allCards) {
+  if (registry.has(card.id)) throw new Error(`Duplicate card id ${card.id}`);
+  if (card.type === "crew" && (card.might == null || card.endurance == null)) throw new Error(`${card.id} is a crew and needs Might and Endurance`);
+  registry.set(card.id, card);
 }
 var regionIds = /* @__PURE__ */ new Set();
 for (const region of regions) {
@@ -4596,7 +6727,7 @@ for (const region of regions) {
   regionIds.add(region.id);
 }
 function getCard(id) {
-  const card = basics.find((c) => c.id === id) ?? extraCards.get(id);
+  const card = registry.get(id) ?? extraCards.get(id);
   if (!card) throw new Error(`Unknown card ${id}`);
   return card;
 }
@@ -4606,9 +6737,10 @@ function getRegion(id) {
   return region;
 }
 var extraCards = /* @__PURE__ */ new Map();
-var starter = basicDeck();
-if (starter.length !== 40) throw new Error("The Basic deck is not 40 cards.");
-for (const id of starter) getCard(id);
+for (const deck of [basicDeck(), ...STARTER_DECKS.map((d) => d.cards)]) {
+  const problems = validateDeck(deck, getCard);
+  if (problems.length) throw new Error(`A built-in deck is not legal: ${problems.join(" ")}`);
+}
 
 // node_modules/.pnpm/immer@10.2.0/node_modules/immer/dist/immer.mjs
 var NOTHING = Symbol.for("immer-nothing");
@@ -4717,11 +6849,11 @@ function is(x, y) {
     return x !== x && y !== y;
   }
 }
-function isMap(target) {
-  return target instanceof Map;
+function isMap(target2) {
+  return target2 instanceof Map;
 }
-function isSet(target) {
-  return target instanceof Set;
+function isSet(target2) {
+  return target2 instanceof Set;
 }
 function latest(state2) {
   return state2.copy_ || state2.base_;
@@ -4997,13 +7129,13 @@ function createProxyProxy(base, parent) {
     revoke_: null,
     isManual_: false
   };
-  let target = state2;
+  let target2 = state2;
   let traps = objectTraps;
   if (isArray) {
-    target = [state2];
+    target2 = [state2];
     traps = arrayTraps;
   }
-  const { revoke, proxy } = Proxy.revocable(target, traps);
+  const { revoke, proxy } = Proxy.revocable(target2, traps);
   state2.draft_ = proxy;
   state2.revoke_ = revoke;
   return proxy;
@@ -5075,15 +7207,15 @@ var objectTraps = {
   // Note: We never coerce `desc.value` into an Immer draft, because we can't make
   // the same guarantee in ES5 mode.
   getOwnPropertyDescriptor(state2, prop) {
-    const owner = latest(state2);
-    const desc = Reflect.getOwnPropertyDescriptor(owner, prop);
+    const owner2 = latest(state2);
+    const desc = Reflect.getOwnPropertyDescriptor(owner2, prop);
     if (!desc)
       return desc;
     return {
       writable: true,
       configurable: state2.type_ !== 1 || prop !== "length",
       enumerable: desc.enumerable,
-      value: owner[prop]
+      value: owner2[prop]
     };
   },
   defineProperty() {
@@ -5334,6 +7466,11 @@ function currentImpl(value) {
 var immer = new Immer2();
 var produce = immer.produce;
 
+// packages/engine/src/types.ts
+function other(player) {
+  return player === 0 ? 1 : 0;
+}
+
 // packages/engine/src/query.ts
 function roll(state2) {
   let s = state2.rng >>> 0;
@@ -5364,46 +7501,136 @@ function crewsOf(state2, player) {
 function findCrew(state2, iid) {
   return state2.crews.find((c) => c.iid === iid);
 }
+function regionOf(crew) {
+  return crew.where.zone === "region" ? crew.where.index : null;
+}
 function trait(regionId, kind) {
   return getRegion(regionId).traits.find((t) => t.kind === kind);
 }
-function hasKeyword(state2, crew, keyword) {
-  if (getCard(crew.cardId).keywords.includes(keyword)) return true;
-  if (crew.where.zone !== "region") return false;
-  const region = state2.regions[crew.where.index];
-  if (!region) return false;
-  if (keyword === "entrench") {
-    if (trait(region.regionId, "grantEntrenchToController") && region.controller === crew.owner) return true;
-    if (region.outpost && region.outpost.owner === crew.owner) {
-      const aura = getCard(region.outpost.cardId).abilities.some(
-        (a) => a.trigger === "static" && a.keyword === "entrench" && a.scope === "yourCrews"
-      );
-      if (aura) return true;
-    }
-  }
-  if (keyword === "hardy") {
-    for (const other2 of crewsAt(state2, crew.where.index)) {
-      if (other2.iid === crew.iid || other2.owner !== crew.owner) continue;
-      const aura = getCard(other2.cardId).abilities.some(
-        (a) => a.trigger === "static" && a.keyword === "hardy" && a.scope === "otherFriendlies"
-      );
-      if (aura) return true;
-    }
-  }
-  return false;
+function permanents(state2) {
+  const out = state2.crews.map((c) => ({ iid: c.iid, cardId: c.cardId, owner: c.owner, here: regionOf(c), kind: "crew" }));
+  state2.regions.forEach((region, index) => {
+    if (region.outpost) out.push({ iid: region.outpost.iid, cardId: region.outpost.cardId, owner: region.outpost.owner, here: index, kind: "outpost" });
+  });
+  return out;
 }
-function enduranceOf(crew) {
+function triggered(state2, on2, first, accept = () => true) {
+  const found = [];
+  for (const player of [first, other(first)]) {
+    for (const p of permanents(state2)) {
+      if (p.owner !== player || !accept(p)) continue;
+      for (const ability2 of getCard(p.cardId).abilities) {
+        if (ability2.on !== on2) continue;
+        found.push({ ability: ability2, ctx: { player, cardId: p.cardId, sourceIid: p.iid, here: p.here } });
+      }
+    }
+  }
+  return found;
+}
+function controlled(state2, player) {
+  return state2.regions.flatMap((r, i) => r.faceUp && r.controller === player ? [i] : []);
+}
+function goodsOf(state2, player) {
+  const goods = /* @__PURE__ */ new Set();
+  for (const index of controlled(state2, player)) for (const good2 of getRegion(state2.regions[index].regionId).goods) goods.add(good2);
+  return goods;
+}
+function hasGoods(state2, player, goods) {
+  const held = goodsOf(state2, player);
+  return goods.every((good2) => held.has(good2));
+}
+function conditionMet(state2, condition2, player, here) {
+  if (!condition2) return true;
+  const mine = controlled(state2, player);
+  switch (condition2.if) {
+    case "controlAtLeast":
+      return mine.length >= condition2.n;
+    case "controlPositions":
+      return condition2.positions.every((p) => mine.includes(p - 1));
+    case "outpostRegions":
+      return mine.filter((i) => state2.regions[i].outpost?.owner === player).length >= condition2.n;
+    case "goodsAtLeast":
+      return goodsOf(state2, player).size >= condition2.n;
+    case "crewsInRegions":
+      return new Set(crewsOf(state2, player).flatMap((c) => c.where.zone === "region" ? [c.where.index] : [])).size >= condition2.n;
+    case "takenAtLeast":
+      return state2.players[player].taken >= condition2.n;
+    case "controlHere":
+      return here != null && mine.includes(here);
+    case "controlHereWithGood":
+      return here != null && mine.includes(here) && getRegion(state2.regions[here].regionId).goods.length > 0;
+    case "crewsHere":
+      return here != null && crewsAt(state2, here).filter((c) => c.owner === player).length >= condition2.n;
+    case "hazardsControlled":
+      return mine.filter((i) => getRegion(state2.regions[i].regionId).hazard).length >= condition2.n;
+    case "faceUpRegions":
+      return state2.regions.filter((r) => r.faceUp).length >= condition2.n;
+    case "behind":
+      return state2.players[player].renown < state2.players[other(player)].renown;
+    case "hasFactionCrew":
+      return crewsOf(state2, player).some((c) => getCard(c.cardId).faction === condition2.faction);
+  }
+}
+function auras(state2) {
+  const out = [];
+  for (const p of permanents(state2)) {
+    for (const ability2 of getCard(p.cardId).abilities) {
+      if (ability2.on !== "static") continue;
+      if (!conditionMet(state2, ability2.if, p.owner, p.here)) continue;
+      out.push({ aura: ability2.aura, source: p });
+    }
+  }
+  return out;
+}
+function auraTouches(live, crew) {
+  const a = live.aura;
+  if (!("scope" in a)) return false;
+  if (crew.owner !== live.source.owner) return false;
+  if (a.subtype && !getCard(crew.cardId).subtypes.includes(a.subtype)) return false;
+  const here = regionOf(crew);
+  switch (a.scope) {
+    case "self":
+      return crew.iid === live.source.iid;
+    case "otherFriendlyHere":
+      return crew.iid !== live.source.iid && here != null && here === live.source.here;
+    case "friendlyHere":
+      return here != null && here === live.source.here;
+    case "yourCrews":
+      return true;
+  }
+}
+function hasKeyword(state2, crew, keyword2) {
+  if (getCard(crew.cardId).keywords.includes(keyword2)) return true;
+  if (crew.grants.some((g) => g.keyword === keyword2)) return true;
+  const here = regionOf(crew);
+  if (keyword2 === "entrench" && here != null) {
+    const region = state2.regions[here];
+    if (trait(region.regionId, "grantEntrenchToController") && region.controller === crew.owner) return true;
+  }
+  return auras(state2).some((live) => live.aura.aura === "keyword" && live.aura.keyword === keyword2 && auraTouches(live, crew));
+}
+function auraStats(state2, crew) {
+  let might = 0;
+  let endurance = 0;
+  for (const live of auras(state2)) {
+    if (live.aura.aura !== "stats" || !auraTouches(live, crew)) continue;
+    might += live.aura.might ?? 0;
+    endurance += live.aura.endurance ?? 0;
+  }
+  return { might, endurance };
+}
+function enduranceOf(state2, crew) {
   const base = getCard(crew.cardId).endurance ?? 1;
-  return base + crew.mods.reduce((sum, mod) => sum + mod.endurance, 0);
+  return Math.max(1, base + crew.mods.reduce((sum, mod) => sum + mod.endurance, 0) + auraStats(state2, crew).endurance);
 }
 function crewMight(state2, crew, clash) {
   const base = getCard(crew.cardId).might ?? 0;
-  let might = base + crew.mods.reduce((sum, mod) => sum + mod.might, 0);
-  if (clash && hasKeyword(state2, crew, "entrench") && crew.where.zone === "region") {
+  let might = base + crew.mods.reduce((sum, mod) => sum + mod.might, 0) + auraStats(state2, crew).might;
+  if (clash && crew.where.zone === "region" && hasKeyword(state2, crew, "entrench")) {
     const held = state2.claim?.controlAtStart[crew.where.index];
     if (held === crew.owner) might += 1;
   }
-  return might;
+  return Math.max(0, might);
 }
 function sideMight(state2, player, index, clash) {
   let sum = crewsAt(state2, index).filter((c) => c.owner === player).reduce((total, crew) => total + crewMight(state2, crew, clash), 0);
@@ -5414,17 +7641,59 @@ function sideMight(state2, player, index, clash) {
   }
   return sum;
 }
-function goodsOf(state2, player) {
-  const goods = /* @__PURE__ */ new Set();
-  for (const region of state2.regions) {
-    if (!region.faceUp || region.controller !== player) continue;
-    for (const good of getRegion(region.regionId).goods) goods.add(good);
-  }
-  return goods;
+function entryTax(state2, player, index) {
+  const outpost = state2.regions[index]?.outpost;
+  if (!outpost || outpost.owner === player) return 0;
+  return getCard(outpost.cardId).abilities.reduce((t, a) => t + (a.on === "static" && a.aura.aura === "taxEntry" ? a.aura.amount : 0), 0);
 }
-function hasGoods(state2, player, goods) {
-  const held = goodsOf(state2, player);
-  return goods.every((good) => held.has(good));
+function holdMargin(state2, index) {
+  const region = state2.regions[index];
+  const outpost = region.outpost;
+  if (!outpost || outpost.owner !== region.controller) return 0;
+  return getCard(outpost.cardId).abilities.reduce((t, a) => Math.max(t, a.on === "static" && a.aura.aura === "holdMargin" ? a.aura.margin : 0), 0);
+}
+function stowsPerTurn(state2, player) {
+  return 1 + auras(state2).reduce((t, live) => t + (live.source.owner === player && live.aura.aura === "stowLimit" ? live.aura.amount : 0), 0);
+}
+function canPlayTakenFromStores(state2, player) {
+  return auras(state2).some((live) => live.source.owner === player && live.aura.aura === "playTakenFromStores");
+}
+function crewMatches(state2, crew, filter, ctx) {
+  if (filter.owner === "you" && crew.owner !== ctx.player) return false;
+  if (filter.owner === "opponent" && crew.owner === ctx.player) return false;
+  if (filter.other && crew.iid === ctx.sourceIid) return false;
+  if (filter.subtype && !getCard(crew.cardId).subtypes.includes(filter.subtype)) return false;
+  if (filter.keyword && !hasKeyword(state2, crew, filter.keyword)) return false;
+  const here = regionOf(crew);
+  switch (filter.where) {
+    case "anywhere":
+      return true;
+    case "here":
+      return here != null && here === ctx.here;
+    case "contested":
+      return here != null && contested(state2, here);
+    case "controlled":
+      return here != null && state2.regions[here].controller === ctx.player;
+    case "harbor":
+      return here == null;
+    case "map":
+      return here != null;
+  }
+}
+function regionMatches(state2, index, filter, player, mustHaveCrewsOf) {
+  const region = state2.regions[index];
+  if (!region || !region.faceUp) return false;
+  const foe = other(player);
+  if (filter.controller === "you" && region.controller !== player) return false;
+  if (filter.controller === "opponent" && region.controller !== foe) return false;
+  if (filter.controller === "none" && region.controller !== null) return false;
+  if (filter.controller === "notYou" && region.controller === player) return false;
+  if (filter.yourCrewThere && !crewsAt(state2, index).some((c) => c.owner === player)) return false;
+  if (filter.contested && !contested(state2, index)) return false;
+  if (filter.opponentMightAtMost != null && sideMight(state2, foe, index, false) > filter.opponentMightAtMost) return false;
+  if (filter.noEnemyOutpost && region.outpost && region.outpost.owner !== player) return false;
+  if (mustHaveCrewsOf != null && !crewsAt(state2, index).some((c) => c.owner === mustHaveCrewsOf)) return false;
+  return true;
 }
 function crewCap(regionId) {
   return trait(regionId, "crewCap")?.n ?? 5;
@@ -5512,41 +7781,79 @@ function scoutSees(state2, player, index) {
 function act(action) {
   return { kind: "act", action };
 }
-function playableOrder(state2, player, iid, ambushOnly) {
-  const cardRef = state2.players[player].hand.find((c) => c.iid === iid);
-  if (!cardRef) return [];
-  const card = getCard(cardRef.cardId);
-  if (card.type !== "order") return [];
-  if (ambushOnly && !card.keywords.includes("ambush")) return [];
-  if (!hasGoods(state2, player, card.cost.goods)) return [];
-  if (readySupply(state2, player) < supplyCost(state2, card.id)) return [];
-  const text = card.abilities.flatMap((a) => a.trigger === "onPlay" ? a.effects : []);
-  const actions2 = [];
-  if (text.some((e) => e.do === "extraMarch")) {
-    for (const crew of crewsOf(state2, player)) actions2.push({ type: "play", iid, target: crew.iid });
-    return actions2;
+function firstChoice(effects) {
+  for (const effect2 of effects) {
+    if ("target" in effect2 && effect2.target.t !== "self" && effect2.target.t !== "allCrews" && effect2.target.t !== "entering") return effect2;
   }
-  if (text.some((e) => e.do === "buffYourCrews")) {
+  return null;
+}
+function choicesFor(state2, effect2, ctx, orderFrom) {
+  if (!("target" in effect2)) return [{}];
+  const t = effect2.target;
+  if (t.t === "chosenCrew") {
+    return state2.crews.filter((crew) => crewMatches(state2, crew, t.filter, ctx) && (orderFrom == null || orderCanTarget(state2, orderFrom, crew))).map((crew) => ({ target: crew.iid }));
+  }
+  if (t.t === "crewsInChosenRegion") {
+    const whose = t.owner === "you" ? ctx.player : other(ctx.player);
+    return [0, 1, 2, 3, 4].filter((i) => regionMatches(state2, i, t.region, ctx.player, whose)).map((region) => ({ region }));
+  }
+  if (t.t === "chosenRegion") {
+    return [0, 1, 2, 3, 4].filter((i) => regionMatches(state2, i, t.region, ctx.player)).map((region) => ({ region }));
+  }
+  return [{}];
+}
+function spendable(state2, player, card, fromStores) {
+  const ready = readySupply(state2, player);
+  if (!fromStores) return ready;
+  const self = state2.players[player].stores.find((s) => s.iid === card.iid);
+  return self && !self.exhausted ? ready - 1 : ready;
+}
+function orderPlays(state2, player, card, ambushOnly, fromStores) {
+  const def = getCard(card.cardId);
+  if (def.type !== "order") return [];
+  if (ambushOnly && !def.keywords.includes("ambush")) return [];
+  if (!hasGoods(state2, player, def.cost.goods)) return [];
+  if (spendable(state2, player, card, fromStores) < supplyCost(state2, def.id)) return [];
+  const effects = def.abilities.flatMap((a) => a.on === "onPlay" ? a.effects : []);
+  const extra = fromStores ? { fromStores: true } : {};
+  const choice = firstChoice(effects);
+  if (!choice) return [{ type: "play", iid: card.iid, ...extra }];
+  const ctx = { player, cardId: def.id, here: null };
+  return choicesFor(state2, choice, ctx, player).map((pick) => ({ type: "play", iid: card.iid, ...pick, ...extra }));
+}
+function playsFor(state2, player, card, fromStores) {
+  const you = state2.players[player];
+  const def = getCard(card.cardId);
+  if (!hasGoods(state2, player, def.cost.goods)) return [];
+  const supply = spendable(state2, player, card, fromStores);
+  const extra = fromStores ? { fromStores: true } : {};
+  const out = [];
+  if (def.type === "crew") {
+    const cost = supplyCost(state2, def.id);
+    if (supply < cost) return [];
+    const dests = [{ zone: "harbor" }];
     for (let index = 0; index < 5; index++) {
-      if (state2.crews.some((c) => c.owner === player && c.where.zone === "region" && c.where.index === index)) {
-        actions2.push({ type: "play", iid, region: index });
-      }
+      if (canDeploy(state2, player, index) && supply >= cost + entryTax(state2, player, index)) dests.push({ zone: "region", index });
     }
-    return actions2;
-  }
-  if (text.some((e) => e.do === "damageCrew")) {
+    for (const dest of dests) out.push({ type: "play", iid: card.iid, dest, ...extra });
+  } else if (def.type === "order") {
+    out.push(...orderPlays(state2, player, card, false, fromStores));
+  } else if (def.type === "outpost") {
     for (let index = 0; index < 5; index++) {
-      if (!contested(state2, index)) continue;
-      for (const crew of state2.crews) {
-        if (crew.where.zone === "region" && crew.where.index === index && orderCanTarget(state2, player, crew)) {
-          actions2.push({ type: "play", iid, target: crew.iid, region: index });
-        }
-      }
+      const region = state2.regions[index];
+      if (!region.faceUp || region.controller !== player || region.outpost) continue;
+      if (!state2.crews.some((c) => c.owner === player && c.where.zone === "region" && c.where.index === index)) continue;
+      if (supply < supplyCost(state2, def.id, index)) continue;
+      out.push({ type: "play", iid: card.iid, region: index, ...extra });
     }
-    return actions2;
+  } else if (def.type === "venture") {
+    if (you.ventures.some((slot) => slot === null) && supply >= supplyCost(state2, def.id)) out.push({ type: "play", iid: card.iid, ...extra });
   }
-  actions2.push({ type: "play", iid });
-  return actions2;
+  return out;
+}
+function playableStores(state2, player) {
+  if (!canPlayTakenFromStores(state2, player)) return [];
+  return state2.players[player].stores.filter((s) => s.taken);
 }
 function commandActions(state2, player) {
   const you = state2.players[player];
@@ -5554,44 +7861,25 @@ function commandActions(state2, player) {
   if (you.stowLeft > 0) {
     for (const card of you.hand) out.push(act({ type: "stow", iid: card.iid }));
   }
-  for (const card of you.hand) {
-    const def = getCard(card.cardId);
-    if (!hasGoods(state2, player, def.cost.goods)) continue;
-    if (def.type === "crew") {
-      const cost = supplyCost(state2, def.id);
-      if (readySupply(state2, player) < cost) continue;
-      const dests = [{ zone: "harbor" }];
-      for (let index = 0; index < 5; index++) if (canDeploy(state2, player, index)) dests.push({ zone: "region", index });
-      for (const dest of dests) out.push(act({ type: "play", iid: card.iid, dest }));
-    } else if (def.type === "order") {
-      for (const action of playableOrder(state2, player, card.iid, false)) out.push(act(action));
-    } else if (def.type === "outpost") {
-      for (let index = 0; index < 5; index++) {
-        const region = state2.regions[index];
-        if (!region.faceUp || region.controller !== player || region.outpost) continue;
-        if (!state2.crews.some((c) => c.owner === player && c.where.zone === "region" && c.where.index === index)) continue;
-        if (readySupply(state2, player) < supplyCost(state2, def.id, index)) continue;
-        out.push(act({ type: "play", iid: card.iid, region: index }));
-      }
-    } else if (def.type === "venture") {
-      if (you.ventures.some((slot) => slot === null) && readySupply(state2, player) >= supplyCost(state2, def.id)) {
-        out.push(act({ type: "play", iid: card.iid }));
-      }
-    }
-  }
+  for (const card of you.hand) for (const action of playsFor(state2, player, card, false)) out.push(act(action));
+  for (const card of playableStores(state2, player)) for (const action of playsFor(state2, player, card, true)) out.push(act(action));
+  const ready = readySupply(state2, player);
   for (const crew of crewsOf(state2, player)) {
     if (crew.marchesLeft <= 0) continue;
+    const dests = [];
     if (crew.where.zone === "harbor") {
       for (let index = 0; index < 5; index++) {
         const region = state2.regions[index];
-        if (region.faceUp && forbidsHarbor(region.regionId) || !roomFor(state2, player, index)) continue;
-        out.push(act({ type: "march", iid: crew.iid, dest: { zone: "region", index } }));
+        if (region.faceUp && forbidsHarbor(region.regionId)) continue;
+        dests.push(index);
       }
     } else {
       out.push(act({ type: "march", iid: crew.iid, dest: { zone: "harbor" } }));
-      for (const index of regionsYouCanMarchTo(state2, crew)) {
-        if (roomFor(state2, player, index)) out.push(act({ type: "march", iid: crew.iid, dest: { zone: "region", index } }));
-      }
+      dests.push(...regionsYouCanMarchTo(state2, crew));
+    }
+    for (const index of dests) {
+      if (!roomFor(state2, player, index) || ready < entryTax(state2, player, index)) continue;
+      out.push(act({ type: "march", iid: crew.iid, dest: { zone: "region", index } }));
     }
   }
   you.ventures.forEach((slot, index) => {
@@ -5604,69 +7892,35 @@ function getLegalActions(state2, player) {
   const concede = act({ type: "concede", player });
   const decision = state2.decision;
   if (!decision || decision.player !== player) return [concede];
-  if (decision.type === "mulligan") {
-    return [
-      concede,
-      { kind: "subset", actionType: "mulligan", options: state2.players[player].hand.map((c) => c.iid), min: 0, max: state2.players[player].hand.length }
-    ];
-  }
-  if (decision.type === "discard") {
-    const hand = state2.players[player].hand;
-    return [concede, { kind: "subset", actionType: "discard", options: hand.map((c) => c.iid), min: hand.length - 8, max: hand.length - 8 }];
-  }
-  if (decision.type === "surveyLook") {
-    return [concede, { kind: "subset", actionType: "surveyLook", options: decision.options, min: 0, max: Math.min(decision.max, decision.options.length) }];
-  }
-  if (decision.type === "surveyFlip") {
-    return [concede, { kind: "subset", actionType: "surveyFlip", options: decision.options, min: 0, max: decision.options.length }];
-  }
-  if (decision.type === "command") return [concede, ...commandActions(state2, player)];
-  if (decision.type === "ambush") {
-    const orders = [act({ type: "pass" })];
-    for (const card of state2.players[player].hand) {
-      for (const action of playableOrder(state2, player, card.iid, true)) orders.push(act(action));
+  switch (decision.type) {
+    case "mulligan":
+      return [concede, { kind: "subset", actionType: "mulligan", options: state2.players[player].hand.map((c) => c.iid), min: 0, max: state2.players[player].hand.length }];
+    case "discard": {
+      const hand = state2.players[player].hand;
+      return [concede, { kind: "subset", actionType: "discard", options: hand.map((c) => c.iid), min: hand.length - 8, max: hand.length - 8 }];
     }
-    return [concede, ...orders];
+    case "surveyLook":
+      return [concede, { kind: "subset", actionType: "surveyLook", options: decision.options, min: 0, max: Math.min(decision.max, decision.options.length) }];
+    case "surveyFlip":
+      return [concede, { kind: "subset", actionType: "surveyFlip", options: decision.options, min: 0, max: decision.options.length }];
+    case "command":
+      return [concede, ...commandActions(state2, player)];
+    case "ambush": {
+      const orders = [act({ type: "pass" })];
+      for (const card of state2.players[player].hand) for (const action of orderPlays(state2, player, card, true, false)) orders.push(act(action));
+      for (const card of playableStores(state2, player)) for (const action of orderPlays(state2, player, card, true, true)) orders.push(act(action));
+      return [concede, ...orders];
+    }
+    case "assign":
+      return [concede, { kind: "assign", targets: decision.targets, amount: decision.amount }];
+    case "pick":
+      return [concede, ...decision.options.map((choice) => act({ type: "pick", choice }))];
+    case "choose":
+      return [concede, ...decision.options.map((_, index) => act({ type: "choose", index }))];
   }
-  if (decision.type === "assign") {
-    return [concede, { kind: "assign", targets: decision.targets, amount: decision.amount }];
-  }
-  return [concede];
-}
-
-// packages/engine/src/types.ts
-function other(player) {
-  return player === 0 ? 1 : 0;
 }
 
 // packages/engine/src/apply.ts
-function compile(effects, player, ctx) {
-  const out = [];
-  for (const effect of effects) {
-    if (effect.do === "draw") out.push({ op: "draw", player, amount: effect.amount });
-    else if (effect.do === "stowFromDeck") out.push({ op: "stowDeck", player });
-    else if (effect.do === "extraStow") out.push({ op: "extraStow", player, amount: effect.amount });
-    else if (effect.do === "survey") out.push({ op: "beginSurvey", player, n: effect.n });
-    else if (effect.do === "extraMarch") {
-      if (!ctx.target) throw new Error("That order needs a crew.");
-      out.push({ op: "extraMarch", iid: ctx.target });
-    } else if (effect.do === "buffYourCrews") {
-      if (ctx.region == null) throw new Error("That order needs a Region.");
-      out.push({
-        op: "buff",
-        player,
-        region: ctx.region,
-        might: effect.might ?? 0,
-        endurance: effect.endurance ?? 0,
-        until: effect.until
-      });
-    } else if (effect.do === "damageCrew") {
-      if (!ctx.target) throw new Error("That order needs a crew.");
-      out.push({ op: "damage", iid: ctx.target, amount: effect.amount, source: "order" });
-    }
-  }
-  return out;
-}
 function draw(state2, player, amount, events) {
   const you = state2.players[player];
   const drawn = [];
@@ -5683,12 +7937,26 @@ function draw(state2, player, amount, events) {
   }
   if (drawn.length) events.push({ type: "draw", player, amount: drawn.length, cardIds: drawn });
 }
+function stowFromDeck(state2, player, amount) {
+  for (let n = 0; n < amount; n++) {
+    const cardId = state2.players[player].deck.shift();
+    if (cardId) state2.players[player].stores.push({ iid: mint(state2), cardId, exhausted: false });
+  }
+}
+function queueTriggers(state2, on2, first, accept, extra = {}, front = false) {
+  const items = triggered(state2, on2, first, accept).map(({ ability: ability2, ctx }) => ({ op: "ability", ability: ability2, ctx: { ...ctx, ...extra } }));
+  if (front) state2.queue.unshift(...items);
+  else state2.queue.push(...items);
+}
 function defeat(state2, iid, events) {
   const crew = findCrew(state2, iid);
   if (!crew) return;
+  const here = regionOf(crew);
+  const last = getCard(crew.cardId).abilities.flatMap((a) => a.on === "onDefeated" ? [a] : []);
   state2.players[crew.owner].discard.push({ iid: crew.iid, cardId: crew.cardId });
   state2.crews = state2.crews.filter((c) => c.iid !== iid);
   events.push({ type: "defeat", iid, owner: crew.owner, cardId: crew.cardId });
+  for (const ability2 of last) state2.queue.push({ op: "ability", ability: ability2, ctx: { player: crew.owner, cardId: crew.cardId, here } });
 }
 function damageCrew(state2, iid, amount, source, events) {
   const crew = findCrew(state2, iid);
@@ -5699,7 +7967,7 @@ function damageCrew(state2, iid, amount, source, events) {
   }
   crew.damage += amount;
   events.push({ type: "damage", iid, amount });
-  if (source !== "strike" && crew.damage >= enduranceOf(crew)) defeat(state2, iid, events);
+  if (source !== "strike" && crew.damage >= enduranceOf(state2, crew)) defeat(state2, iid, events);
 }
 function surveyOptions(state2) {
   const options = [];
@@ -5708,56 +7976,279 @@ function surveyOptions(state2) {
   });
   return options;
 }
-function applyFx(state2, fx2, events) {
-  if (fx2.op === "draw") draw(state2, fx2.player, fx2.amount, events);
-  else if (fx2.op === "stowDeck") {
-    const cardId = state2.players[fx2.player].deck.shift();
-    if (cardId) state2.players[fx2.player].stores.push({ iid: mint(state2), cardId, exhausted: false });
-  } else if (fx2.op === "extraStow") state2.players[fx2.player].stowLeft += fx2.amount;
-  else if (fx2.op === "beginSurvey") {
-    const options = surveyOptions(state2);
-    if (!options.length || fx2.n <= 0) return;
-    if (state2.decision) state2.paused.push(state2.decision);
-    state2.decision = { type: "surveyLook", player: fx2.player, max: fx2.n, options };
-  } else if (fx2.op === "flip") {
-    const region = state2.regions[fx2.index];
-    if (!region || region.faceUp || trait(region.regionId, "hiddenFromScout")) return;
-    region.faceUp = true;
-    events.push({ type: "flip", index: fx2.index, regionId: region.regionId, player: fx2.player });
-    const revealed = getRegion(region.regionId).traits.find((t) => t.kind === "whenRevealed");
-    if (revealed && revealed.kind === "whenRevealed") state2.queue.unshift(...compile(revealed.effects, fx2.player, {}));
-  } else if (fx2.op === "damage") damageCrew(state2, fx2.iid, fx2.amount, fx2.source, events);
-  else if (fx2.op === "buff") {
-    for (const crew of crewsAt(state2, fx2.region)) {
-      if (crew.owner !== fx2.player) continue;
-      crew.mods.push({ might: fx2.might, endurance: fx2.endurance, until: fx2.until });
-    }
-  } else if (fx2.op === "extraMarch") {
-    const crew = findCrew(state2, fx2.iid);
-    if (crew) crew.marchesLeft += 1;
-  } else if (fx2.op === "handoffAmbush") handoffAmbush(state2);
-}
-function drain(state2, events) {
-  let guard = 0;
-  while (state2.queue.length && !choiceOpen(state2) && !state2.over) {
-    if (++guard > 500) throw new Error("The rules queued too much work.");
-    const fx2 = state2.queue.shift();
-    if (fx2) applyFx(state2, fx2, events);
+function flipRegion(state2, index, player, events, lander) {
+  const region = state2.regions[index];
+  if (!region || region.faceUp) return [];
+  region.faceUp = true;
+  events.push({ type: "flip", index, regionId: region.regionId, player });
+  const out = [];
+  for (const t of getRegion(region.regionId).traits) {
+    if (t.kind !== "whenRevealed") continue;
+    for (const effect2 of t.effects) out.push({ op: "effect", effect: effect2, ctx: { player, cardId: region.regionId, here: index } });
   }
-  if (choiceOpen(state2) || state2.over) return;
-  if (state2.claim && !state2.decision) continueClaim(state2, events);
-  if (!choiceOpen(state2) && state2.paused.length && !state2.queue.length && !state2.claim) {
-    state2.decision = state2.paused.pop() ?? null;
+  if (lander) {
+    for (const ability2 of getCard(lander.cardId).abilities) {
+      if (ability2.on === "landing") out.push({ op: "ability", ability: ability2, ctx: { player, cardId: lander.cardId, sourceIid: lander.iid, here: index } });
+    }
+  }
+  out.push(...triggered(state2, "onFlip", player).map(({ ability: ability2, ctx }) => ({ op: "ability", ability: ability2, ctx })));
+  return out;
+}
+function setController(state2, index, next, events) {
+  const region = state2.regions[index];
+  const prev = region.controller;
+  if (prev === next) return;
+  if (region.outpost && prev !== null && region.outpost.owner === prev) {
+    state2.players[prev].discard.push({ iid: region.outpost.iid, cardId: region.outpost.cardId });
+    events.push({ type: "razed", owner: prev, index, cardId: region.outpost.cardId });
+    region.outpost = null;
+  }
+  region.controller = next;
+  events.push({ type: "control", index, player: next });
+  if (next === null) return;
+  if (prev !== null) raid(state2, next, prev, index, events);
+  if (!region.controlledOnce) {
+    region.controlledOnce = true;
+    for (const t of getRegion(region.regionId).traits) {
+      if (t.kind !== "firstControl") continue;
+      for (const effect2 of t.effects) state2.queue.push({ op: "effect", effect: effect2, ctx: { player: next, cardId: region.regionId, here: index } });
+    }
+  }
+  queueTriggers(state2, "onControlGained", next, (p) => p.kind === "crew" && p.here === index);
+}
+function steal(state2, taker, victim, amount, events, byRaid) {
+  for (let n = 0; n < amount; n++) {
+    const pile = state2.players[victim].stores;
+    if (!pile.length) break;
+    const [card] = pile.splice(Math.floor(roll(state2) * pile.length), 1);
+    if (!card) break;
+    card.exhausted = true;
+    card.taken = true;
+    state2.players[taker].stores.push(card);
+    state2.players[taker].taken += 1;
+    events.push({ type: "raid", player: taker, from: victim, cardId: card.cardId });
+    if (byRaid) queueTriggers(state2, "onRaid", taker);
+  }
+}
+function raid(state2, taker, victim, index, events) {
+  const region = state2.regions[index];
+  const per = 1 + (trait(region.regionId, "raidExtra")?.extra ?? 0);
+  for (const crew of crewsAt(state2, index)) {
+    if (crew.owner !== taker || !hasKeyword(state2, crew, "raid")) continue;
+    steal(state2, taker, victim, per, events, true);
+  }
+}
+function needsChoice(effect2, ctx) {
+  if (!("target" in effect2)) return false;
+  const t = effect2.target.t;
+  if (t === "chosenCrew") return ctx.target == null;
+  if (t === "crewsInChosenRegion" || t === "chosenRegion") return ctx.region == null;
+  return false;
+}
+function crewsFor(state2, target2, ctx) {
+  switch (target2.t) {
+    case "self":
+      return state2.crews.filter((c) => c.iid === ctx.sourceIid);
+    case "entering":
+      return state2.crews.filter((c) => c.iid === ctx.target);
+    case "chosenCrew":
+      return state2.crews.filter((c) => c.iid === ctx.target && crewMatches(state2, c, target2.filter, ctx));
+    case "allCrews":
+      return state2.crews.filter((c) => crewMatches(state2, c, target2.filter, ctx));
+    case "crewsInChosenRegion": {
+      if (ctx.region == null) return [];
+      const whose = target2.owner === "you" ? ctx.player : other(ctx.player);
+      return crewsAt(state2, ctx.region).filter((c) => c.owner === whose);
+    }
+    case "chosenRegion":
+      return [];
+  }
+}
+function openPick(state2, effects, ctx) {
+  const choice = firstChoice(effects);
+  if (!choice) return false;
+  const options = choicesFor(state2, choice, ctx);
+  const kind = options.some((o) => o.region != null) ? "region" : "crew";
+  const values = options.map((o) => kind === "region" ? o.region : o.target);
+  if (!values.length) return false;
+  if (values.length === 1) {
+    const picked2 = kind === "region" ? { ...ctx, region: values[0] } : { ...ctx, target: values[0] };
+    state2.queue.unshift(...effects.map((effect2) => ({ op: "effect", effect: effect2, ctx: picked2 })));
+    return true;
+  }
+  if (state2.decision && state2.decision.type === "command") state2.paused.push(state2.decision);
+  state2.decision = { type: "pick", player: ctx.player, kind, options: values, effects, ctx };
+  return true;
+}
+function runEffect(state2, effect2, ctx, events) {
+  if (needsChoice(effect2, ctx)) {
+    openPick(state2, [effect2], ctx);
+    return;
+  }
+  const you = ctx.player;
+  const foe = other(you);
+  switch (effect2.do) {
+    case "draw":
+      draw(state2, effect2.who === "opponent" ? foe : you, effect2.amount, events);
+      return;
+    case "stowFromDeck":
+      stowFromDeck(state2, you, effect2.amount);
+      return;
+    case "extraStow":
+      state2.players[you].stowLeft += effect2.amount;
+      return;
+    case "readyStores": {
+      let left = effect2.amount;
+      for (const card of state2.players[you].stores) {
+        if (left <= 0) break;
+        if (card.exhausted) {
+          card.exhausted = false;
+          left -= 1;
+        }
+      }
+      return;
+    }
+    case "survey": {
+      const options = surveyOptions(state2);
+      if (!options.length) return;
+      if (state2.decision && state2.decision.type === "command") state2.paused.push(state2.decision);
+      state2.decision = { type: "surveyLook", player: you, max: effect2.n, options };
+      return;
+    }
+    case "damage":
+      for (const crew of crewsFor(state2, effect2.target, ctx)) damageCrew(state2, crew.iid, effect2.amount, "effect", events);
+      return;
+    case "modifyStats":
+      for (const crew of crewsFor(state2, effect2.target, ctx)) {
+        crew.mods.push({ might: effect2.might ?? 0, endurance: effect2.endurance ?? 0, until: effect2.until });
+        if (crew.damage >= enduranceOf(state2, crew)) defeat(state2, crew.iid, events);
+      }
+      return;
+    case "grantKeyword":
+      for (const crew of crewsFor(state2, effect2.target, ctx)) {
+        crew.grants.push({ keyword: effect2.keyword, until: effect2.until });
+        if (effect2.keyword === "swift" && crew.deployedThisTurn && crew.marchesLeft === 0 && crew.owner === you) crew.marchesLeft = 1;
+      }
+      return;
+    case "returnToHarbor":
+      for (const crew of crewsFor(state2, effect2.target, ctx)) {
+        crew.where = { zone: "harbor" };
+        events.push({ type: "returned", iid: crew.iid });
+      }
+      return;
+    case "extraMarch":
+      for (const crew of crewsFor(state2, effect2.target, ctx)) crew.marchesLeft += 1;
+      return;
+    case "takeFromStores":
+      steal(state2, you, foe, effect2.amount, events, false);
+      return;
+    case "discardFromStores":
+      for (let n = 0; n < effect2.amount; n++) {
+        const pile = state2.players[foe].stores;
+        if (!pile.length) break;
+        const [card] = pile.splice(Math.floor(roll(state2) * pile.length), 1);
+        if (!card) break;
+        state2.players[foe].discard.push({ iid: card.iid, cardId: card.cardId });
+        events.push({ type: "discarded", player: foe, cardId: card.cardId, from: "stores" });
+      }
+      return;
+    case "discardFromHand":
+      for (let n = 0; n < effect2.amount; n++) {
+        const hand = state2.players[foe].hand;
+        if (!hand.length) break;
+        const [card] = hand.splice(Math.floor(roll(state2) * hand.length), 1);
+        if (!card) break;
+        state2.players[foe].discard.push(card);
+        events.push({ type: "discarded", player: foe, cardId: card.cardId, from: "hand" });
+      }
+      return;
+    case "gainRenown": {
+      const times = effect2.per === "good" ? goodsOf(state2, you).size : effect2.per === "regionControlled" ? controlled(state2, you).length : effect2.per === "crewHere" ? ctx.here == null ? 0 : crewsAt(state2, ctx.here).filter((c) => c.owner === you).length : 1;
+      const amount = effect2.amount * times;
+      if (amount > 0) {
+        state2.players[you].renown += amount;
+        events.push({ type: "renown", player: you, amount, reason: ctx.cardId });
+      }
+      return;
+    }
+    case "takeControl": {
+      if (ctx.region == null) return;
+      for (const crew of crewsAt(state2, ctx.region).filter((c) => c.owner === foe)) {
+        crew.where = { zone: "harbor" };
+        events.push({ type: "returned", iid: crew.iid });
+      }
+      setController(state2, ctx.region, you, events);
+      return;
+    }
+    case "chooseOne":
+      if (state2.decision && state2.decision.type === "command") state2.paused.push(state2.decision);
+      state2.decision = { type: "choose", player: you, options: effect2.options, ctx };
+      return;
+  }
+}
+function runAbility(state2, ability2, ctx) {
+  if (!conditionMet(state2, ability2.if, ctx.player, ctx.here)) return;
+  const choice = firstChoice(ability2.effects);
+  if (choice && needsChoice(choice, ctx)) {
+    if (!openPick(state2, ability2.effects, ctx)) {
+      const rest = ability2.effects.filter((e) => !needsChoice(e, ctx));
+      state2.queue.unshift(...rest.map((effect2) => ({ op: "effect", effect: effect2, ctx })));
+    }
+    return;
+  }
+  state2.queue.unshift(...ability2.effects.map((effect2) => ({ op: "effect", effect: effect2, ctx })));
+}
+function applyFx(state2, fx3, events) {
+  switch (fx3.op) {
+    case "ability":
+      runAbility(state2, fx3.ability, fx3.ctx);
+      return;
+    case "effect":
+      runEffect(state2, fx3.effect, fx3.ctx, events);
+      return;
+    case "flip": {
+      const region = state2.regions[fx3.index];
+      if (!region || trait(region.regionId, "hiddenFromScout")) return;
+      state2.queue.unshift(...flipRegion(state2, fx3.index, fx3.player, events));
+      return;
+    }
+    case "damage":
+      damageCrew(state2, fx3.iid, fx3.amount, fx3.source, events);
+      return;
+    case "handoffAmbush":
+      handoffAmbush(state2);
+      return;
   }
 }
 function choiceOpen(state2) {
   const kind = state2.decision?.type;
-  return kind === "surveyLook" || kind === "surveyFlip" || kind === "ambush" || kind === "assign" || kind === "discard" || kind === "mulligan";
+  return kind != null && kind !== "command";
+}
+function run(state2, events) {
+  for (let guard = 0; guard < 5e3; guard++) {
+    if (state2.over) return;
+    if (choiceOpen(state2)) return;
+    const fx3 = state2.queue.shift();
+    if (fx3) {
+      applyFx(state2, fx3, events);
+      continue;
+    }
+    if (state2.claim) {
+      stepClaim(state2, events);
+      continue;
+    }
+    if (!state2.decision && state2.paused.length) {
+      state2.decision = state2.paused.pop() ?? null;
+      continue;
+    }
+    return;
+  }
+  throw new Error("The rules queued too much work.");
 }
 function startTurn(state2, player, events) {
   const you = state2.players[player];
   for (const card of you.stores) card.exhausted = false;
-  you.stowLeft = 1;
+  you.stowLeft = stowsPerTurn(state2, player);
   if (!(state2.round === 1 && player === state2.firstPlayer)) draw(state2, player, 1, events);
   for (const crew of crewsOf(state2, player)) {
     crew.deployedThisTurn = false;
@@ -5766,13 +8257,17 @@ function startTurn(state2, player, events) {
   state2.turnsTaken += 1;
   state2.claim = null;
   state2.decision = { type: "command", player };
+  queueTriggers(state2, "startOfTurn", player, (p) => p.owner === player);
 }
 function finishTurn(state2, player, events) {
-  for (const crew of crewsOf(state2, player)) crew.mods = crew.mods.filter((mod) => mod.until !== "turn");
-  if (state2.turnsTaken >= 2) beginClaim(state2, events);
+  for (const crew of state2.crews) {
+    crew.mods = crew.mods.filter((mod) => mod.until !== "turn");
+    crew.grants = crew.grants.filter((g) => g.until !== "turn");
+  }
+  if (state2.turnsTaken >= 2) beginClaim(state2);
   else startTurn(state2, other(player), events);
 }
-function beginClaim(state2, events) {
+function beginClaim(state2) {
   state2.claim = {
     step: "hazards",
     region: 0,
@@ -5784,71 +8279,55 @@ function beginClaim(state2, events) {
     controlAtStart: state2.regions.map((region) => region.controller)
   };
   state2.decision = null;
-  continueClaim(state2, events);
 }
-function continueClaim(state2, events) {
+function stepClaim(state2, events) {
   const claim = state2.claim;
-  if (!claim || state2.over) return;
-  let guard = 0;
-  while (!state2.over && !choiceOpen(state2)) {
-    if (++guard > 80) throw new Error("The Claim phase did not advance.");
-    if (claim.step === "hazards") {
+  switch (claim.step) {
+    case "hazards":
       resolveHazards(state2, events);
       claim.step = "clash";
       claim.region = 0;
       claim.clashStep = "ambush";
-      continue;
-    }
-    if (claim.step === "clash") {
+      return;
+    case "clash": {
       if (claim.region >= 5) {
         claim.step = "control";
-        continue;
+        return;
       }
       const both = crewsAt(state2, claim.region).some((c) => c.owner === 0) && crewsAt(state2, claim.region).some((c) => c.owner === 1);
-      if (!both) {
+      if (!both || claim.clashStep === "defeat") {
         claim.region += 1;
         claim.clashStep = "ambush";
-        continue;
+        return;
       }
       if (claim.clashStep === "ambush") {
         claim.passes = 0;
         claim.priority = other(state2.initiative);
         openAmbush(state2);
-        if (choiceOpen(state2)) return;
-        if (claim.clashStep === "ambush") claim.clashStep = "assign";
-        continue;
+        return;
       }
-      if (claim.clashStep === "assign") {
-        prepareAssign(state2, events);
-        if (choiceOpen(state2)) return;
-        continue;
-      }
-      claim.region += 1;
-      claim.clashStep = "ambush";
-      continue;
+      prepareAssign(state2, events);
+      return;
     }
-    if (claim.step === "control") {
+    case "control":
       resolveControl(state2, events);
       scoreRegionRenown(state2, events);
       claim.step = "ventures";
-      continue;
-    }
-    if (claim.step === "ventures") {
+      return;
+    case "ventures":
       scoreVentures(state2, events);
       claim.step = "other";
-      continue;
-    }
-    if (claim.step === "other") {
+      return;
+    case "other":
+      queueTriggers(state2, "atClaim", state2.initiative);
       claim.step = "victory";
-      continue;
-    }
-    if (claim.step === "victory") {
-      if (checkVictory(state2, events)) return;
-      claim.step = "cleanup";
-      continue;
-    }
-    cleanup(state2, events);
-    return;
+      return;
+    case "victory":
+      if (!checkVictory(state2, events)) claim.step = "cleanup";
+      return;
+    case "cleanup":
+      cleanup(state2, events);
+      return;
   }
 }
 function resolveHazards(state2, events) {
@@ -5859,11 +8338,11 @@ function resolveHazards(state2, events) {
       if (t.kind === "atClaimDamageEach") {
         for (const crew of [...crewsAt(state2, index)]) damageCrew(state2, crew.iid, t.amount, "region", events);
       } else if (t.kind === "atClaimDamageLowest") {
-        for (const owner of [0, 1]) {
-          const mine = crewsAt(state2, index).filter((c) => c.owner === owner);
+        for (const owner2 of [0, 1]) {
+          const mine = crewsAt(state2, index).filter((c) => c.owner === owner2);
           if (!mine.length) continue;
-          const low = Math.min(...mine.map(enduranceOf));
-          for (const crew of mine) if (enduranceOf(crew) === low) damageCrew(state2, crew.iid, t.amount, "region", events);
+          const low = Math.min(...mine.map((c) => enduranceOf(state2, c)));
+          for (const crew of mine) if (enduranceOf(state2, crew) === low) damageCrew(state2, crew.iid, t.amount, "region", events);
         }
       }
     }
@@ -5917,7 +8396,7 @@ function finishAssign(state2, events) {
   for (const [iid, amount] of Object.entries(claim.hits)) damageCrew(state2, iid, amount, "strike", events);
   claim.hits = {};
   for (const crew of [...crewsAt(state2, claim.region)]) {
-    if (crew.damage >= enduranceOf(crew)) defeat(state2, crew.iid, events);
+    if (crew.damage >= enduranceOf(state2, crew)) defeat(state2, crew.iid, events);
   }
   claim.clashStep = "defeat";
   state2.decision = null;
@@ -5930,14 +8409,13 @@ function resolveControl(state2, events) {
     const here = crewsAt(state2, index);
     const left = here.filter((c) => c.owner === 0);
     const right = here.filter((c) => c.owner === 1);
-    const m0 = sideMight(state2, 0, index, false);
-    const m1 = sideMight(state2, 1, index, false);
+    const might = { 0: sideMight(state2, 0, index, false), 1: sideMight(state2, 1, index, false) };
     let next = region.controller;
     if (left.length && !right.length) next = 0;
     else if (right.length && !left.length) next = 1;
     else if (left.length && right.length) {
-      if (m0 > m1) next = 0;
-      else if (m1 > m0) next = 1;
+      if (might[0] > might[1]) next = 0;
+      else if (might[1] > might[0]) next = 1;
     }
     if (def.traits.some((t) => t.kind === "loseControlWithoutCrew") && next !== null) {
       const holding = next === 0 ? left : right;
@@ -5945,26 +8423,14 @@ function resolveControl(state2, events) {
     }
     const margin = def.traits.find((t) => t.kind === "controlMargin");
     if (next !== region.controller && next !== null && margin && margin.kind === "controlMargin") {
-      const have = next === 0 ? m0 : m1;
-      const against = next === 0 ? m1 : m0;
-      if (have < against + margin.margin) next = region.controller;
+      if (might[next] < might[other(next)] + margin.margin) next = region.controller;
     }
-    if (next === region.controller) continue;
-    const prev = region.controller;
-    if (region.outpost && prev !== null && region.outpost.owner === prev) {
-      state2.players[prev].discard.push({ iid: region.outpost.iid, cardId: region.outpost.cardId });
-      region.outpost = null;
+    const hold2 = holdMargin(state2, index);
+    if (hold2 > 0 && region.controller !== null && next !== region.controller) {
+      const holder = region.controller;
+      if (might[other(holder)] < might[holder] + hold2) next = holder;
     }
-    region.controller = next;
-    events.push({ type: "control", index, player: next });
-    if (prev !== null && next !== null) raid(state2, next, prev, index, events);
-    if (next !== null && !region.controlledOnce) {
-      region.controlledOnce = true;
-      const first = def.traits.find((t) => t.kind === "firstControl");
-      if (first && first.kind === "firstControl") {
-        for (const effect of first.effects) if (effect.do === "draw") draw(state2, next, effect.amount, events);
-      }
-    }
+    setController(state2, index, next, events);
   }
 }
 function scoreRegionRenown(state2, events) {
@@ -5977,39 +8443,20 @@ function scoreRegionRenown(state2, events) {
     events.push({ type: "renown", player, amount, reason: region.regionId });
   }
 }
-function raid(state2, taker, victim, index, events) {
-  const region = state2.regions[index];
-  const extra = trait(region.regionId, "raidExtra")?.extra ?? 0;
-  const per = 1 + extra;
-  for (const crew of crewsAt(state2, index)) {
-    if (crew.owner !== taker || !hasKeyword(state2, crew, "raid")) continue;
-    for (let n = 0; n < per; n++) {
-      const pile = state2.players[victim].stores;
-      if (!pile.length) break;
-      const pick = Math.floor(roll(state2) * pile.length);
-      const [card] = pile.splice(pick, 1);
-      if (!card) break;
-      card.exhausted = true;
-      state2.players[taker].stores.push(card);
-      events.push({ type: "raid", player: taker, from: victim, cardId: card.cardId });
-    }
-  }
-}
 function scoreVentures(state2, events) {
   for (const player of [state2.initiative, other(state2.initiative)]) {
     const you = state2.players[player];
-    const held = state2.regions.filter((region) => region.controller === player).length;
     for (let slot = 0; slot < 2; slot++) {
       const venture = you.ventures[slot];
       if (!venture) continue;
-      for (const ability of getCard(venture.cardId).abilities) {
-        if (ability.trigger !== "atClaim" || held < ability.if.youControlAtLeast) continue;
-        you.renown += ability.gain;
-        you.completedVentures += 1;
-        you.discard.push(venture);
-        you.ventures[slot] = null;
-        events.push({ type: "renown", player, amount: ability.gain, reason: venture.cardId });
-      }
+      const def = getCard(venture.cardId);
+      const ability2 = def.abilities.find((a) => a.on === "atClaim");
+      if (!ability2 || !conditionMet(state2, ability2.if, player, null)) continue;
+      you.completedVentures += 1;
+      you.discard.push(venture);
+      you.ventures[slot] = null;
+      events.push({ type: "ventureDone", player, cardId: venture.cardId });
+      for (const effect2 of ability2.effects) state2.queue.push({ op: "effect", effect: effect2, ctx: { player, cardId: venture.cardId, here: null } });
     }
   }
 }
@@ -6058,6 +8505,7 @@ function cleanup(state2, events) {
   for (const crew of state2.crews) {
     crew.damage = 0;
     crew.mods = crew.mods.filter((mod) => mod.until !== "round");
+    crew.grants = crew.grants.filter((g) => g.until !== "round");
   }
   state2.initiative = other(state2.initiative);
   state2.round += 1;
@@ -6077,11 +8525,26 @@ function takeFromHand(state2, player, iid) {
   const [card] = hand.splice(index, 1);
   return card;
 }
+function takeFromStores(state2, player, iid) {
+  const stores = state2.players[player].stores;
+  const index = stores.findIndex((card2) => card2.iid === iid);
+  if (index < 0) throw new Error("That card is not in your Stores.");
+  const [card] = stores.splice(index, 1);
+  return { iid: card.iid, cardId: card.cardId };
+}
 function subsetFits(legal, values) {
   if (legal.kind !== "subset") return false;
   if (values.length < legal.min || values.length > legal.max) return false;
   const options = new Set(legal.options);
   return values.every((value) => options.has(value)) && new Set(values).size === values.length;
+}
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, v]) => v !== void 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 function allowed(state2, player, action) {
   if (state2.over) throw new Error("The game is over.");
@@ -6115,18 +8578,19 @@ function allowed(state2, player, action) {
   const match = legal.some((item) => item.kind === "act" && canonical(item.action) === key);
   if (!match) throw new Error("That is not a legal action.");
 }
-function canonical(value) {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value).filter(([, v]) => v !== void 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
 function actorOf(state2, action) {
   if (action.type === "concede") return action.player;
   if (!state2.decision) throw new Error("Nobody is deciding.");
   return state2.decision.player;
+}
+function enterRegion(state2, crew, index) {
+  queueTriggers(
+    state2,
+    "onFriendlyEnter",
+    crew.owner,
+    (p) => p.kind === "crew" && p.owner === crew.owner && p.here === index && p.iid !== crew.iid,
+    { target: crew.iid }
+  );
 }
 function perform(state2, action, events) {
   const player = state2.decision?.player;
@@ -6135,76 +8599,90 @@ function perform(state2, action, events) {
     return;
   }
   if (player == null) throw new Error("Nobody is deciding.");
-  if (action.type === "mulligan") return mulligan(state2, player, action.iids, events);
-  if (action.type === "discard") {
-    for (const iid of action.iids) {
-      const card = takeFromHand(state2, player, iid);
-      state2.players[player].discard.push(card);
-    }
-    state2.decision = null;
-    finishTurn(state2, player, events);
-    return;
-  }
-  if (action.type === "stow") {
-    const card = takeFromHand(state2, player, action.iid);
-    state2.players[player].stores.push({ ...card, exhausted: false });
-    state2.players[player].stowLeft -= 1;
-    return;
-  }
-  if (action.type === "play") return play(state2, player, action, events);
-  if (action.type === "march") return march(state2, player, action.iid, action.dest, events);
-  if (action.type === "abandon") {
-    const venture = state2.players[player].ventures[action.slot];
-    if (!venture) throw new Error("That Venture slot is empty.");
-    state2.players[player].discard.push(venture);
-    state2.players[player].ventures[action.slot] = null;
-    return;
-  }
-  if (action.type === "end") {
-    const you = state2.players[player];
-    if (you.hand.length > 8) {
-      state2.decision = { type: "discard", player };
+  switch (action.type) {
+    case "mulligan":
+      mulligan(state2, player, action.iids, events);
+      return;
+    case "discard":
+      for (const iid of action.iids) state2.players[player].discard.push(takeFromHand(state2, player, iid));
+      state2.decision = null;
+      finishTurn(state2, player, events);
+      return;
+    case "stow": {
+      const card = takeFromHand(state2, player, action.iid);
+      state2.players[player].stores.push({ ...card, exhausted: false });
+      state2.players[player].stowLeft -= 1;
+      events.push({ type: "stow", player });
       return;
     }
-    state2.decision = null;
-    finishTurn(state2, player, events);
-    return;
-  }
-  if (action.type === "pass") {
-    const claim = state2.claim;
-    if (!claim) throw new Error("Nothing to pass.");
-    claim.passes += 1;
-    state2.decision = null;
-    if (claim.passes >= 2) {
-      claim.clashStep = "assign";
-      continueClaim(state2, events);
+    case "play":
+      play(state2, player, action, events);
+      return;
+    case "march":
+      march(state2, player, action.iid, action.dest, events);
+      return;
+    case "abandon": {
+      const venture = state2.players[player].ventures[action.slot];
+      if (!venture) throw new Error("That Venture slot is empty.");
+      state2.players[player].discard.push(venture);
+      state2.players[player].ventures[action.slot] = null;
       return;
     }
-    claim.priority = other(player);
-    openAmbush(state2);
-    if (!choiceOpen(state2)) continueClaim(state2, events);
-    return;
-  }
-  if (action.type === "assign") {
-    const claim = state2.claim;
-    if (!claim) throw new Error("No Clash to assign.");
-    for (const [iid, amount] of Object.entries(action.hits)) claim.hits[iid] = (claim.hits[iid] ?? 0) + amount;
-    claim.assignQueue.shift();
-    state2.decision = null;
-    finishAssign(state2, events);
-    if (!choiceOpen(state2)) continueClaim(state2, events);
-    return;
-  }
-  if (action.type === "surveyLook") {
-    const seen = state2.peeked[player];
-    for (const index of action.indices) if (!seen.includes(index)) seen.push(index);
-    state2.decision = { type: "surveyFlip", player, options: action.indices };
-    return;
-  }
-  if (action.type === "surveyFlip") {
-    state2.decision = state2.paused.pop() ?? null;
-    state2.queue.unshift(...action.indices.map((index) => ({ op: "flip", index, player })));
-    drain(state2, events);
+    case "end":
+      if (state2.players[player].hand.length > 8) {
+        state2.decision = { type: "discard", player };
+        return;
+      }
+      state2.decision = null;
+      finishTurn(state2, player, events);
+      return;
+    case "pass": {
+      const claim = state2.claim;
+      if (!claim) throw new Error("Nothing to pass.");
+      claim.passes += 1;
+      state2.decision = null;
+      if (claim.passes >= 2) {
+        claim.clashStep = "assign";
+        return;
+      }
+      claim.priority = other(player);
+      openAmbush(state2);
+      return;
+    }
+    case "assign": {
+      const claim = state2.claim;
+      if (!claim) throw new Error("No Clash to assign.");
+      for (const [iid, amount] of Object.entries(action.hits)) claim.hits[iid] = (claim.hits[iid] ?? 0) + amount;
+      claim.assignQueue.shift();
+      state2.decision = null;
+      finishAssign(state2, events);
+      return;
+    }
+    case "surveyLook": {
+      const seen = state2.peeked[player];
+      for (const index of action.indices) if (!seen.includes(index)) seen.push(index);
+      state2.decision = { type: "surveyFlip", player, options: action.indices };
+      return;
+    }
+    case "surveyFlip":
+      state2.decision = null;
+      state2.queue.unshift(...action.indices.map((index) => ({ op: "flip", index, player })));
+      return;
+    case "pick": {
+      const decision = state2.decision;
+      if (decision?.type !== "pick") throw new Error("Nothing to pick.");
+      const ctx = decision.kind === "region" ? { ...decision.ctx, region: action.choice } : { ...decision.ctx, target: action.choice };
+      state2.decision = null;
+      state2.queue.unshift(...decision.effects.map((effect2) => ({ op: "effect", effect: effect2, ctx })));
+      return;
+    }
+    case "choose": {
+      const decision = state2.decision;
+      if (decision?.type !== "choose") throw new Error("Nothing to choose.");
+      state2.decision = null;
+      state2.queue.unshift(...decision.options[action.index].map((effect2) => ({ op: "effect", effect: effect2, ctx: decision.ctx })));
+      return;
+    }
   }
 }
 function mulligan(state2, player, iids, events) {
@@ -6225,42 +8703,43 @@ function mulligan(state2, player, iids, events) {
   startTurn(state2, first, events);
 }
 function play(state2, player, action, events) {
-  const card = takeFromHand(state2, player, action.iid);
+  const card = action.fromStores ? takeFromStores(state2, player, action.iid) : takeFromHand(state2, player, action.iid);
   const def = getCard(card.cardId);
-  const cost = def.type === "outpost" ? supplyCostOf(state2, def.id, action.region) : supplyCostOf(state2, def.id);
+  let cost = supplyCostOf(state2, def.id, def.type === "outpost" ? action.region : void 0);
+  if (def.type === "crew" && action.dest?.zone === "region") cost += entryTax(state2, player, action.dest.index);
   pay(state2, player, cost);
   events.push({ type: "play", player, cardId: card.cardId });
   if (def.type === "crew") {
     const dest = action.dest ?? { zone: "harbor" };
-    const crew = {
-      iid: card.iid,
-      cardId: card.cardId,
-      owner: player,
-      where: dest,
-      damage: 0,
-      deployedThisTurn: true,
-      marchesLeft: def.keywords.includes("swift") ? 1 : 0,
-      mods: []
-    };
+    const crew = { iid: card.iid, cardId: card.cardId, owner: player, where: dest, damage: 0, deployedThisTurn: true, marchesLeft: 0, mods: [], grants: [] };
     state2.crews.push(crew);
-    state2.queue.push(...compile(effectsOn(card.cardId, "onDeploy"), player, {}));
-    drain(state2, events);
+    if (hasKeyword(state2, crew, "swift")) crew.marchesLeft = 1;
+    events.push({ type: "deploy", player, iid: crew.iid, cardId: crew.cardId, dest });
+    const here = dest.zone === "region" ? dest.index : null;
+    for (const ability2 of def.abilities) {
+      if (ability2.on === "onDeploy") state2.queue.push({ op: "ability", ability: ability2, ctx: { player, cardId: def.id, sourceIid: crew.iid, here } });
+    }
+    if (here != null) enterRegion(state2, crew, here);
     return;
   }
   if (def.type === "order") {
     state2.players[player].discard.push(card);
     const ambush = state2.decision?.type === "ambush";
     if (ambush) state2.decision = null;
-    state2.queue.push(...compile(effectsOn(card.cardId, "onPlay"), player, { target: action.target, region: action.region }));
+    const ctx = { player, cardId: def.id, here: null, target: action.target, region: action.region };
+    for (const ability2 of def.abilities) if (ability2.on === "onPlay") state2.queue.push({ op: "ability", ability: ability2, ctx });
     if (ambush) state2.queue.push({ op: "handoffAmbush" });
-    drain(state2, events);
     return;
   }
   if (def.type === "outpost") {
     const index = action.region;
     const region = index == null ? void 0 : state2.regions[index];
-    if (!region) throw new Error("That Region cannot hold an Outpost.");
+    if (!region || index == null) throw new Error("That Region cannot hold an Outpost.");
     region.outpost = { ...card, owner: player };
+    events.push({ type: "built", player, index, cardId: card.cardId });
+    for (const ability2 of def.abilities) {
+      if (ability2.on === "onDeploy") state2.queue.push({ op: "ability", ability: ability2, ctx: { player, cardId: def.id, sourceIid: card.iid, here: index } });
+    }
     return;
   }
   const slot = state2.players[player].ventures.findIndex((venture) => venture === null);
@@ -6277,33 +8756,25 @@ function supplyCostOf(state2, cardId, region) {
   }
   return cost;
 }
-function effectsOn(cardId, trigger) {
-  return getCard(cardId).abilities.flatMap((ability) => ability.trigger === trigger ? ability.effects : []);
-}
 function march(state2, player, iid, dest, events) {
   const crew = findCrew(state2, iid);
   if (!crew || crew.owner !== player || crew.marchesLeft <= 0) throw new Error("That crew cannot March.");
-  const fromHarbor = crew.where.zone === "harbor";
+  const from = crew.where;
+  const fromHarbor = from.zone === "harbor";
   crew.marchesLeft -= 1;
   if (dest.zone === "region" && fromHarbor && forbidsHarbor(state2.regions[dest.index].regionId)) {
     state2.queue.push({ op: "flip", index: dest.index, player });
-    drain(state2, events);
     return;
   }
+  if (dest.zone === "region") pay(state2, player, entryTax(state2, player, dest.index));
   crew.where = dest;
+  events.push({ type: "march", player, iid, from, to: dest });
   if (dest.zone !== "region") return;
   const region = state2.regions[dest.index];
-  const flipped = !region.faceUp;
-  if (flipped) {
-    region.faceUp = true;
-    events.push({ type: "flip", index: dest.index, regionId: region.regionId, player });
-    const revealed = getRegion(region.regionId).traits.find((t) => t.kind === "whenRevealed");
-    if (revealed && revealed.kind === "whenRevealed") state2.queue.push(...compile(revealed.effects, player, {}));
-    state2.queue.push(...compile(effectsOn(crew.cardId, "landing"), player, {}));
-  }
+  if (!region.faceUp) state2.queue.push(...flipRegion(state2, dest.index, player, events, crew));
   const landingDamage = trait(region.regionId, "enterFromHarborDamage");
   if (fromHarbor && landingDamage) state2.queue.push({ op: "damage", iid: crew.iid, amount: landingDamage.amount, source: "region" });
-  drain(state2, events);
+  enterRegion(state2, crew, dest.index);
 }
 function applyAction(state2, action) {
   const events = [];
@@ -6314,10 +8785,7 @@ function applyAction(state2, action) {
       const player = action.type === "concede" ? action.player : actorOf(draft, action);
       allowed(draft, player, action);
       perform(draft, action, events);
-      drain(draft, events);
-      if (!choiceOpen(draft) && draft.paused.length && !draft.queue.length && !draft.claim && !draft.over) {
-        draft.decision = draft.paused.pop() ?? null;
-      }
+      run(draft, events);
     } catch (err) {
       error2 = err instanceof Error ? err : new Error(String(err));
     }
@@ -6336,7 +8804,8 @@ function emptyPlayer(deck) {
     ventures: [null, null],
     renown: 0,
     stowLeft: 0,
-    completedVentures: 0
+    completedVentures: 0,
+    taken: 0
   };
 }
 function faceDown(regionId) {
@@ -6344,7 +8813,7 @@ function faceDown(regionId) {
 }
 function hasAllGoods(ids) {
   const goods = /* @__PURE__ */ new Set();
-  for (const id of ids) for (const good of getRegion(id).goods) goods.add(good);
+  for (const id of ids) for (const good2 of getRegion(id).goods) goods.add(good2);
   return goods.has("gold") && goods.has("timber") && goods.has("spice");
 }
 function copyDeck(ids) {
@@ -6445,6 +8914,7 @@ function getPlayerView(state2, viewer) {
     over: state2.over,
     renown: [state2.players[0].renown, state2.players[1].renown],
     completedVentures: [state2.players[0].completedVentures, state2.players[1].completedVentures],
+    taken: [state2.players[0].taken, state2.players[1].taken],
     decision: shownDecision(state2, viewer),
     hand: you.hand,
     foeHand: them.hand.length,
@@ -6475,6 +8945,434 @@ function redactEvents(events, viewer) {
     if (event.type === "draw" && event.player !== viewer) return { ...event, cardIds: [] };
     return event;
   });
+}
+
+// packages/ai/src/config.ts
+var AI_CONFIG = {
+  deckhand: { samples: 1, noise: 2.5, randomMove: 0.15, ambushChance: 0.5 },
+  captain: { samples: 3, noise: 0.4, randomMove: 0, ambushChance: 1, planDepth: 90 },
+  /** Milliseconds the table waits before the computer moves, so animations can play. */
+  thinkDelay: 650
+};
+var WEIGHTS = {
+  renown: 10,
+  projectedRegion: 6,
+  good: 2,
+  might: 1.2,
+  endurance: 0.4,
+  hand: 0.8,
+  stores: 1.6,
+  venture: 2,
+  ventureOnTrack: 7,
+  atRisk: 1.5,
+  /** How much a Region counts when the rival can reach and outmuscle it before Claim. */
+  contestable: 0.45
+};
+
+// packages/ai/src/index.ts
+function chooseAction(view2, level, rng2) {
+  const decision = view2.decision;
+  if (!decision || decision.player !== view2.you || view2.over) throw new Error("The computer has nothing to decide.");
+  const legal = view2.legal;
+  switch (decision.type) {
+    case "mulligan":
+      return { type: "mulligan", iids: mulliganPicks(view2) };
+    case "discard":
+      return { type: "discard", iids: discardPicks(view2, subsetOf(legal, "discard").min) };
+    case "surveyLook": {
+      const spec = subsetOf(legal, "surveyLook");
+      return { type: "surveyLook", indices: shuffled(spec.options, rng2).slice(0, spec.max) };
+    }
+    case "surveyFlip":
+      return { type: "surveyFlip", indices: flipPicks(view2, subsetOf(legal, "surveyFlip").options) };
+    case "assign": {
+      const spec = legal.find((item) => item.kind === "assign");
+      if (!spec || spec.kind !== "assign") throw new Error("No damage to assign.");
+      return { type: "assign", hits: assignHits(view2, spec.amount, spec.targets) };
+    }
+    case "ambush":
+      return ambushChoice(view2, level, rng2);
+    case "command":
+      return commandChoice(view2, level, rng2);
+    case "pick":
+    case "choose":
+      return bestOption(view2, level, rng2);
+  }
+}
+function subsetOf(legal, type) {
+  const spec = legal.find((item) => item.kind === "subset" && item.actionType === type);
+  if (!spec || spec.kind !== "subset") throw new Error(`No ${type} choice.`);
+  return spec;
+}
+function acts(view2) {
+  return view2.legal.flatMap((item) => item.kind === "act" && item.action.type !== "concede" ? [item.action] : []);
+}
+function shuffled(list, rng2) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng2() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+function mulliganPicks(view2) {
+  const cheap = view2.hand.filter((c) => getCard(c.cardId).cost.supply <= 2).length;
+  if (cheap >= 2) return [];
+  return view2.hand.filter((c) => getCard(c.cardId).cost.supply >= 3).map((c) => c.iid);
+}
+function playable(view2, iid) {
+  return (view2.hand.find((c) => c.iid === iid) ?? view2.stores.find((c) => c.iid === iid)).cardId;
+}
+function cardValue(cardId) {
+  const card = getCard(cardId);
+  if (card.type === "crew") return (card.might ?? 0) * 1.2 + (card.endurance ?? 0) * 0.6 + card.keywords.length * 0.5 + card.abilities.length * 0.6;
+  if (card.type === "venture") return 2.5;
+  if (card.type === "outpost") return 2;
+  return 1.5 + card.cost.supply * 0.4;
+}
+function discardPicks(view2, count) {
+  return [...view2.hand].sort((a, b) => cardValue(a.cardId) - cardValue(b.cardId)).slice(0, count).map((c) => c.iid);
+}
+function flipPicks(view2, options) {
+  return options.filter((index) => {
+    const id = view2.regions[index]?.regionId;
+    return id ? getRegion(id).traits.some((t) => t.kind === "whenRevealed") : false;
+  });
+}
+function assignHits(view2, amount, targets) {
+  const hits2 = Object.fromEntries(targets.map((t) => [t, 0]));
+  const crews = targets.map((iid) => view2.crews.find((c) => c.iid === iid)).filter(Boolean).map((c) => ({ c, left: enduranceOf2(c) - c.damage, worth: mightOf(c) + 1 })).sort((a, b) => b.worth / Math.max(1, a.left) - a.worth / Math.max(1, b.left));
+  let pool = amount;
+  for (const { c, left } of crews) {
+    if (pool >= left && left > 0) {
+      hits2[c.iid] = left;
+      pool -= left;
+    }
+  }
+  if (pool > 0) {
+    const target2 = crews.find(({ c }) => hits2[c.iid] < enduranceOf2(c) - c.damage) ?? crews[0];
+    hits2[target2.c.iid] = (hits2[target2.c.iid] ?? 0) + pool;
+  }
+  return hits2;
+}
+function bestOption(view2, level, rng2) {
+  const options = acts(view2).filter((a) => a.type === "pick" || a.type === "choose");
+  if (!options.length) throw new Error("Nothing to choose.");
+  if (level === "deckhand") return options[Math.floor(rng2() * options.length)];
+  const worlds = Array.from({ length: AI_CONFIG.captain.samples }, () => determinize(view2, rng2));
+  let best = options[0];
+  let bestScore = -Infinity;
+  for (const option of options) {
+    const score = average(worlds.map((world) => {
+      try {
+        return evaluate(applyAction(world, option).state, view2.you);
+      } catch {
+        return -Infinity;
+      }
+    }));
+    if (score > bestScore) {
+      best = option;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+function mightOf(crew) {
+  return (getCard(crew.cardId).might ?? 0) + crew.mods.reduce((t, m) => t + m.might, 0);
+}
+function enduranceOf2(crew) {
+  return (getCard(crew.cardId).endurance ?? 1) + crew.mods.reduce((t, m) => t + m.endurance, 0);
+}
+function sideAt(crews, owner2, index) {
+  return crews.filter((c) => c.owner === owner2 && c.where.zone === "region" && c.where.index === index);
+}
+function ambushChoice(view2, level, rng2) {
+  const plays = acts(view2).filter((a) => a.type === "play");
+  const pass = { type: "pass" };
+  if (!plays.length) return pass;
+  if (rng2() > AI_CONFIG[level].ambushChance) return pass;
+  const me = view2.you;
+  const foe = other(me);
+  let best = { action: pass, score: 0 };
+  const world = determinize(view2, rng2);
+  const crew = (iid) => world.crews.find((c) => c.iid === iid);
+  const left = (c) => enduranceOf(world, c) - c.damage;
+  const might = (owner2, index) => sideAt(world.crews, owner2, index).reduce((t, c) => t + crewMight(world, c, true), 0);
+  for (const action of plays) {
+    const card = getCard(playable(view2, action.iid));
+    let score = 0;
+    for (const ability2 of card.abilities) {
+      if (ability2.on !== "onPlay") continue;
+      for (const effect2 of ability2.effects) {
+        if (effect2.do === "damage") {
+          if (effect2.target.t === "allCrews") {
+            for (const c of world.crews) {
+              if (c.owner === foe && c.where.zone === "region" && sideAt(world.crews, me, c.where.index).length) score += left(c) <= effect2.amount ? 4 + mightOf(c) : 1;
+            }
+          } else {
+            const c = crew(action.target);
+            if (c && c.owner === foe) score += left(c) <= effect2.amount ? 4 + mightOf(c) : 1;
+            else score -= 5;
+          }
+        }
+        if (effect2.do === "modifyStats" && action.region != null) {
+          const mm = might(me, action.region);
+          const tm = might(foe, action.region);
+          const gain = (effect2.might ?? 0) * sideAt(world.crews, me, action.region).length;
+          const theirs = sideAt(world.crews, foe, action.region).length;
+          if (theirs && mm <= tm && mm + gain > tm) score += 5;
+          else if (theirs) score += gain * 0.6 + (effect2.endurance ?? 0) * 0.5;
+        }
+        if (effect2.do === "modifyStats" && action.target) {
+          const c = crew(action.target);
+          if (c && c.owner === me && c.where.zone === "region" && might(foe, c.where.index) >= left(c)) score += 3;
+        }
+        if (effect2.do === "returnToHarbor") {
+          const c = crew(action.target);
+          if (c && c.where.zone === "region") {
+            const index = c.where.index;
+            if (c.owner === me && might(foe, index) >= left(c) && might(me, index) <= might(foe, index)) score += 3 + mightOf(c) * 0.3;
+            if (c.owner === foe) score += mightOf(c) * 1.2 + (might(foe, index) - crewMight(world, c, true) < might(me, index) ? 3 : 0);
+          }
+          if (effect2.target.t === "allCrews") {
+            let losing = 0;
+            for (let i = 0; i < 5; i++) if (sideAt(world.crews, me, i).length && sideAt(world.crews, foe, i).length && might(me, i) < might(foe, i)) losing += 1;
+            score += losing * 3 - 1;
+          }
+        }
+        if (effect2.do === "takeFromStores" || effect2.do === "draw") score += 1;
+      }
+    }
+    if (score > best.score) best = { action, score };
+  }
+  return best.action;
+}
+function deckhandChoice(view2, rng2, planning = false) {
+  const cfg = AI_CONFIG.deckhand;
+  const options = acts(view2);
+  const moves = options.filter((a) => a.type !== "end");
+  if (!planning && moves.length && rng2() < cfg.randomMove) return moves[Math.floor(rng2() * moves.length)];
+  const foe = other(view2.you);
+  const ready = view2.stores.filter((c) => !c.exhausted).length;
+  const score = (a) => {
+    if (a.type === "end") return 0.5;
+    if (a.type === "abandon") return -5;
+    if (a.type === "stow") {
+      const card = view2.hand.find((c) => c.iid === a.iid);
+      return 3 + (ready < 2 ? 2 : 0) - cardValue(card.cardId) * 0.3;
+    }
+    if (a.type === "play") {
+      const card = getCard(playable(view2, a.iid));
+      if (card.type === "crew") return 2 + (card.might ?? 0) + (card.endurance ?? 0) * 0.5 + (a.dest?.zone === "region" ? 1 : 0);
+      if (card.type === "venture") return 2.5;
+      if (card.type === "outpost") return 2;
+      return 1.5;
+    }
+    if (a.type === "march") {
+      if (a.dest.zone === "harbor") return -2;
+      const theirs = sideAt(view2.crews, foe, a.dest.index).reduce((t, c) => t + mightOf(c), 0);
+      const region = view2.regions[a.dest.index];
+      const owned = region.controller === view2.you;
+      return 3 - theirs + (region.faceUp ? 0 : 2) + (owned ? -2 : 1);
+    }
+    return 0;
+  };
+  let best = options.find((a) => a.type === "end") ?? { type: "end" };
+  let bestScore = -Infinity;
+  for (const a of options) {
+    const v = score(a) + (planning ? 0 : (rng2() - 0.5) * cfg.noise);
+    if (v > bestScore) {
+      best = a;
+      bestScore = v;
+    }
+  }
+  return best;
+}
+function commandChoice(view2, level, rng2) {
+  if (level === "deckhand") return deckhandChoice(view2, rng2);
+  const cfg = AI_CONFIG[level];
+  const options = acts(view2);
+  const end = options.find((a) => a.type === "end") ?? { type: "end" };
+  const moves = options.filter((a) => a.type !== "end");
+  if (!moves.length) return end;
+  if (rng2() < cfg.randomMove) return moves[Math.floor(rng2() * moves.length)];
+  const worlds = Array.from({ length: cfg.samples }, () => determinize(view2, rng2));
+  const outcome = (move) => average(worlds.map((world) => {
+    try {
+      return evaluate(rollout(applyAction(world, move).state, rng2), view2.you);
+    } catch {
+      return -Infinity;
+    }
+  }));
+  let best = end;
+  let bestScore = outcome(end) + 0.25;
+  for (const move of moves) {
+    const scores = [outcome(move)];
+    const score = average(scores) + (rng2() - 0.5) * cfg.noise;
+    if (score > bestScore) {
+      best = move;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+function rollout(world, rng2) {
+  let state2 = world;
+  const round = state2.round;
+  for (let step = 0; step < AI_CONFIG.captain.planDepth; step++) {
+    const decision = state2.decision;
+    if (!decision || state2.over || state2.round !== round) break;
+    const view2 = getPlayerView(state2, decision.player);
+    const action = decision.type === "command" ? deckhandChoice(view2, rng2, true) : chooseAction(view2, "deckhand", rng2);
+    try {
+      state2 = applyAction(state2, action).state;
+    } catch {
+      break;
+    }
+  }
+  return state2;
+}
+function average(values) {
+  return values.reduce((t, v) => t + v, 0) / Math.max(1, values.length);
+}
+function determinize(view2, rng2) {
+  const me = view2.you;
+  const foe = other(me);
+  const pool = basicDeck();
+  const sample = (n) => Array.from({ length: n }, () => pool[Math.floor(rng2() * pool.length)]);
+  let hidden = 0;
+  const hid = () => `x${++hidden}`;
+  const seen = new Set(view2.regions.flatMap((r) => r.regionId ? [r.regionId] : []));
+  const unseen = shuffled(regions.map((r) => r.id).filter((id) => !seen.has(id)), rng2);
+  const boardRegions = view2.regions.map((r) => ({
+    regionId: r.regionId ?? unseen.pop(),
+    faceUp: r.faceUp,
+    controller: r.controller,
+    outpost: r.outpost,
+    controlledOnce: r.controller != null
+  }));
+  const highest = Math.max(
+    0,
+    ...[...view2.hand, ...view2.stores, ...view2.discard[0], ...view2.discard[1], ...view2.crews].map((c) => Number(c.iid.slice(1)) || 0)
+  );
+  const ventures = (p) => view2.ventures[p].map((v) => v ? { ...v } : null);
+  const foeStores = Array.from({ length: view2.foeStores.total }, (_, i) => ({ iid: hid(), cardId: sample(1)[0], exhausted: i >= view2.foeStores.ready }));
+  const players = [];
+  players[me] = {
+    deck: sample(view2.deck),
+    hand: view2.hand.map((c) => ({ ...c })),
+    stores: view2.stores.map((c) => ({ ...c })),
+    discard: view2.discard[me].map((c) => ({ ...c })),
+    ventures: ventures(me),
+    renown: view2.renown[me],
+    stowLeft: view2.stowLeft,
+    completedVentures: view2.completedVentures[me],
+    taken: view2.taken[me]
+  };
+  players[foe] = {
+    deck: sample(view2.foeDeck),
+    hand: sample(view2.foeHand).map((cardId) => ({ iid: hid(), cardId })),
+    stores: foeStores,
+    discard: view2.discard[foe].map((c) => ({ ...c })),
+    ventures: ventures(foe),
+    renown: view2.renown[foe],
+    stowLeft: 1,
+    completedVentures: view2.completedVentures[foe],
+    taken: view2.taken[foe]
+  };
+  return {
+    rng: Math.floor(rng2() * 4294967295) >>> 0,
+    round: view2.round,
+    firstPlayer: view2.firstPlayer,
+    initiative: view2.initiative,
+    turnsTaken: me === view2.initiative ? 1 : 2,
+    seq: highest + 1e3,
+    players,
+    crews: view2.crews.map((c) => ({ ...c, where: { ...c.where }, mods: c.mods.map((m) => ({ ...m })), grants: c.grants.map((g) => ({ ...g })) })),
+    regions: boardRegions,
+    regionDeck: unseen,
+    decision: view2.decision,
+    paused: [],
+    queue: [],
+    claim: null,
+    over: view2.over,
+    extraRound: view2.extraRound,
+    peeked: [[], []]
+  };
+}
+function reachableMight(state2, player, index) {
+  const target2 = getRegion(state2.regions[index].regionId);
+  const noHarbor = target2.traits.some((t) => t.kind === "cantEnterFromHarbor") && state2.regions[index].faceUp;
+  let total = 0;
+  for (const crew of state2.crews) {
+    if (crew.owner !== player) continue;
+    if (crew.where.zone === "harbor") {
+      if (!noHarbor) total += mightOf(crew);
+    } else if (crew.where.index === index || Math.abs(crew.where.index - index) === 1) total += mightOf(crew);
+  }
+  return total;
+}
+function evaluate(state2, me) {
+  if (state2.over) return state2.over.winner === me ? 1e4 : state2.over.winner == null ? 0 : -1e4;
+  const foe = other(me);
+  let score = (state2.players[me].renown - state2.players[foe].renown) * WEIGHTS.renown;
+  const held = { 0: 0, 1: 0 };
+  const goods = { 0: /* @__PURE__ */ new Set(), 1: /* @__PURE__ */ new Set() };
+  state2.regions.forEach((region, index) => {
+    const mine = sideAt(state2.crews, me, index);
+    const theirs = sideAt(state2.crews, foe, index);
+    const def = getRegion(region.regionId);
+    let owner2 = region.controller;
+    if (region.faceUp) {
+      if (mine.length && !theirs.length) owner2 = me;
+      else if (theirs.length && !mine.length) owner2 = foe;
+      else if (mine.length && theirs.length) {
+        const mm = mine.reduce((t, c) => t + mightOf(c), 0);
+        const tm = theirs.reduce((t, c) => t + mightOf(c), 0);
+        if (mm > tm) owner2 = me;
+        else if (tm > mm) owner2 = foe;
+      }
+      if (def.traits.some((t) => t.kind === "loseControlWithoutCrew") && owner2 != null && !(owner2 === me ? mine : theirs).length) owner2 = null;
+    }
+    if (owner2 != null) {
+      held[owner2] += 1;
+      for (const g of def.goods) goods[owner2].add(g);
+      let value = def.renown * WEIGHTS.projectedRegion;
+      const rival = other(owner2);
+      const holding = (owner2 === me ? mine : theirs).reduce((t, c) => t + mightOf(c), 0);
+      const reach = reachableMight(state2, rival, index);
+      if (state2.decision?.player !== rival && reach > holding) value *= WEIGHTS.contestable;
+      score += (owner2 === me ? 1 : -1) * value;
+    }
+    const hazard = def.traits.reduce((t, tr) => t + (tr.kind === "atClaimDamageEach" ? tr.amount : 0), 0);
+    if (hazard && region.faceUp) {
+      for (const crew of [...mine, ...theirs]) {
+        const hardy = getCard(crew.cardId).keywords.includes("hardy");
+        if (!hardy && enduranceOf2(crew) - crew.damage <= hazard) score += (crew.owner === me ? -1 : 1) * (mightOf(crew) + 2) * WEIGHTS.atRisk;
+      }
+    }
+  });
+  for (const crew of state2.crews) {
+    const value = crewMight(state2, crew, false) * WEIGHTS.might + (enduranceOf(state2, crew) - crew.damage) * WEIGHTS.endurance;
+    score += crew.owner === me ? value : -value;
+  }
+  score += (goods[me].size - goods[foe].size) * WEIGHTS.good;
+  score += (state2.players[me].hand.length - state2.players[foe].hand.length) * WEIGHTS.hand;
+  score += (state2.players[me].stores.length - state2.players[foe].stores.length) * WEIGHTS.stores;
+  for (const who of [me, foe]) {
+    const sign = who === me ? 1 : -1;
+    for (const venture of state2.players[who].ventures) {
+      if (!venture) continue;
+      score += sign * WEIGHTS.venture;
+      for (const ability2 of getCard(venture.cardId).abilities) {
+        if (ability2.on !== "atClaim") continue;
+        const gain = ability2.effects.reduce((t, e) => t + (e.do === "gainRenown" ? e.amount : 1), 0);
+        const onTrack = ability2.if?.if === "controlAtLeast" ? held[who] >= ability2.if.n : conditionMet(state2, ability2.if, who, null);
+        if (onTrack) score += sign * gain * WEIGHTS.ventureOnTrack / 3;
+      }
+    }
+  }
+  return score;
 }
 
 // apps/table/art.ts
@@ -6808,8 +9706,132 @@ function compassRose() {
     <g fill="#c9a44c" fill-opacity="0.5"><path d="M0 -150 L14 0 L0 150 L-14 0 Z"/><path d="M-150 0 L0 14 L150 0 L0 -14 Z"/></g></svg>`;
 }
 
+// apps/table/auth.ts
+var AUTH_REQUIRED = false;
+var API = location.hostname.endsWith("pureforge.dev") ? "https://meridian-api.pureforge.dev" : "http://localhost:8787";
+var ApiError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+};
+var slowNotice = null;
+function onSlow(listener) {
+  slowNotice = listener;
+}
+async function api(path, body) {
+  const timer = window.setTimeout(() => slowNotice?.(true), 3e3);
+  try {
+    const response = await fetch(`${API}${path}`, {
+      method: body === void 0 ? "GET" : "POST",
+      credentials: "include",
+      headers: body === void 0 ? {} : { "content-type": "application/json" },
+      body: body === void 0 ? void 0 : JSON.stringify(body)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(response.status, data.error ?? "Something went wrong.");
+    return data;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(0, "Can't reach the Meridian server. Check your connection and try again.");
+  } finally {
+    window.clearTimeout(timer);
+    slowNotice?.(false);
+  }
+}
+async function currentUser() {
+  try {
+    return (await api("/auth/me")).user;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return null;
+    throw err;
+  }
+}
+var signIn = (name, password) => api("/auth/login", { name, password }).then((r) => r.user);
+var join = (code, name, password) => api("/auth/join", { code, name, password }).then((r) => r.user);
+var redeemReset = (code, password) => api("/auth/reset", { code, password }).then((r) => r.user);
+var signOut = () => api("/auth/logout", {});
+var esc = (value) => value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
+function signInGate(host) {
+  return new Promise((resolve) => {
+    let tab = new URLSearchParams(location.search).has("invite") ? "join" : "signin";
+    let message = "";
+    let busy = false;
+    let slow = false;
+    const invite = new URLSearchParams(location.search).get("invite") ?? "";
+    const values = { "a-code": invite };
+    const keep = () => host.querySelectorAll("input").forEach((input) => values[input.id] = input.value);
+    onSlow((s) => {
+      slow = s;
+      draw2();
+    });
+    function field(id, label, type, auto) {
+      return `<label class="field" for="${id}"><span>${label}</span><input id="${id}" name="${id}" type="${type}" autocomplete="${auto}" value="${esc(values[id] ?? "")}" ${type === "password" ? 'minlength="8"' : ""} ${busy ? "readonly" : ""} required /></label>`;
+    }
+    function draw2(fresh = false) {
+      if (!fresh) keep();
+      const body = tab === "signin" ? `${field("a-name", "Name", "text", "username")}${field("a-pass", "Password", "password", "current-password")}<button class="brass big" type="submit" ${busy ? "disabled" : ""}>Sign in</button>` : tab === "join" ? `${field("a-code", "Invite code", "text", "off")}${field("a-name", "Pick a display name", "text", "username")}${field("a-pass", "Pick a password (8 or more characters)", "password", "new-password")}<button class="brass big" type="submit" ${busy ? "disabled" : ""}>Join Meridian</button>` : `${field("a-code", "Reset code from the admin", "text", "off")}${field("a-pass", "New password (8 or more characters)", "password", "new-password")}<button class="brass big" type="submit" ${busy ? "disabled" : ""}>Set new password</button>`;
+      host.hidden = false;
+      host.innerHTML = `<section class="cover-card auth-card" style="--accent:#c9a44c">
+        <div class="cover-ship" aria-hidden="true">\u2693</div>
+        <p class="kicker">Set 1 \xB7 First Landing</p>
+        <h2>Meridian</h2>
+        <div class="auth-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="${tab === "signin"}" data-tab="signin">Sign in</button>
+          <button type="button" role="tab" aria-selected="${tab === "join"}" data-tab="join">I have an invite</button>
+          <button type="button" role="tab" aria-selected="${tab === "reset"}" data-tab="reset">Reset password</button>
+        </div>
+        <form class="auth-form" novalidate>${body}</form>
+        ${message ? `<p class="alert" role="alert">${esc(message)}</p>` : ""}
+        ${slow ? `<p class="muted small">Waking the server. The first sign-in of the day can take up to a minute.</p>` : ""}
+        <p class="muted small">Meridian is invite-only. Ask the admin for a code.</p>
+      </section>`;
+      const first = Array.from(host.querySelectorAll("input")).find((input) => !input.value) ?? host.querySelector("input");
+      if (!busy && !message) first?.focus();
+    }
+    host.addEventListener("click", (event) => {
+      const target2 = event.target instanceof Element ? event.target.closest("[data-tab]") : null;
+      if (!target2 || busy) return;
+      keep();
+      tab = target2.dataset.tab;
+      message = "";
+      draw2();
+    });
+    host.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (busy) return;
+      keep();
+      const value = (id) => values[id] ?? "";
+      busy = true;
+      message = "";
+      draw2();
+      try {
+        const user = tab === "signin" ? await signIn(value("a-name"), value("a-pass")) : tab === "join" ? await join(value("a-code"), value("a-name"), value("a-pass")) : await redeemReset(value("a-code"), value("a-pass"));
+        host.hidden = true;
+        host.innerHTML = "";
+        if (invite) history.replaceState(null, "", location.pathname);
+        resolve(user);
+      } catch (err) {
+        message = err instanceof Error ? err.message : String(err);
+        busy = false;
+        keep();
+        delete values["a-pass"];
+        draw2(true);
+      }
+    });
+    draw2();
+  });
+}
+
 // apps/table/main.ts
-var seatName = (player) => player === 0 ? "Player 1" : "Player 2";
+var mode = "captain";
+var HUMAN = 0;
+var AI_SEAT = 1;
+var vsComputer = () => mode !== "hotseat";
+var seatName = (player) => {
+  if (!vsComputer()) return player === 0 ? "Player 1" : "Player 2";
+  return player === HUMAN ? "You" : mode === "captain" ? "The Captain" : "The Deckhand";
+};
 var SEAT_COLOR = { 0: "#d4af5a", 1: "#38b6ad" };
 var state = createGame({ seed: 1 });
 var seed = 1;
@@ -6823,10 +9845,11 @@ var armConcede = false;
 var error = "";
 var note = "";
 var selected = null;
-var fx = null;
+var fx2 = null;
 var routes = /* @__PURE__ */ new Map();
 var trayActions = [];
 var inspecting = null;
+var aiTimer = null;
 function required(id) {
   const node = document.getElementById(id);
   if (!node) throw new Error(`#${id} is missing.`);
@@ -6834,20 +9857,43 @@ function required(id) {
 }
 var table = required("table");
 var cover = required("cover");
-var seedNode = required("seed");
-if (!(seedNode instanceof HTMLInputElement)) throw new Error("#seed is not a field.");
-var seedInput = seedNode;
+var SETUP_KEY = "meridian.setup";
+function loadSetup() {
+  const fallback = { mode: "captain", deck: STARTER_DECKS[0].id, foeDeck: "random" };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETUP_KEY) ?? "null");
+    if (!saved) return fallback;
+    const decks = new Set(STARTER_DECKS.map((d) => d.id));
+    return {
+      mode: saved.mode === "deckhand" || saved.mode === "hotseat" ? saved.mode : "captain",
+      deck: saved.deck && decks.has(saved.deck) ? saved.deck : fallback.deck,
+      foeDeck: saved.foeDeck && (saved.foeDeck === "random" || decks.has(saved.foeDeck)) ? saved.foeDeck : "random"
+    };
+  } catch {
+    return fallback;
+  }
+}
+var setup = loadSetup();
+var choosing = true;
+var foeDeckName = "";
+function deckOf(choice) {
+  if (choice === "random") return STARTER_DECKS[Math.floor(Math.random() * STARTER_DECKS.length)];
+  return STARTER_DECKS.find((d) => d.id === choice) ?? STARTER_DECKS[0];
+}
+var FACTION_COLOR = Object.fromEntries(factions.map((f2) => [f2.id, f2.color]));
+FACTION_COLOR.neutral = "#8a7a5a";
+FACTION_COLOR.basic = "#8a7a5a";
 required("rose").innerHTML = compassRose();
 function yourDecision() {
   const decision = state.decision;
   if (!decision || decision.player !== seat) return null;
   return decision;
 }
-function esc(value) {
+function esc2(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 }
 var cardName = (id) => getCard(id).name;
-var cap = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+var cap2 = (word) => word.charAt(0).toUpperCase() + word.slice(1);
 var view = () => getPlayerView(state, seat);
 function coastLabel(index, seen) {
   const region = seen.regions[index];
@@ -6903,38 +9949,38 @@ var KEYWORD_HELP = {
   escort: "Enemy Orders can't target your other crews here.",
   ambush: "Can also be played during an Ambush window at Claim."
 };
-function accentOf(owner) {
-  return owner == null ? "#c9a44c" : SEAT_COLOR[owner];
+function accentOf(owner2) {
+  return owner2 == null ? "#c9a44c" : SEAT_COLOR[owner2];
 }
 function rulesText(def) {
-  const keys = def.keywords.map(cap);
+  const keys = def.keywords.map(cap2);
   let body = def.text;
   for (const key of keys) body = body.replace(new RegExp(`^${key}\\.?\\s*`), "");
-  const keyLine = keys.length ? `<b class="kw" title="${esc(def.keywords.map((k) => `${cap(k)}: ${KEYWORD_HELP[k] ?? ""}`).join(" "))}">${esc(keys.join(" \xB7 "))}</b>` : "";
-  return `${keyLine}${body ? `<span>${esc(body)}</span>` : ""}${def.flavor ? `<i>${esc(def.flavor)}</i>` : ""}`;
+  const keyLine = keys.length ? `<b class="kw" title="${esc2(def.keywords.map((k) => `${cap2(k)}: ${KEYWORD_HELP[k] ?? ""}`).join(" "))}">${esc2(keys.join(" \xB7 "))}</b>` : "";
+  return `${keyLine}${body ? `<span>${esc2(body)}</span>` : ""}${def.flavor ? `<i>${esc2(def.flavor)}</i>` : ""}`;
 }
 function typeLine(def) {
-  const subs = def.subtypes.map(cap).join(", ");
+  const subs = def.subtypes.map(cap2).join(", ");
   const amb = def.keywords.includes("ambush") && def.type === "order" ? ": Ambush" : "";
-  return `${cap(def.type)}${subs ? `: ${subs}` : amb}`;
+  return `${cap2(def.type)}${subs ? `: ${subs}` : amb}`;
 }
 function cardFace(def, opts = {}) {
   const accent = accentOf(opts.owner ?? null);
-  const goods = def.cost.goods.map((g) => `<span class="good good-${g}" title="Requires ${cap(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
+  const goods = def.cost.goods.map((g) => `<span class="good good-${g}" title="Requires ${cap2(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
   const stats = def.type === "crew" ? `<div class="stats"><span class="stat might" title="Might"><b>${def.might}</b></span><span class="stat endure" title="Endurance">${icon("shield")}<b>${def.endurance}</b></span></div>` : "";
-  return `<article class="card type-${def.type} rarity-${def.rarity} ${opts.cls ?? ""}" style="--accent:${accent};${opts.style ?? ""}" ${opts.iid ? `data-card="${esc(opts.iid)}"` : ""} ${opts.attrs ?? ""}>
+  return `<article class="card type-${def.type} rarity-${def.rarity} faction-${def.faction} ${opts.cls ?? ""}" style="--accent:${accent};--faction:${FACTION_COLOR[def.faction]};${opts.style ?? ""}" ${opts.iid ? `data-card="${esc2(opts.iid)}"` : ""} ${opts.attrs ?? ""}>
     <div class="card-inner">
       <div class="card-head">
         <span class="coin" title="Supply cost"><b>${def.cost.supply}</b></span>
         <div class="goods">${goods}</div>
-        <h3 class="card-name">${esc(def.name)}</h3>
-        <span class="seal" title="${def.faction === "basic" ? "Basic" : cap(def.faction)}">${icon("compass")}</span>
+        <h3 class="card-name">${esc2(def.name)}</h3>
+        <span class="seal" style="--faction:${FACTION_COLOR[def.faction]}" title="${def.faction === "basic" ? "Basic" : def.faction === "captains" ? "Free Captains" : cap2(def.faction)}">${icon("compass")}</span>
       </div>
       <div class="card-art">${cardArt(def, accent)}</div>
-      <div class="type-line">${esc(typeLine(def))}</div>
+      <div class="type-line">${esc2(typeLine(def))}</div>
       <div class="text-box">${rulesText(def)}</div>
       ${stats}
-      <div class="card-foot"><span class="gem gem-${def.rarity}"></span><span>${def.set === "basic" ? "Basic" : "FL"}</span><span>Meridian Studio</span></div>
+      <div class="card-foot"><span class="gem gem-${def.rarity}"></span><span>${def.number ? `${def.number}/140` : "Basic"}</span><span>Meridian Studio</span></div>
       <div class="glare"></div>
       ${opts.badge ?? ""}
     </div>
@@ -6959,18 +10005,18 @@ function unit(seen, crew) {
     selected === crew.iid ? "selected" : "",
     route ? "target" : "",
     assignable ? "assignable" : "",
-    fx?.landed.has(crew.iid) ? "fx-land" : "",
-    fx?.marched.has(crew.iid) ? "fx-march" : "",
-    fx?.damaged.has(crew.iid) ? "fx-hit" : ""
+    fx2?.landed.has(crew.iid) ? "fx-land" : "",
+    fx2?.marched.has(crew.iid) ? "fx-march" : "",
+    fx2?.damaged.has(crew.iid) ? "fx-hit" : ""
   ].filter(Boolean).join(" ");
   const pips = Array.from({ length: endure }, (_, i) => `<i class="${i < crew.damage ? "lost" : ""}"></i>`).join("");
-  const pop = fx?.damaged.get(crew.iid) ? `<span class="pop">\u2212${fx.damaged.get(crew.iid)}</span>` : "";
-  const keys = def.keywords.length ? `<span class="unit-keys">${def.keywords.map((k) => cap(k).slice(0, 1)).join("")}</span>` : "";
-  const stepper = assignable ? `<div class="stepper"><button type="button" data-bump="${esc(crew.iid)}" data-dir="-1" aria-label="Less damage">\u2212</button><b>${hits[crew.iid] ?? 0}</b><button type="button" data-bump="${esc(crew.iid)}" data-dir="1" aria-label="More damage">+</button></div>` : "";
+  const pop = fx2?.damaged.get(crew.iid) ? `<span class="pop">\u2212${fx2.damaged.get(crew.iid)}</span>` : "";
+  const keys = def.keywords.length ? `<span class="unit-keys">${def.keywords.map((k) => cap2(k).slice(0, 1)).join("")}</span>` : "";
+  const stepper = assignable ? `<div class="stepper"><button type="button" data-bump="${esc2(crew.iid)}" data-dir="-1" aria-label="Less damage">\u2212</button><b>${hits[crew.iid] ?? 0}</b><button type="button" data-bump="${esc2(crew.iid)}" data-dir="1" aria-label="More damage">+</button></div>` : "";
   const clickable = canAct || route;
-  return `<div class="${cls}" style="--accent:${SEAT_COLOR[crew.owner]}" ${clickable ? `role="button" tabindex="0"` : ""} data-crew="${esc(crew.iid)}" ${route ? `data-route="${route}"` : ""} title="${esc(`${def.name}. Might ${might}, Endurance ${endure}${crew.damage ? `, ${crew.damage} damage` : ""}. ${def.text}`)}">
+  return `<div class="${cls}" style="--accent:${SEAT_COLOR[crew.owner]}" ${clickable ? `role="button" tabindex="0"` : ""} data-crew="${esc2(crew.iid)}" ${route ? `data-route="${route}"` : ""} title="${esc2(`${def.name}. Might ${might}, Endurance ${endure}${crew.damage ? `, ${crew.damage} damage` : ""}. ${def.text}`)}">
     <div class="unit-art">${cardArt(def, SEAT_COLOR[crew.owner])}</div>
-    <div class="unit-name">${esc(def.name)}</div>
+    <div class="unit-name">${esc2(def.name)}</div>
     ${keys}
     <div class="unit-stats"><span class="might">${might}</span><span class="endure">${endure - crew.damage}</span></div>
     <div class="pips">${pips}</div>
@@ -6980,7 +10026,7 @@ function unit(seen, crew) {
 function ghost(g) {
   const def = getCard(g.cardId);
   return `<div class="unit owner-${g.owner} fx-burn" style="--accent:${SEAT_COLOR[g.owner]}" aria-hidden="true">
-    <div class="unit-art">${cardArt(def, SEAT_COLOR[g.owner])}</div><div class="unit-name">${esc(def.name)}</div></div>`;
+    <div class="unit-art">${cardArt(def, SEAT_COLOR[g.owner])}</div><div class="unit-name">${esc2(def.name)}</div></div>`;
 }
 function regionColumn(seen, index) {
   const spot = seen.regions[index];
@@ -6990,33 +10036,33 @@ function regionColumn(seen, index) {
   const decision = yourDecision();
   const surveying = decision && (decision.type === "surveyLook" || decision.type === "surveyFlip") && decision.options.includes(index);
   const pickedHere = picked.has(String(index));
-  const crewsOf2 = (owner) => seen.crews.filter((c) => c.where.zone === "region" && c.where.index === index && c.owner === owner);
-  const lane = (owner) => {
-    const units = crewsOf2(owner).map((c) => unit(seen, c)).join("") + (fx?.ghosts.filter((g) => g.where === index && g.owner === owner).map(ghost).join("") ?? "");
-    return `<div class="lane lane-${owner === seat ? "you" : "foe"}">${units || `<span class="lane-empty"></span>`}</div>`;
+  const crewsOf2 = (owner2) => seen.crews.filter((c) => c.where.zone === "region" && c.where.index === index && c.owner === owner2);
+  const lane = (owner2) => {
+    const units = crewsOf2(owner2).map((c) => unit(seen, c)).join("") + (fx2?.ghosts.filter((g) => g.where === index && g.owner === owner2).map(ghost).join("") ?? "");
+    return `<div class="lane lane-${owner2 === seat ? "you" : "foe"}">${units || `<span class="lane-empty"></span>`}</div>`;
   };
-  const mFor = (owner) => crewsOf2(owner).reduce((t, c) => t + (getCard(c.cardId).might ?? 0) + c.mods.reduce((s, m) => s + m.might, 0), 0);
+  const mFor = (owner2) => crewsOf2(owner2).reduce((t, c) => t + (getCard(c.cardId).might ?? 0) + c.mods.reduce((s, m) => s + m.might, 0), 0);
   const contested2 = crewsOf2(0).length > 0 && crewsOf2(1).length > 0;
   const clashHere = state.claim && state.decision && "region" in state.decision && state.decision.region === index;
   let face;
   if (spot.faceUp && known) {
-    const goods = known.goods.map((g) => `<span class="good good-${g}" title="${cap(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
-    const banner = spot.controller != null ? `<span class="flag-banner ${fx?.control.has(index) ? "fx-plant" : ""}" style="--accent:${SEAT_COLOR[spot.controller]}" title="${seatName(spot.controller)} controls">${icon("banner")}</span>` : "";
-    const post = spot.outpost ? `<span class="outpost-chip" style="--accent:${SEAT_COLOR[spot.outpost.owner]}" title="${esc(getCard(spot.outpost.cardId).text)}">${icon("crate")}${esc(cardName(spot.outpost.cardId))}</span>` : "";
-    face = `<div class="region-card ${known.hazard ? "hazard" : ""} ${fx?.flips.has(index) ? "fx-reveal" : ""}">
+    const goods = known.goods.map((g) => `<span class="good good-${g}" title="${cap2(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
+    const banner = spot.controller != null ? `<span class="flag-banner ${fx2?.control.has(index) ? "fx-plant" : ""}" style="--accent:${SEAT_COLOR[spot.controller]}" title="${seatName(spot.controller)} controls">${icon("banner")}</span>` : "";
+    const post = spot.outpost ? `<span class="outpost-chip" style="--accent:${SEAT_COLOR[spot.outpost.owner]}" title="${esc2(getCard(spot.outpost.cardId).text)}">${icon("crate")}${esc2(cardName(spot.outpost.cardId))}</span>` : "";
+    face = `<div class="region-card ${known.hazard ? "hazard" : ""} ${fx2?.flips.has(index) ? "fx-reveal" : ""}">
       <div class="region-art">${regionArt(known)}</div>
-      <div class="region-head"><h3>${esc(known.name)}</h3><span class="renown-ribbon" title="Renown at each Claim">${icon("star")}<b>${known.renown}</b></span></div>
+      <div class="region-head"><h3>${esc2(known.name)}</h3><span class="renown-ribbon" title="Renown at each Claim">${icon("star")}<b>${known.renown}</b></span></div>
       ${banner}
       <div class="region-goods">${goods}</div>
       ${post}
-      <p class="trait ${known.hazard ? "hazard" : ""}">${known.hazard ? icon("hazard") : ""}${esc(known.text)}</p>
+      <p class="trait ${known.hazard ? "hazard" : ""}">${known.hazard ? icon("hazard") : ""}${esc2(known.text)}</p>
     </div>`;
   } else if (known) {
     face = `<div class="region-card peeked">
       <div class="region-art">${regionArt(known)}</div>
-      <div class="region-head"><h3>${esc(known.name)}</h3><span class="renown-ribbon">${icon("star")}<b>${known.renown}</b></span></div>
+      <div class="region-head"><h3>${esc2(known.name)}</h3><span class="renown-ribbon">${icon("star")}<b>${known.renown}</b></span></div>
       <span class="peek-tag">${icon("eye")} Seen from afar</span>
-      <p class="trait">${esc(known.text)}</p>
+      <p class="trait">${esc2(known.text)}</p>
     </div>`;
   } else {
     face = `<div class="region-card hidden">
@@ -7027,7 +10073,7 @@ function regionColumn(seen, index) {
   }
   const pick = surveying ? `<button type="button" class="survey-pick ${pickedHere ? "on" : ""}" data-pick="${index}">${icon("eye")}${pickedHere ? "Chosen" : decision.type === "surveyLook" ? "Look" : "Flip"}</button>` : "";
   const tally = contested2 ? `<div class="tally"><span style="color:${SEAT_COLOR[foe]}">${mFor(foe)}</span>${icon("sword")}<span style="color:${SEAT_COLOR[seat]}">${mFor(seat)}</span></div>` : "";
-  return `<section class="region-col ${route ? "target" : ""} ${contested2 ? "contested" : ""} ${clashHere ? "clashing" : ""} ${pickedHere ? "picked" : ""}" style="--n:${index}" ${route ? `data-route="${route}" role="button" tabindex="0"` : ""} aria-label="${esc(coastLabel(index, seen))}">
+  return `<section class="region-col ${route ? "target" : ""} ${contested2 ? "contested" : ""} ${clashHere ? "clashing" : ""} ${pickedHere ? "picked" : ""}" style="--n:${index}" ${route ? `data-route="${route}" role="button" tabindex="0"` : ""} aria-label="${esc2(coastLabel(index, seen))}">
     ${lane(foe)}
     <div class="region-slot">${face}${pick}${tally}${clashHere ? `<div class="clash-burst">${icon("sword")}</div>` : ""}</div>
     ${lane(seat)}
@@ -7040,7 +10086,7 @@ function storesPile(seen, player) {
   const route = mine && routes.has("stores") ? "stores" : "";
   const stack = Array.from({ length: Math.min(total, 6) }, (_, i) => `<span class="pile-card" style="--i:${i}"></span>`).join("");
   const pips = Array.from({ length: total }, (_, i) => `<i class="${i < ready ? "lit" : ""}"></i>`).join("");
-  return `<div class="zone stores ${route ? "target" : ""}" ${route ? `data-route="stores" role="button" tabindex="0"` : ""} title="${mine ? esc(seen.stores.map((c) => `${cardName(c.cardId)}${c.exhausted ? " (spent)" : ""}`).join(", ") || "Empty") : "Hidden"}">
+  return `<div class="zone stores ${route ? "target" : ""}" ${route ? `data-route="stores" role="button" tabindex="0"` : ""} title="${mine ? esc2(seen.stores.map((c) => `${cardName(c.cardId)}${c.exhausted ? " (spent)" : ""}`).join(", ") || "Empty") : "Hidden"}">
     <div class="pile">${stack || `<span class="pile-empty"></span>`}</div>
     <div class="zone-label">Stores</div>
     <div class="supply"><b>${ready}</b><small>/${total}</small></div>
@@ -7049,7 +10095,7 @@ function storesPile(seen, player) {
 }
 function harbor(seen, player) {
   const route = player === seat && routes.has("harbor") ? "harbor" : "";
-  const units = seen.crews.filter((c) => c.where.zone === "harbor" && c.owner === player).map((c) => unit(seen, c)).join("") + (fx?.ghosts.filter((g) => g.where === "harbor" && g.owner === player).map(ghost).join("") ?? "");
+  const units = seen.crews.filter((c) => c.where.zone === "harbor" && c.owner === player).map((c) => unit(seen, c)).join("") + (fx2?.ghosts.filter((g) => g.where === "harbor" && g.owner === player).map(ghost).join("") ?? "");
   return `<div class="zone harbor ${route ? "target" : ""}" ${route ? `data-route="harbor" role="button" tabindex="0"` : ""}>
     <div class="zone-label">${icon("ship")} Harbor</div>
     <div class="dock">${units || `<span class="muted small">No crews waiting</span>`}</div>
@@ -7072,7 +10118,7 @@ function deckZone(seen, player) {
   const top = discard.at(-1);
   return `<div class="zone deckzone">
     <div class="deck-stack" title="Deck">${cardBack("tiny")}<b>${deck}</b></div>
-    <div class="discard-top" title="${esc(discard.map((c) => cardName(c.cardId)).join(", ") || "Discard is empty")}">${top ? cardFace(getCard(top.cardId), { cls: "tiny", owner: player }) : `<span class="discard-empty"></span>`}<b>${discard.length}</b></div>
+    <div class="discard-top" title="${esc2(discard.map((c) => cardName(c.cardId)).join(", ") || "Discard is empty")}">${top ? cardFace(getCard(top.cardId), { cls: "tiny", owner: player }) : `<span class="discard-empty"></span>`}<b>${discard.length}</b></div>
   </div>`;
 }
 function crest(player, seen) {
@@ -7080,8 +10126,9 @@ function crest(player, seen) {
   const init = seen.initiative === player;
   return `<div class="crest ${turn ? "active" : ""}" style="--accent:${SEAT_COLOR[player]}">
     <div class="crest-badge">${icon("ship")}</div>
-    <div><div class="crest-name">${seatName(player)}${player === seat ? " <small>(you)</small>" : ""}</div>
-    <div class="crest-sub">${icon("star")} ${seen.renown[player]} Renown${init ? ` \xB7 ${icon("compass")} Initiative` : ""}</div></div>
+    <div><div class="crest-name">${seatName(player)}${player === seat && !vsComputer() ? " <small>(you)</small>" : ""}${vsComputer() && player === AI_SEAT ? ` <small>computer</small>` : ""}</div>
+    <div class="crest-sub">${icon("star")} ${seen.renown[player]} Renown${init ? ` \xB7 ${icon("compass")} Initiative` : ""}</div>
+    <div class="crest-deck">${esc2(player === HUMAN || !vsComputer() && player === 0 ? deckOf(setup.deck).name : foeDeckName)}</div></div>
   </div>`;
 }
 function foeRow(seen) {
@@ -7106,15 +10153,15 @@ function youRow(seen) {
   </section>`;
 }
 function handFan(seen) {
-  const choosing = seen.decision?.type === "mulligan" || seen.decision?.type === "discard";
+  const choosing2 = seen.decision?.type === "mulligan" || seen.decision?.type === "discard";
   const all = actsOf(seen);
   const n = seen.hand.length;
   const cards = seen.hand.map((card, i) => {
     const def = getCard(card.cardId);
-    const playable = all.some((a) => (a.type === "play" || a.type === "stow") && a.iid === card.iid);
+    const playable2 = all.some((a) => (a.type === "play" || a.type === "stow") && a.iid === card.iid);
     const cls = [
       "in-hand",
-      choosing ? "choosable" : playable ? "playable" : "idle",
+      choosing2 ? "choosable" : playable2 ? "playable" : "idle",
       selected === card.iid ? "selected" : "",
       picked.has(card.iid) ? "set-aside" : ""
     ].join(" ");
@@ -7124,28 +10171,43 @@ function handFan(seen) {
       owner: seat,
       cls,
       style: `--i:${i};--n:${n};`,
-      attrs: `role="button" tabindex="0" ${choosing ? `data-pick="${esc(card.iid)}"` : `data-select="${esc(card.iid)}"`}`,
+      attrs: `role="button" tabindex="0" ${choosing2 ? `data-pick="${esc2(card.iid)}"` : `data-select="${esc2(card.iid)}"`}`,
       badge
     });
   }).join("");
-  return `<section class="hand" style="--n:${n}">${cards || `<p class="muted">Your hand is empty.</p>`}</section>`;
+  const spoils = seen.stores.filter((s) => s.taken && all.some((a) => a.type === "play" && a.iid === s.iid));
+  const loot = spoils.map((card, i) => cardFace(getCard(card.cardId), {
+    iid: card.iid,
+    owner: seat,
+    cls: `in-hand playable spoils ${selected === card.iid ? "selected" : ""}`,
+    style: `--i:${n + i};--n:${n + spoils.length};`,
+    attrs: `role="button" tabindex="0" data-select="${esc2(card.iid)}"`,
+    badge: `<span class="spoils-badge">From Stores</span>`
+  })).join("");
+  return `<section class="hand" style="--n:${n + spoils.length}">${cards || (loot ? "" : `<p class="muted">Your hand is empty.</p>`)}${loot}</section>`;
 }
 function prompt(seen) {
   const decision = yourDecision();
   if (seen.over) {
     if (seen.over.winner == null) return "The voyage ends in a draw.";
     const why = seen.over.reason === "renown" ? "reaching 15 Renown" : seen.over.reason === "rounds" ? "the long count" : seen.over.reason === "concede" ? "concession" : seen.over.reason;
-    return `${seatName(seen.over.winner)} wins by ${why}.`;
+    const verb = vsComputer() && seen.over.winner === HUMAN ? "win" : "wins";
+    return `${seatName(seen.over.winner)} ${verb} by ${why}.`;
   }
-  if (!decision) return "Waiting for the other captain.";
+  if (!decision) return vsComputer() ? `${seatName(AI_SEAT)} is thinking\u2026` : "Waiting for the other captain.";
   if (decision.type === "mulligan") return "Click any cards to set aside. You draw that many back, once.";
   if (decision.type === "discard") return "Your hand is over 8. Choose cards to discard.";
   if (decision.type === "surveyLook") return `Survey: choose up to ${decision.max} hidden coast${decision.max > 1 ? "s" : ""} to look at.`;
   if (decision.type === "surveyFlip") return "You see them now. Choose any to flip face up, or none.";
   if (decision.type === "ambush") return `Ambush at ${coastLabel(decision.region, seen)}. Play an Ambush order, or pass.`;
   if (decision.type === "assign") return `Strike! Split ${decision.amount} damage among the enemy crews at ${coastLabel(decision.region, seen)}.`;
+  if (decision.type === "pick") {
+    const what = decision.effects.map((e) => effectText(e, cardName(decision.ctx.cardId))).join(", then ");
+    return `${cardName(decision.ctx.cardId)}: choose ${decision.kind === "region" ? "a Region" : "a crew"} (glowing) to ${what}.`;
+  }
+  if (decision.type === "choose") return `${cardName(decision.ctx.cardId)}: choose one.`;
   if (selected) {
-    const card = seen.hand.find((c) => c.iid === selected);
+    const card = seen.hand.find((c) => c.iid === selected) ?? seen.stores.find((c) => c.iid === selected);
     const crew = seen.crews.find((c) => c.iid === selected);
     if (card) return `${cardName(card.cardId)}: choose where it goes. Glowing spots are legal.`;
     if (crew) return `${cardName(crew.cardId)}: choose where to March.`;
@@ -7167,12 +10229,17 @@ function eventLine(event, viewer) {
   }
   if (event.type === "play") return `${who(event.player)} play${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
   if (event.type === "raid") return `${who(event.player)} raid${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
-  if (event.type === "gameover") return event.winner == null ? "The voyage is a draw." : `${seatName(event.winner)} wins the coast.`;
+  if (event.type === "gameover") return event.winner == null ? "The voyage is a draw." : event.winner === viewer ? "You win the coast." : `${seatName(event.winner)} wins the coast.`;
+  if (event.type === "built") return `${who(event.player)} build${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
+  if (event.type === "razed") return `${cardName(event.cardId)} is razed.`;
+  if (event.type === "ventureDone") return `${who(event.player)} complete${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
+  if (event.type === "returned") return "A crew falls back to its Harbor.";
+  if (event.type === "discarded") return `${who(event.player)} lose${event.player === viewer ? "" : "s"} ${cardName(event.cardId)} from ${event.from === "hand" ? "hand" : "Stores"}.`;
   return "";
 }
 function track(seen) {
   const ticks = Array.from({ length: 16 }, (_, i) => `<span class="tick ${i % 5 === 0 ? "major" : ""}" style="--v:${i}">${i % 5 === 0 ? i : ""}</span>`).join("");
-  const token = (p) => `<span class="token ${fx && fx.renown[p] ? "fx-rise" : ""}" style="--v:${Math.min(15, seen.renown[p])};--accent:${SEAT_COLOR[p]}" title="${seatName(p)}: ${seen.renown[p]}">${icon("ship")}<b>${seen.renown[p]}</b></span>`;
+  const token = (p) => `<span class="token ${fx2 && fx2.renown[p] ? "fx-rise" : ""}" style="--v:${Math.min(15, seen.renown[p])};--accent:${SEAT_COLOR[p]}" title="${seatName(p)}: ${seen.renown[p]}">${icon("ship")}<b>${seen.renown[p]}</b></span>`;
   return `<aside class="track" aria-label="Renown race to 15"><div class="track-title">Renown</div><div class="track-bar">${ticks}${token(0)}${token(1)}<span class="goal">15</span></div></aside>`;
 }
 function helm(seen) {
@@ -7193,29 +10260,40 @@ function helm(seen) {
     const sum = assign.targets.reduce((t, iid) => t + (hits[iid] ?? 0), 0);
     big.push(`<button type="button" class="brass big" data-go="assign" ${sum === assign.amount ? "" : "disabled"}>Strike ${sum} / ${assign.amount}</button>`);
   }
-  const tray = selectionActions(seen).map((a) => `<button type="button" class="chip" data-act="${trayActions.push(a) - 1}">${esc(actionLabel(a, seen))}</button>`).join("");
+  const decisionNow = yourDecision();
+  const chooseButtons = decisionNow?.type === "choose" ? decisionNow.options.map((option, index) => {
+    const label = option.map((e) => effectText(e, cardName(decisionNow.ctx.cardId))).join(", then ");
+    return `<button type="button" class="brass big" data-act="${trayActions.push({ type: "choose", index }) - 1}">${esc2(label.charAt(0).toUpperCase() + label.slice(1))}</button>`;
+  }).join("") : "";
+  if (chooseButtons) big.push(chooseButtons);
+  const tray = selectionActions(seen).map((a) => `<button type="button" class="chip" data-act="${trayActions.push(a) - 1}">${esc2(actionLabel(a, seen))}</button>`).join("");
   const orders = seen.decision?.type === "ambush" ? all.filter((a) => a.type === "play" && !selected) : [];
   const ambushHint = orders.length ? `<p class="small muted">Pick an Ambush order from your hand.</p>` : "";
   const phase = state.claim ? "Claim" : seen.decision?.type === "mulligan" ? "Mulligan" : "Command";
-  const lines = (fx?.lines.length ? fx.lines : redactEvents(log, seat).slice(-6).map((e) => eventLine(e, seat)).filter(Boolean)).slice(-7);
+  const lines = (fx2?.lines.length ? fx2.lines : redactEvents(log, seat).slice(-6).map((e) => eventLine(e, seat)).filter(Boolean)).slice(-7);
   return `<aside class="helm">
     <div class="helm-top">
       <div class="round"><small>Round</small><b>${seen.round}</b></div>
       <div class="phase"><small>Phase</small><b>${phase}</b></div>
       <div class="init" style="--accent:${SEAT_COLOR[seen.initiative]}" title="Initiative">${icon("compass")}<small>${seatName(seen.initiative)}</small></div>
     </div>
-    <p class="prompt">${esc(prompt(seen))}</p>
-    ${error ? `<p class="alert">${esc(error)}</p>` : ""}
-    ${note ? `<p class="small muted note">${esc(note)}</p>` : ""}
+    <p class="prompt">${esc2(prompt(seen))}</p>
+    ${error ? `<p class="alert">${esc2(error)}</p>` : ""}
+    ${note ? `<p class="small muted note">${esc2(note)}</p>` : ""}
     ${ambushHint}
     ${tray ? `<div class="tray">${tray}<button type="button" class="chip quiet" data-go="deselect">Cancel</button></div>` : ""}
     <div class="big-row">${big.join("")}</div>
-    <ol class="log">${lines.map((l, i) => `<li style="--d:${i}" class="${fx ? "fx-line" : ""}">${esc(l)}</li>`).join("") || `<li class="muted">The voyage begins.</li>`}</ol>
+    <ol class="log">${lines.map((l, i) => `<li style="--d:${i}" class="${fx2 ? "fx-line" : ""}">${esc2(l)}</li>`).join("") || `<li class="muted">The voyage begins.</li>`}</ol>
     ${seen.over ? "" : `<button type="button" class="chip ${armConcede ? "danger" : "quiet"} concede" data-go="concede">${armConcede ? "Concede? Click again" : "Concede"}</button>`}
   </aside>`;
 }
 function computeRoutes(seen) {
   routes = /* @__PURE__ */ new Map();
+  const decision = yourDecision();
+  if (decision?.type === "pick") {
+    for (const choice of decision.options) routes.set(decision.kind === "region" ? `r${choice}` : `c${choice}`, { type: "pick", choice });
+    return;
+  }
   for (const action of selectionActions(seen)) {
     const key = routeKey(action);
     if (key && !routes.has(key)) routes.set(key, action);
@@ -7224,9 +10302,56 @@ function computeRoutes(seen) {
 function inspectOverlay() {
   if (!inspecting) return "";
   return `<div class="inspect" data-go="close-inspect"><div class="inspect-card">${cardFace(getCard(inspecting), { cls: "huge", owner: seat })}
-    <div class="inspect-keys">${getCard(inspecting).keywords.map((k) => `<p><b>${cap(k)}.</b> ${esc(KEYWORD_HELP[k] ?? "")}</p>`).join("")}<p class="muted small">Click anywhere to close.</p></div></div></div>`;
+    <div class="inspect-keys">${getCard(inspecting).keywords.map((k) => `<p><b>${cap2(k)}.</b> ${esc2(KEYWORD_HELP[k] ?? "")}</p>`).join("")}<p class="muted small">Click anywhere to close.</p></div></div></div>`;
+}
+var FACTION_NAME2 = Object.fromEntries(factions.map((f2) => [f2.id, f2.name]));
+var FACTION_PLAN = Object.fromEntries(factions.map((f2) => [f2.id, f2.plan]));
+function deckPicker() {
+  const tiles = STARTER_DECKS.map((deck) => {
+    const on2 = setup.deck === deck.id;
+    const keys = deck.keyCards.map((id) => cardFace(getCard(id), { cls: "peek", attrs: `data-inspect="${id}" title="See ${esc2(getCard(id).name)} full size"` })).join("");
+    return `<div class="deck-tile ${on2 ? "on" : ""}" role="radio" aria-checked="${on2}" tabindex="0" data-deck="${deck.id}" style="--faction:${FACTION_COLOR[deck.faction]}">
+      <div class="tile-band"><span class="tile-crest">${icon("compass")}</span>${esc2(FACTION_NAME2[deck.faction] ?? "")}</div>
+      <h3>${esc2(deck.name)}</h3>
+      <p class="tile-plan">${esc2(FACTION_PLAN[deck.faction] ?? "")}</p>
+      <p class="tile-blurb">${esc2(deck.blurb)}</p>
+      <div class="tile-keys">${keys}</div>
+      <p class="tile-names">${deck.keyCards.map((id) => esc2(getCard(id).name)).join(" \xB7 ")}</p>
+      <span class="tile-check">${on2 ? "Your deck" : "Choose"}</span>
+    </div>`;
+  }).join("");
+  const modes = [
+    ["captain", "The Captain", "A sharp computer opponent"],
+    ["deckhand", "The Deckhand", "An easier computer opponent"],
+    ["hotseat", "A friend", "Two players, one screen"]
+  ];
+  const modeButtons = modes.map(([value, name, note2]) => `<button type="button" class="seg ${setup.mode === value ? "on" : ""}" aria-pressed="${setup.mode === value}" data-mode="${value}"><b>${name}</b><small>${note2}</small></button>`).join("");
+  const foes = [["random", "Random"], ...STARTER_DECKS.map((d) => [d.id, d.name])].map(([value, name]) => `<button type="button" class="chip ${setup.foeDeck === value ? "on" : ""}" aria-pressed="${setup.foeDeck === value}" data-foe="${value}">${esc2(name)}</button>`).join("");
+  return `<section class="picker">
+    <p class="kicker">Choose your expedition</p>
+    <h2>Which flag do you sail under?</h2>
+    <div class="deck-grid" role="radiogroup" aria-label="Your deck">${tiles}</div>
+    <div class="picker-foot">
+      <div class="picker-group"><span class="zone-label">Your opponent</span><div class="segs">${modeButtons}</div></div>
+      <div class="picker-group"><span class="zone-label">${setup.mode === "hotseat" ? "Your friend's deck" : "Their deck"}</span><div class="foe-chips">${foes}</div></div>
+      <button type="button" class="brass big sail" data-go="sail">Set sail</button>
+    </div>
+    <p class="muted small picker-hint">Click a card to see it full size. Each deck is 40 cards: 24 from its faction, 14 Basics and 2 Neutral.</p>
+  </section>`;
+}
+function saveSetup() {
+  try {
+    localStorage.setItem(SETUP_KEY, JSON.stringify(setup));
+  } catch {
+  }
 }
 function render() {
+  if (choosing) {
+    table.innerHTML = "";
+    cover.hidden = false;
+    cover.innerHTML = deckPicker() + inspectOverlay();
+    return;
+  }
   const seen = view();
   trayActions = [];
   computeRoutes(seen);
@@ -7238,8 +10363,8 @@ function render() {
     cover.innerHTML = `<section class="cover-card" style="--accent:${SEAT_COLOR[seat]}">
       <div class="cover-ship">${icon("ship")}</div>
       <p class="kicker">Hand the screen across</p>
-      <h2>${esc(seatName(seat))}</h2>
-      <p>${esc(waiting)}</p>
+      <h2>${esc2(seatName(seat))}</h2>
+      <p>${esc2(waiting)}</p>
       <p class="muted">Round ${seen.round} \xB7 Renown ${seen.renown[0]} to ${seen.renown[1]}</p>
       <button type="button" class="brass big" data-go="sit">Take the helm</button>
     </section>`;
@@ -7247,7 +10372,7 @@ function render() {
   }
   cover.hidden = true;
   cover.innerHTML = "";
-  const over = seen.over ? `<div class="victory" style="--accent:${seen.over.winner == null ? "#c9a44c" : SEAT_COLOR[seen.over.winner]}"><div><p class="kicker">The voyage is over</p><h2>${esc(prompt(seen))}</h2><button type="button" class="brass big" data-go="again">Sail again</button></div></div>` : "";
+  const over = seen.over ? `<div class="victory" style="--accent:${seen.over.winner == null ? "#c9a44c" : SEAT_COLOR[seen.over.winner]}"><div><p class="kicker">The voyage is over</p><h2>${esc2(prompt(seen))}</h2><div class="victory-actions"><button type="button" class="brass big" data-go="again">Sail again</button><button type="button" class="chip" data-go="change">Change decks</button></div></div></div>` : "";
   table.innerHTML = `
     <div class="stage ${selected ? "selecting" : ""}">
       ${track(seen)}
@@ -7258,7 +10383,7 @@ function render() {
       ${handFan(seen)}
     </div>
     ${over}${inspectOverlay()}`;
-  fx = null;
+  fx2 = null;
 }
 function collectFx(before, after, events) {
   const out = { flips: /* @__PURE__ */ new Set(), damaged: /* @__PURE__ */ new Map(), landed: /* @__PURE__ */ new Set(), marched: /* @__PURE__ */ new Set(), control: /* @__PURE__ */ new Set(), renown: [0, 0], ghosts: [], lines: [] };
@@ -7290,10 +10415,10 @@ function send(action) {
     actions.push(action);
     error = "";
     const next2 = state.decision?.player ?? null;
-    const viewer = next2 ?? seat;
+    const viewer = vsComputer() ? HUMAN : next2 ?? seat;
     const batch = collectFx(before, state, result.events);
     batch.lines = redactEvents(result.events, viewer).map((e) => eventLine(e, viewer)).filter(Boolean);
-    fx = batch;
+    fx2 = batch;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
     render();
@@ -7304,18 +10429,47 @@ function send(action) {
   hits = {};
   armConcede = false;
   selected = null;
-  if (next != null && next !== prevPlayer) {
+  if (!vsComputer() && next != null && next !== prevPlayer) {
     covered = true;
     seat = next;
   }
   render();
+  scheduleComputer();
+}
+function scheduleComputer() {
+  if (aiTimer != null) window.clearTimeout(aiTimer);
+  aiTimer = null;
+  if (!vsComputer() || state.over || state.decision?.player !== AI_SEAT) return;
+  const level = mode;
+  aiTimer = window.setTimeout(() => {
+    aiTimer = null;
+    if (state.over || state.decision?.player !== AI_SEAT) return;
+    let action;
+    try {
+      action = chooseAction(getPlayerView(state, AI_SEAT), level, Math.random);
+    } catch (err) {
+      error = `The computer could not move: ${err instanceof Error ? err.message : String(err)}`;
+      render();
+      return;
+    }
+    send(action);
+  }, AI_CONFIG.thinkDelay);
 }
 function boot(nextSeed) {
   seed = nextSeed >>> 0 || 1;
-  seedInput.value = String(seed);
-  state = createGame({ seed });
-  seat = state.decision?.player ?? 0;
-  covered = state.decision != null;
+  mode = setup.mode;
+  const mine = deckOf(setup.deck);
+  const theirs = deckOf(setup.foeDeck);
+  foeDeckName = theirs.name;
+  state = createGame({ seed, decks: [mine.cards, theirs.cards] });
+  choosing = false;
+  if (vsComputer()) {
+    seat = HUMAN;
+    covered = false;
+  } else {
+    seat = state.decision?.player ?? 0;
+    covered = state.decision != null;
+  }
   log = [];
   actions = [];
   picked = /* @__PURE__ */ new Set();
@@ -7324,38 +10478,71 @@ function boot(nextSeed) {
   error = "";
   note = "";
   selected = null;
-  fx = null;
+  fx2 = null;
   inspecting = null;
   render();
+  scheduleComputer();
 }
-function activate(target) {
-  if (target.dataset.go === "concede") {
+function activate(target2) {
+  if (target2.dataset.go === "concede") {
     if (!armConcede) {
       armConcede = true;
       render();
       return;
     }
-    send({ type: "concede", player: seat });
+    send({ type: "concede", player: vsComputer() ? HUMAN : seat });
     return;
   }
   armConcede = false;
-  if (target.dataset.go === "close-inspect") {
+  if (target2.dataset.go === "close-inspect") {
     inspecting = null;
     render();
     return;
   }
-  if (target.dataset.act != null) {
-    const action = trayActions[Number(target.dataset.act)];
+  if (target2.dataset.inspect) {
+    inspecting = target2.dataset.inspect;
+    render();
+    return;
+  }
+  if (target2.dataset.deck) {
+    setup = { ...setup, deck: target2.dataset.deck };
+    saveSetup();
+    render();
+    return;
+  }
+  if (target2.dataset.mode) {
+    setup = { ...setup, mode: target2.dataset.mode };
+    saveSetup();
+    render();
+    return;
+  }
+  if (target2.dataset.foe) {
+    setup = { ...setup, foeDeck: target2.dataset.foe };
+    saveSetup();
+    render();
+    return;
+  }
+  if (target2.dataset.go === "sail") {
+    boot(1 + Math.floor(Math.random() * 999999));
+    return;
+  }
+  if (target2.dataset.go === "change") {
+    choosing = true;
+    render();
+    return;
+  }
+  if (target2.dataset.act != null) {
+    const action = trayActions[Number(target2.dataset.act)];
     if (action) send(action);
     return;
   }
-  if (target.dataset.route != null) {
-    const action = routes.get(target.dataset.route);
+  if (target2.dataset.route != null) {
+    const action = routes.get(target2.dataset.route);
     if (action) send(action);
     return;
   }
-  if (target.dataset.select != null) {
-    const iid = target.dataset.select;
+  if (target2.dataset.select != null) {
+    const iid = target2.dataset.select;
     selected = selected === iid ? null : iid;
     const only = selectionActions(view());
     if (selected && only.length === 1 && routeKey(only[0]) === "self") {
@@ -7365,8 +10552,8 @@ function activate(target) {
     render();
     return;
   }
-  if (target.dataset.crew != null) {
-    const iid = target.dataset.crew;
+  if (target2.dataset.crew != null) {
+    const iid = target2.dataset.crew;
     const seen = view();
     if (actsOf(seen).some((a) => a.type === "march" && a.iid === iid)) {
       selected = selected === iid ? null : iid;
@@ -7374,17 +10561,17 @@ function activate(target) {
     }
     return;
   }
-  if (target.dataset.pick != null) {
-    const id = target.dataset.pick;
+  if (target2.dataset.pick != null) {
+    const id = target2.dataset.pick;
     const spec = view().legal.find((item) => item.kind === "subset");
     if (picked.has(id)) picked.delete(id);
     else if (spec && spec.kind === "subset" && picked.size < spec.max) picked.add(id);
     render();
     return;
   }
-  if (target.dataset.bump != null && target.dataset.dir != null) {
-    const iid = target.dataset.bump;
-    const dir = Number(target.dataset.dir);
+  if (target2.dataset.bump != null && target2.dataset.dir != null) {
+    const iid = target2.dataset.bump;
+    const dir = Number(target2.dataset.dir);
     const spec = view().legal.find((item) => item.kind === "assign");
     if (!spec || spec.kind !== "assign" || !spec.targets.includes(iid)) return;
     const next = (hits[iid] ?? 0) + dir;
@@ -7395,7 +10582,7 @@ function activate(target) {
     render();
     return;
   }
-  if (target.dataset.go === "subset") {
+  if (target2.dataset.go === "subset") {
     const spec = view().legal.find((item) => item.kind === "subset");
     if (!spec || spec.kind !== "subset" || picked.size < spec.min || picked.size > spec.max) return;
     const values = [...picked];
@@ -7403,7 +10590,7 @@ function activate(target) {
     else send({ type: spec.actionType, indices: values.map(Number) });
     return;
   }
-  if (target.dataset.go === "assign") {
+  if (target2.dataset.go === "assign") {
     const spec = view().legal.find((item) => item.kind === "assign");
     if (!spec || spec.kind !== "assign") return;
     const payload = {};
@@ -7411,16 +10598,16 @@ function activate(target) {
     send({ type: "assign", hits: payload });
     return;
   }
-  if (target.dataset.go === "deselect") {
+  if (target2.dataset.go === "deselect") {
     selected = null;
     render();
     return;
   }
-  if (target.dataset.go === "again") {
+  if (target2.dataset.go === "again") {
     boot(1 + Math.floor(Math.random() * 999999));
     return;
   }
-  if (target.dataset.go === "sit") {
+  if (target2.dataset.go === "sit") {
     covered = false;
     picked = /* @__PURE__ */ new Set();
     hits = {};
@@ -7428,10 +10615,10 @@ function activate(target) {
     render();
   }
 }
-var HOT = "[data-act], [data-route], [data-pick], [data-bump], [data-go], [data-select], [data-crew]";
+var HOT = "[data-act], [data-route], [data-pick], [data-bump], [data-go], [data-select], [data-crew], [data-inspect], [data-deck], [data-mode], [data-foe]";
 document.body.addEventListener("click", (event) => {
-  const target = event.target instanceof Element ? event.target.closest(HOT) : null;
-  if (target instanceof HTMLElement) activate(target);
+  const target2 = event.target instanceof Element ? event.target.closest(HOT) : null;
+  if (target2 instanceof HTMLElement) activate(target2);
 });
 document.body.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -7441,10 +10628,10 @@ document.body.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key !== "Enter" && event.key !== " ") return;
-  const target = event.target instanceof HTMLElement && !(event.target instanceof HTMLButtonElement) ? event.target.closest(HOT) : null;
-  if (target instanceof HTMLElement) {
+  const target2 = event.target instanceof HTMLElement && !(event.target instanceof HTMLButtonElement) ? event.target.closest(HOT) : null;
+  if (target2 instanceof HTMLElement) {
     event.preventDefault();
-    activate(target);
+    activate(target2);
   }
 });
 document.body.addEventListener("contextmenu", (event) => {
@@ -7476,9 +10663,13 @@ document.body.addEventListener("pointerout", (event) => {
     card.style.removeProperty("--ry");
   }
 });
+var signedIn = !AUTH_REQUIRED;
 document.querySelector("#new")?.addEventListener("click", () => {
-  const raw = Number(seedInput.value);
-  boot(Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 1);
+  if (!signedIn) return;
+  if (aiTimer != null) window.clearTimeout(aiTimer);
+  aiTimer = null;
+  choosing = true;
+  render();
 });
 document.querySelector("#replay")?.addEventListener("click", async () => {
   const text = JSON.stringify({ seed, actions });
@@ -7490,4 +10681,35 @@ document.querySelector("#replay")?.addEventListener("click", async () => {
   }
   render();
 });
-boot(1 + Math.floor(Math.random() * 999999));
+function showAccount(user) {
+  const node = document.getElementById("account");
+  if (!node) return;
+  if (!user) {
+    node.innerHTML = "";
+    return;
+  }
+  node.innerHTML = `<span class="who">${icon("ship")} ${esc2(user.name)}</span>${user.isAdmin ? `<a class="chip quiet" href="admin.html">Admin</a>` : ""}<button type="button" class="chip quiet" id="sign-out">Sign out</button>`;
+  document.getElementById("sign-out")?.addEventListener("click", async () => {
+    try {
+      await signOut();
+    } finally {
+      location.reload();
+    }
+  });
+}
+async function start() {
+  if (AUTH_REQUIRED) {
+    let user = null;
+    try {
+      user = await currentUser();
+    } catch {
+      user = null;
+    }
+    if (!user) user = await signInGate(cover);
+    showAccount(user);
+    signedIn = true;
+  }
+  choosing = true;
+  render();
+}
+void start();

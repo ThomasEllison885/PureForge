@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meridian Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; --brass: #c9a44c; --brass-hi: #f1d58a; --parch: #efe7d6; --muted: #a9b3bc; --panel: rgba(22, 32, 45, 0.85); --danger: #c8413b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(ellipse at 50% 0%, #1c2c40, #0e1621 60%) fixed, #0e1621; color: var(--parch); font: 14px/1.45 Inter, system-ui, sans-serif; }
+    header, main { width: min(980px, calc(100% - 32px)); margin: 0 auto; }
+    header { display: flex; align-items: baseline; gap: 1rem; padding: 1.2rem 0 0.6rem; flex-wrap: wrap; }
+    h1 { margin: 0; font: 600 2rem "Cormorant Garamond", serif; color: var(--brass-hi); }
+    header a { color: var(--brass); margin-left: auto; }
+    .panel { background: var(--panel); border: 1px solid rgba(201,164,76,0.25); border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; overflow-x: auto; }
+    h2 { margin: 0 0 0.7rem; font: 700 1.25rem "Cormorant Garamond", serif; }
+    table { width: 100%; border-collapse: collapse; min-width: 520px; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.07); vertical-align: middle; }
+    th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    code { font: 600 0.95rem ui-monospace, Menlo, monospace; color: var(--brass-hi); }
+    .open { color: #7ed09a; font-weight: 600; }
+    .tag { font-size: 0.7rem; color: #1e1606; background: var(--brass); padding: 0 0.4rem; border-radius: 999px; }
+    .row-form { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: end; }
+    .field { display: grid; gap: 0.25rem; font-size: 0.82rem; color: var(--muted); flex: 1 1 220px; }
+    .field.small { flex: 0 1 200px; }
+    input { font: inherit; color: inherit; background: rgba(14,22,33,0.85); border: 1px solid rgba(201,164,76,0.4); border-radius: 8px; padding: 0.5rem 0.6rem; width: 100%; }
+    button { font: inherit; cursor: pointer; }
+    .brass { background: linear-gradient(180deg, #f4dc96, #c9a44c 48%, #96752c); color: #1e1606; font-weight: 700; border: 1px solid #f7e2a6; border-radius: 10px; padding: 0.55rem 1rem; }
+    .chip { background: rgba(36,48,68,0.85); color: var(--parch); border: 1px solid rgba(239,231,214,0.2); border-radius: 999px; padding: 0.25rem 0.7rem; font-size: 0.8rem; }
+    .chip:hover { border-color: var(--brass); }
+    .chip.danger { color: #f3b6b0; border-color: rgba(200,65,59,0.7); }
+    .actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+    .fresh { margin-top: 0.9rem; padding: 0.8rem; border-radius: 10px; background: rgba(201,164,76,0.1); border: 1px solid rgba(201,164,76,0.45); }
+    .fresh p { margin: 0 0 0.3rem; } .fresh code { font-size: 1.4rem; display: block; margin-bottom: 0.4rem; }
+    .link { word-break: break-all; color: var(--parch); }
+    .muted { color: var(--muted); } .small { font-size: 0.8rem; }
+    .alert { color: #f3b6b0; }
+    #cover { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(4,8,12,0.9); }
+    #cover[hidden] { display: none; }
+    .cover-card { width: min(440px, 100%); padding: 1.8rem 1.5rem; border-radius: 16px; background: var(--panel); border: 1px solid var(--brass); }
+    .cover-card h2 { font-size: 2.6rem; text-align: center; margin: 0.2rem 0; color: var(--brass-hi); }
+    .cover-ship, .kicker { text-align: center; color: var(--brass); }
+    .kicker { margin: 0; letter-spacing: 0.2em; text-transform: uppercase; font-size: 0.66rem; }
+    .auth-tabs { display: flex; gap: 4px; margin: 0.8rem 0 0.6rem; background: rgba(0,0,0,0.25); border-radius: 10px; padding: 3px; }
+    .auth-tabs button { flex: 1; border: none; background: transparent; color: var(--muted); padding: 0.45rem; border-radius: 8px; font-size: 0.82rem; }
+    .auth-tabs button[aria-selected="true"] { background: rgba(201,164,76,0.2); color: var(--brass-hi); }
+    .auth-form { display: grid; gap: 0.65rem; }
+    .auth-form .brass { width: 100%; padding: 0.7rem; }
+  </style>
+</head>
+<body>
+  <header><h1>Meridian Admin</h1><span class="muted">Signed in as <b id="who"></b></span><a href="./">Back to the game</a></header>
+  <main id="admin"><p class="muted">Loading…</p></main>
+  <div id="cover" hidden></div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
