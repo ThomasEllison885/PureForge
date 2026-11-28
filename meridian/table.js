@@ -538,18 +538,18 @@ var ParseStatus = class _ParseStatus {
     if (this.value !== "aborted")
       this.value = "aborted";
   }
-  static mergeArray(status2, results) {
+  static mergeArray(status, results) {
     const arrayValue = [];
     for (const s of results) {
       if (s.status === "aborted")
         return INVALID;
       if (s.status === "dirty")
-        status2.dirty();
+        status.dirty();
       arrayValue.push(s.value);
     }
-    return { status: status2.value, value: arrayValue };
+    return { status: status.value, value: arrayValue };
   }
-  static async mergeObjectAsync(status2, pairs) {
+  static async mergeObjectAsync(status, pairs) {
     const syncPairs = [];
     for (const pair of pairs) {
       const key = await pair.key;
@@ -559,9 +559,9 @@ var ParseStatus = class _ParseStatus {
         value
       });
     }
-    return _ParseStatus.mergeObjectSync(status2, syncPairs);
+    return _ParseStatus.mergeObjectSync(status, syncPairs);
   }
-  static mergeObjectSync(status2, pairs) {
+  static mergeObjectSync(status, pairs) {
     const finalObject = {};
     for (const pair of pairs) {
       const { key, value } = pair;
@@ -570,14 +570,14 @@ var ParseStatus = class _ParseStatus {
       if (value.status === "aborted")
         return INVALID;
       if (key.status === "dirty")
-        status2.dirty();
+        status.dirty();
       if (value.status === "dirty")
-        status2.dirty();
+        status.dirty();
       if (key.value !== "__proto__" && (typeof value.value !== "undefined" || pair.alwaysSet)) {
         finalObject[key.value] = value.value;
       }
     }
-    return { status: status2.value, value: finalObject };
+    return { status: status.value, value: finalObject };
   }
 };
 var INVALID = Object.freeze({
@@ -1037,7 +1037,7 @@ var ZodString = class _ZodString extends ZodType {
       });
       return INVALID;
     }
-    const status2 = new ParseStatus();
+    const status = new ParseStatus();
     let ctx = void 0;
     for (const check of this._def.checks) {
       if (check.kind === "min") {
@@ -1051,7 +1051,7 @@ var ZodString = class _ZodString extends ZodType {
             exact: false,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "max") {
         if (input.data.length > check.value) {
@@ -1064,7 +1064,7 @@ var ZodString = class _ZodString extends ZodType {
             exact: false,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "length") {
         const tooBig = input.data.length > check.value;
@@ -1090,7 +1090,7 @@ var ZodString = class _ZodString extends ZodType {
               message: check.message
             });
           }
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "email") {
         if (!emailRegex.test(input.data)) {
@@ -1100,7 +1100,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "emoji") {
         if (!emojiRegex) {
@@ -1113,7 +1113,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "uuid") {
         if (!uuidRegex.test(input.data)) {
@@ -1123,7 +1123,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "nanoid") {
         if (!nanoidRegex.test(input.data)) {
@@ -1133,7 +1133,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "cuid") {
         if (!cuidRegex.test(input.data)) {
@@ -1143,7 +1143,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "cuid2") {
         if (!cuid2Regex.test(input.data)) {
@@ -1153,7 +1153,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "ulid") {
         if (!ulidRegex.test(input.data)) {
@@ -1163,7 +1163,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "url") {
         try {
@@ -1175,7 +1175,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "regex") {
         check.regex.lastIndex = 0;
@@ -1187,7 +1187,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "trim") {
         input.data = input.data.trim();
@@ -1199,7 +1199,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: { includes: check.value, position: check.position },
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "toLowerCase") {
         input.data = input.data.toLowerCase();
@@ -1213,7 +1213,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: { startsWith: check.value },
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "endsWith") {
         if (!input.data.endsWith(check.value)) {
@@ -1223,7 +1223,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: { endsWith: check.value },
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "datetime") {
         const regex = datetimeRegex(check);
@@ -1234,7 +1234,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: "datetime",
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "date") {
         const regex = dateRegex;
@@ -1245,7 +1245,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: "date",
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "time") {
         const regex = timeRegex(check);
@@ -1256,7 +1256,7 @@ var ZodString = class _ZodString extends ZodType {
             validation: "time",
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "duration") {
         if (!durationRegex.test(input.data)) {
@@ -1266,7 +1266,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "ip") {
         if (!isValidIP(input.data, check.version)) {
@@ -1276,7 +1276,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "jwt") {
         if (!isValidJWT(input.data, check.alg)) {
@@ -1286,7 +1286,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "cidr") {
         if (!isValidCidr(input.data, check.version)) {
@@ -1296,7 +1296,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "base64") {
         if (!base64Regex.test(input.data)) {
@@ -1306,7 +1306,7 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "base64url") {
         if (!base64urlRegex.test(input.data)) {
@@ -1316,13 +1316,13 @@ var ZodString = class _ZodString extends ZodType {
             code: ZodIssueCode.invalid_string,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else {
         util.assertNever(check);
       }
     }
-    return { status: status2.value, value: input.data };
+    return { status: status.value, value: input.data };
   }
   _regex(regex, validation, message) {
     return this.refinement((data) => regex.test(data), {
@@ -1598,7 +1598,7 @@ var ZodNumber = class _ZodNumber extends ZodType {
       return INVALID;
     }
     let ctx = void 0;
-    const status2 = new ParseStatus();
+    const status = new ParseStatus();
     for (const check of this._def.checks) {
       if (check.kind === "int") {
         if (!util.isInteger(input.data)) {
@@ -1609,7 +1609,7 @@ var ZodNumber = class _ZodNumber extends ZodType {
             received: "float",
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "min") {
         const tooSmall = check.inclusive ? input.data < check.value : input.data <= check.value;
@@ -1623,7 +1623,7 @@ var ZodNumber = class _ZodNumber extends ZodType {
             exact: false,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "max") {
         const tooBig = check.inclusive ? input.data > check.value : input.data >= check.value;
@@ -1637,7 +1637,7 @@ var ZodNumber = class _ZodNumber extends ZodType {
             exact: false,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "multipleOf") {
         if (floatSafeRemainder(input.data, check.value) !== 0) {
@@ -1647,7 +1647,7 @@ var ZodNumber = class _ZodNumber extends ZodType {
             multipleOf: check.value,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "finite") {
         if (!Number.isFinite(input.data)) {
@@ -1656,13 +1656,13 @@ var ZodNumber = class _ZodNumber extends ZodType {
             code: ZodIssueCode.not_finite,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else {
         util.assertNever(check);
       }
     }
-    return { status: status2.value, value: input.data };
+    return { status: status.value, value: input.data };
   }
   gte(value, message) {
     return this.setLimit("min", value, true, errorUtil.toString(message));
@@ -1827,7 +1827,7 @@ var ZodBigInt = class _ZodBigInt extends ZodType {
       return this._getInvalidInput(input);
     }
     let ctx = void 0;
-    const status2 = new ParseStatus();
+    const status = new ParseStatus();
     for (const check of this._def.checks) {
       if (check.kind === "min") {
         const tooSmall = check.inclusive ? input.data < check.value : input.data <= check.value;
@@ -1840,7 +1840,7 @@ var ZodBigInt = class _ZodBigInt extends ZodType {
             inclusive: check.inclusive,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "max") {
         const tooBig = check.inclusive ? input.data > check.value : input.data >= check.value;
@@ -1853,7 +1853,7 @@ var ZodBigInt = class _ZodBigInt extends ZodType {
             inclusive: check.inclusive,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "multipleOf") {
         if (input.data % check.value !== BigInt(0)) {
@@ -1863,13 +1863,13 @@ var ZodBigInt = class _ZodBigInt extends ZodType {
             multipleOf: check.value,
             message: check.message
           });
-          status2.dirty();
+          status.dirty();
         }
       } else {
         util.assertNever(check);
       }
     }
-    return { status: status2.value, value: input.data };
+    return { status: status.value, value: input.data };
   }
   _getInvalidInput(input) {
     const ctx = this._getOrReturnCtx(input);
@@ -2027,7 +2027,7 @@ var ZodDate = class _ZodDate extends ZodType {
       });
       return INVALID;
     }
-    const status2 = new ParseStatus();
+    const status = new ParseStatus();
     let ctx = void 0;
     for (const check of this._def.checks) {
       if (check.kind === "min") {
@@ -2041,7 +2041,7 @@ var ZodDate = class _ZodDate extends ZodType {
             minimum: check.value,
             type: "date"
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (check.kind === "max") {
         if (input.data.getTime() > check.value) {
@@ -2054,14 +2054,14 @@ var ZodDate = class _ZodDate extends ZodType {
             maximum: check.value,
             type: "date"
           });
-          status2.dirty();
+          status.dirty();
         }
       } else {
         util.assertNever(check);
       }
     }
     return {
-      status: status2.value,
+      status: status.value,
       value: new Date(input.data.getTime())
     };
   }
@@ -2247,7 +2247,7 @@ ZodVoid.create = (params) => {
 };
 var ZodArray = class _ZodArray extends ZodType {
   _parse(input) {
-    const { ctx, status: status2 } = this._processInputParams(input);
+    const { ctx, status } = this._processInputParams(input);
     const def = this._def;
     if (ctx.parsedType !== ZodParsedType.array) {
       addIssueToContext(ctx, {
@@ -2270,7 +2270,7 @@ var ZodArray = class _ZodArray extends ZodType {
           exact: true,
           message: def.exactLength.message
         });
-        status2.dirty();
+        status.dirty();
       }
     }
     if (def.minLength !== null) {
@@ -2283,7 +2283,7 @@ var ZodArray = class _ZodArray extends ZodType {
           exact: false,
           message: def.minLength.message
         });
-        status2.dirty();
+        status.dirty();
       }
     }
     if (def.maxLength !== null) {
@@ -2296,20 +2296,20 @@ var ZodArray = class _ZodArray extends ZodType {
           exact: false,
           message: def.maxLength.message
         });
-        status2.dirty();
+        status.dirty();
       }
     }
     if (ctx.common.async) {
       return Promise.all([...ctx.data].map((item, i) => {
         return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
       })).then((result2) => {
-        return ParseStatus.mergeArray(status2, result2);
+        return ParseStatus.mergeArray(status, result2);
       });
     }
     const result = [...ctx.data].map((item, i) => {
       return def.type._parseSync(new ParseInputLazyPath(ctx, item, ctx.path, i));
     });
-    return ParseStatus.mergeArray(status2, result);
+    return ParseStatus.mergeArray(status, result);
   }
   get element() {
     return this._def.type;
@@ -2398,7 +2398,7 @@ var ZodObject = class _ZodObject extends ZodType {
       });
       return INVALID;
     }
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     const { shape, keys: shapeKeys } = this._getCached();
     const extraKeys = [];
     if (!(this._def.catchall instanceof ZodNever && this._def.unknownKeys === "strip")) {
@@ -2433,7 +2433,7 @@ var ZodObject = class _ZodObject extends ZodType {
             code: ZodIssueCode.unrecognized_keys,
             keys: extraKeys
           });
-          status2.dirty();
+          status.dirty();
         }
       } else if (unknownKeys === "strip") {
       } else {
@@ -2467,10 +2467,10 @@ var ZodObject = class _ZodObject extends ZodType {
         }
         return syncPairs;
       }).then((syncPairs) => {
-        return ParseStatus.mergeObjectSync(status2, syncPairs);
+        return ParseStatus.mergeObjectSync(status, syncPairs);
       });
     } else {
-      return ParseStatus.mergeObjectSync(status2, pairs);
+      return ParseStatus.mergeObjectSync(status, pairs);
     }
   }
   get shape() {
@@ -2948,7 +2948,7 @@ function mergeValues(a, b) {
 }
 var ZodIntersection = class extends ZodType {
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     const handleParsed = (parsedLeft, parsedRight) => {
       if (isAborted(parsedLeft) || isAborted(parsedRight)) {
         return INVALID;
@@ -2961,9 +2961,9 @@ var ZodIntersection = class extends ZodType {
         return INVALID;
       }
       if (isDirty(parsedLeft) || isDirty(parsedRight)) {
-        status2.dirty();
+        status.dirty();
       }
-      return { status: status2.value, value: merged.data };
+      return { status: status.value, value: merged.data };
     };
     if (ctx.common.async) {
       return Promise.all([
@@ -3001,7 +3001,7 @@ ZodIntersection.create = (left, right, params) => {
 };
 var ZodTuple = class _ZodTuple extends ZodType {
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.array) {
       addIssueToContext(ctx, {
         code: ZodIssueCode.invalid_type,
@@ -3029,7 +3029,7 @@ var ZodTuple = class _ZodTuple extends ZodType {
         exact: false,
         type: "array"
       });
-      status2.dirty();
+      status.dirty();
     }
     const items = [...ctx.data].map((item, itemIndex) => {
       const schema = this._def.items[itemIndex] || this._def.rest;
@@ -3039,10 +3039,10 @@ var ZodTuple = class _ZodTuple extends ZodType {
     }).filter((x) => !!x);
     if (ctx.common.async) {
       return Promise.all(items).then((results) => {
-        return ParseStatus.mergeArray(status2, results);
+        return ParseStatus.mergeArray(status, results);
       });
     } else {
-      return ParseStatus.mergeArray(status2, items);
+      return ParseStatus.mergeArray(status, items);
     }
   }
   get items() {
@@ -3074,7 +3074,7 @@ var ZodRecord = class _ZodRecord extends ZodType {
     return this._def.valueType;
   }
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.object) {
       addIssueToContext(ctx, {
         code: ZodIssueCode.invalid_type,
@@ -3094,9 +3094,9 @@ var ZodRecord = class _ZodRecord extends ZodType {
       });
     }
     if (ctx.common.async) {
-      return ParseStatus.mergeObjectAsync(status2, pairs);
+      return ParseStatus.mergeObjectAsync(status, pairs);
     } else {
-      return ParseStatus.mergeObjectSync(status2, pairs);
+      return ParseStatus.mergeObjectSync(status, pairs);
     }
   }
   get element() {
@@ -3127,7 +3127,7 @@ var ZodMap = class extends ZodType {
     return this._def.valueType;
   }
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.map) {
       addIssueToContext(ctx, {
         code: ZodIssueCode.invalid_type,
@@ -3154,11 +3154,11 @@ var ZodMap = class extends ZodType {
             return INVALID;
           }
           if (key.status === "dirty" || value.status === "dirty") {
-            status2.dirty();
+            status.dirty();
           }
           finalMap.set(key.value, value.value);
         }
-        return { status: status2.value, value: finalMap };
+        return { status: status.value, value: finalMap };
       });
     } else {
       const finalMap = /* @__PURE__ */ new Map();
@@ -3169,11 +3169,11 @@ var ZodMap = class extends ZodType {
           return INVALID;
         }
         if (key.status === "dirty" || value.status === "dirty") {
-          status2.dirty();
+          status.dirty();
         }
         finalMap.set(key.value, value.value);
       }
-      return { status: status2.value, value: finalMap };
+      return { status: status.value, value: finalMap };
     }
   }
 };
@@ -3187,7 +3187,7 @@ ZodMap.create = (keyType, valueType, params) => {
 };
 var ZodSet = class _ZodSet extends ZodType {
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     if (ctx.parsedType !== ZodParsedType.set) {
       addIssueToContext(ctx, {
         code: ZodIssueCode.invalid_type,
@@ -3207,7 +3207,7 @@ var ZodSet = class _ZodSet extends ZodType {
           exact: false,
           message: def.minSize.message
         });
-        status2.dirty();
+        status.dirty();
       }
     }
     if (def.maxSize !== null) {
@@ -3220,7 +3220,7 @@ var ZodSet = class _ZodSet extends ZodType {
           exact: false,
           message: def.maxSize.message
         });
-        status2.dirty();
+        status.dirty();
       }
     }
     const valueType = this._def.valueType;
@@ -3230,10 +3230,10 @@ var ZodSet = class _ZodSet extends ZodType {
         if (element.status === "aborted")
           return INVALID;
         if (element.status === "dirty")
-          status2.dirty();
+          status.dirty();
         parsedSet.add(element.value);
       }
-      return { status: status2.value, value: parsedSet };
+      return { status: status.value, value: parsedSet };
     }
     const elements = [...ctx.data.values()].map((item, i) => valueType._parse(new ParseInputLazyPath(ctx, item, ctx.path, i)));
     if (ctx.common.async) {
@@ -3564,15 +3564,15 @@ var ZodEffects = class extends ZodType {
     return this._def.schema._def.typeName === ZodFirstPartyTypeKind.ZodEffects ? this._def.schema.sourceType() : this._def.schema;
   }
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     const effect = this._def.effect || null;
     const checkCtx = {
       addIssue: (arg) => {
         addIssueToContext(ctx, arg);
         if (arg.fatal) {
-          status2.abort();
+          status.abort();
         } else {
-          status2.dirty();
+          status.dirty();
         }
       },
       get path() {
@@ -3584,7 +3584,7 @@ var ZodEffects = class extends ZodType {
       const processed = effect.transform(ctx.data, checkCtx);
       if (ctx.common.async) {
         return Promise.resolve(processed).then(async (processed2) => {
-          if (status2.value === "aborted")
+          if (status.value === "aborted")
             return INVALID;
           const result = await this._def.schema._parseAsync({
             data: processed2,
@@ -3595,12 +3595,12 @@ var ZodEffects = class extends ZodType {
             return INVALID;
           if (result.status === "dirty")
             return DIRTY(result.value);
-          if (status2.value === "dirty")
+          if (status.value === "dirty")
             return DIRTY(result.value);
           return result;
         });
       } else {
-        if (status2.value === "aborted")
+        if (status.value === "aborted")
           return INVALID;
         const result = this._def.schema._parseSync({
           data: processed,
@@ -3611,7 +3611,7 @@ var ZodEffects = class extends ZodType {
           return INVALID;
         if (result.status === "dirty")
           return DIRTY(result.value);
-        if (status2.value === "dirty")
+        if (status.value === "dirty")
           return DIRTY(result.value);
         return result;
       }
@@ -3636,17 +3636,17 @@ var ZodEffects = class extends ZodType {
         if (inner.status === "aborted")
           return INVALID;
         if (inner.status === "dirty")
-          status2.dirty();
+          status.dirty();
         executeRefinement(inner.value);
-        return { status: status2.value, value: inner.value };
+        return { status: status.value, value: inner.value };
       } else {
         return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((inner) => {
           if (inner.status === "aborted")
             return INVALID;
           if (inner.status === "dirty")
-            status2.dirty();
+            status.dirty();
           return executeRefinement(inner.value).then(() => {
-            return { status: status2.value, value: inner.value };
+            return { status: status.value, value: inner.value };
           });
         });
       }
@@ -3664,13 +3664,13 @@ var ZodEffects = class extends ZodType {
         if (result instanceof Promise) {
           throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
         }
-        return { status: status2.value, value: result };
+        return { status: status.value, value: result };
       } else {
         return this._def.schema._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx }).then((base) => {
           if (!isValid(base))
             return INVALID;
           return Promise.resolve(effect.transform(base.value, checkCtx)).then((result) => ({
-            status: status2.value,
+            status: status.value,
             value: result
           }));
         });
@@ -3849,7 +3849,7 @@ var ZodBranded = class extends ZodType {
 };
 var ZodPipeline = class _ZodPipeline extends ZodType {
   _parse(input) {
-    const { status: status2, ctx } = this._processInputParams(input);
+    const { status, ctx } = this._processInputParams(input);
     if (ctx.common.async) {
       const handleAsync = async () => {
         const inResult = await this._def.in._parseAsync({
@@ -3860,7 +3860,7 @@ var ZodPipeline = class _ZodPipeline extends ZodType {
         if (inResult.status === "aborted")
           return INVALID;
         if (inResult.status === "dirty") {
-          status2.dirty();
+          status.dirty();
           return DIRTY(inResult.value);
         } else {
           return this._def.out._parseAsync({
@@ -3880,7 +3880,7 @@ var ZodPipeline = class _ZodPipeline extends ZodType {
       if (inResult.status === "aborted")
         return INVALID;
       if (inResult.status === "dirty") {
-        status2.dirty();
+        status.dirty();
         return {
           status: "dirty",
           value: inResult.value
@@ -5611,8 +5611,8 @@ function getLegalActions(state2, player) {
     ];
   }
   if (decision.type === "discard") {
-    const hand2 = state2.players[player].hand;
-    return [concede, { kind: "subset", actionType: "discard", options: hand2.map((c) => c.iid), min: hand2.length - 8, max: hand2.length - 8 }];
+    const hand = state2.players[player].hand;
+    return [concede, { kind: "subset", actionType: "discard", options: hand.map((c) => c.iid), min: hand.length - 8, max: hand.length - 8 }];
   }
   if (decision.type === "surveyLook") {
     return [concede, { kind: "subset", actionType: "surveyLook", options: decision.options, min: 0, max: Math.min(decision.max, decision.options.length) }];
@@ -5708,41 +5708,41 @@ function surveyOptions(state2) {
   });
   return options;
 }
-function applyFx(state2, fx, events) {
-  if (fx.op === "draw") draw(state2, fx.player, fx.amount, events);
-  else if (fx.op === "stowDeck") {
-    const cardId = state2.players[fx.player].deck.shift();
-    if (cardId) state2.players[fx.player].stores.push({ iid: mint(state2), cardId, exhausted: false });
-  } else if (fx.op === "extraStow") state2.players[fx.player].stowLeft += fx.amount;
-  else if (fx.op === "beginSurvey") {
+function applyFx(state2, fx2, events) {
+  if (fx2.op === "draw") draw(state2, fx2.player, fx2.amount, events);
+  else if (fx2.op === "stowDeck") {
+    const cardId = state2.players[fx2.player].deck.shift();
+    if (cardId) state2.players[fx2.player].stores.push({ iid: mint(state2), cardId, exhausted: false });
+  } else if (fx2.op === "extraStow") state2.players[fx2.player].stowLeft += fx2.amount;
+  else if (fx2.op === "beginSurvey") {
     const options = surveyOptions(state2);
-    if (!options.length || fx.n <= 0) return;
+    if (!options.length || fx2.n <= 0) return;
     if (state2.decision) state2.paused.push(state2.decision);
-    state2.decision = { type: "surveyLook", player: fx.player, max: fx.n, options };
-  } else if (fx.op === "flip") {
-    const region = state2.regions[fx.index];
+    state2.decision = { type: "surveyLook", player: fx2.player, max: fx2.n, options };
+  } else if (fx2.op === "flip") {
+    const region = state2.regions[fx2.index];
     if (!region || region.faceUp || trait(region.regionId, "hiddenFromScout")) return;
     region.faceUp = true;
-    events.push({ type: "flip", index: fx.index, regionId: region.regionId, player: fx.player });
+    events.push({ type: "flip", index: fx2.index, regionId: region.regionId, player: fx2.player });
     const revealed = getRegion(region.regionId).traits.find((t) => t.kind === "whenRevealed");
-    if (revealed && revealed.kind === "whenRevealed") state2.queue.unshift(...compile(revealed.effects, fx.player, {}));
-  } else if (fx.op === "damage") damageCrew(state2, fx.iid, fx.amount, fx.source, events);
-  else if (fx.op === "buff") {
-    for (const crew of crewsAt(state2, fx.region)) {
-      if (crew.owner !== fx.player) continue;
-      crew.mods.push({ might: fx.might, endurance: fx.endurance, until: fx.until });
+    if (revealed && revealed.kind === "whenRevealed") state2.queue.unshift(...compile(revealed.effects, fx2.player, {}));
+  } else if (fx2.op === "damage") damageCrew(state2, fx2.iid, fx2.amount, fx2.source, events);
+  else if (fx2.op === "buff") {
+    for (const crew of crewsAt(state2, fx2.region)) {
+      if (crew.owner !== fx2.player) continue;
+      crew.mods.push({ might: fx2.might, endurance: fx2.endurance, until: fx2.until });
     }
-  } else if (fx.op === "extraMarch") {
-    const crew = findCrew(state2, fx.iid);
+  } else if (fx2.op === "extraMarch") {
+    const crew = findCrew(state2, fx2.iid);
     if (crew) crew.marchesLeft += 1;
-  } else if (fx.op === "handoffAmbush") handoffAmbush(state2);
+  } else if (fx2.op === "handoffAmbush") handoffAmbush(state2);
 }
 function drain(state2, events) {
   let guard = 0;
   while (state2.queue.length && !choiceOpen(state2) && !state2.over) {
     if (++guard > 500) throw new Error("The rules queued too much work.");
-    const fx = state2.queue.shift();
-    if (fx) applyFx(state2, fx, events);
+    const fx2 = state2.queue.shift();
+    if (fx2) applyFx(state2, fx2, events);
   }
   if (choiceOpen(state2) || state2.over) return;
   if (state2.claim && !state2.decision) continueClaim(state2, events);
@@ -6071,10 +6071,10 @@ function pay(state2, player, cost) {
   for (let i = 0; i < cost; i++) ready[i].exhausted = true;
 }
 function takeFromHand(state2, player, iid) {
-  const hand2 = state2.players[player].hand;
-  const index = hand2.findIndex((card2) => card2.iid === iid);
+  const hand = state2.players[player].hand;
+  const index = hand.findIndex((card2) => card2.iid === iid);
   if (index < 0) throw new Error("That card is not in your hand.");
-  const [card] = hand2.splice(index, 1);
+  const [card] = hand.splice(index, 1);
   return card;
 }
 function subsetFits(legal, values) {
@@ -6477,8 +6477,340 @@ function redactEvents(events, viewer) {
   });
 }
 
+// apps/table/art.ts
+var uid = 0;
+var nextId = (stem) => `${stem}${++uid}`;
+function hash(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+function rng(seed2) {
+  let s = hash(seed2) || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+}
+var SKIES = {
+  dawn: { top: "#1d2a4a", mid: "#7a4a6a", low: "#f0a868", sun: "#ffe2a8", sunX: 120, sunY: 58, sunR: 11 },
+  noon: { top: "#24507a", mid: "#4f86a8", low: "#cfe0d8", sun: "#fff6d8", sunX: 34, sunY: 22, sunR: 9 },
+  dusk: { top: "#1a1730", mid: "#6b2e3e", low: "#e2733f", sun: "#ffcf7a", sunX: 80, sunY: 60, sunR: 14 },
+  storm: { top: "#0f141c", mid: "#26313e", low: "#4a5562", sun: "#9aa7b4", sunX: 130, sunY: 18, sunR: 0 },
+  night: { top: "#070b16", mid: "#142240", low: "#2c4466", sun: "#e9eef5", sunX: 124, sunY: 20, sunR: 7 },
+  haze: { top: "#33405a", mid: "#8c8a86", low: "#d9c9a6", sun: "#fff0c8", sunX: 40, sunY: 30, sunR: 10 },
+  ember: { top: "#140c10", mid: "#4a1a18", low: "#c4502a", sun: "#ffb070", sunX: 112, sunY: 40, sunR: 0 },
+  jade: { top: "#10262a", mid: "#2f5a50", low: "#a8c49a", sun: "#f8f2c8", sunX: 118, sunY: 24, sunR: 8 }
+};
+function skyLayer(sky, w, h, stars = false) {
+  const g = nextId("sky");
+  const glow = nextId("glow");
+  let out = `<defs>
+    <linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${sky.top}"/><stop offset="0.55" stop-color="${sky.mid}"/><stop offset="1" stop-color="${sky.low}"/>
+    </linearGradient>
+    <radialGradient id="${glow}"><stop offset="0" stop-color="${sky.sun}" stop-opacity="0.9"/><stop offset="1" stop-color="${sky.sun}" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="${w}" height="${h}" fill="url(#${g})"/>`;
+  if (stars) {
+    const r = rng(`stars${w}`);
+    for (let i = 0; i < 26; i++) {
+      out += `<circle class="twinkle" style="animation-delay:${(r() * 4).toFixed(2)}s" cx="${(r() * w).toFixed(1)}" cy="${(r() * h * 0.45).toFixed(1)}" r="${(0.3 + r() * 0.5).toFixed(2)}" fill="#fff"/>`;
+    }
+  }
+  if (sky.sunR > 0) {
+    out += `<circle cx="${sky.sunX}" cy="${sky.sunY}" r="${sky.sunR * 3.2}" fill="url(#${glow})"/>`;
+    out += `<circle cx="${sky.sunX}" cy="${sky.sunY}" r="${sky.sunR}" fill="${sky.sun}"/>`;
+  }
+  return out;
+}
+function clouds(seed2, w, color, opacity = 0.5, y0 = 8, y1 = 34) {
+  const r = rng(seed2);
+  let out = `<g class="drift" opacity="${opacity}">`;
+  for (let i = 0; i < 4; i++) {
+    const x = r() * w;
+    const y = y0 + r() * (y1 - y0);
+    const s = 8 + r() * 14;
+    out += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(s * 1.8).toFixed(1)}" ry="${(s * 0.45).toFixed(1)}" fill="${color}"/>`;
+    out += `<ellipse cx="${(x + s * 0.8).toFixed(1)}" cy="${(y - s * 0.25).toFixed(1)}" rx="${s.toFixed(1)}" ry="${(s * 0.4).toFixed(1)}" fill="${color}"/>`;
+  }
+  return `${out}</g>`;
+}
+function ridge(seed2, w, base, height, jag, color, snow) {
+  const r = rng(seed2);
+  const pts = [[0, base]];
+  const steps = 9;
+  for (let i = 0; i <= steps; i++) {
+    const x = i / steps * w;
+    const peak = i % 2 === 1;
+    const y = base - (peak ? height * (0.55 + r() * 0.45) : height * r() * jag);
+    pts.push([x, y]);
+  }
+  pts.push([w, base], [w, 200], [0, 200]);
+  let out = `<path d="M${pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L")} Z" fill="${color}"/>`;
+  if (snow) {
+    for (let i = 1; i < pts.length - 3; i++) {
+      const [x, y] = pts[i];
+      if (y < base - height * 0.7) out += `<path d="M${(x - 5).toFixed(1)} ${(y + 5).toFixed(1)} L${x.toFixed(1)} ${y.toFixed(1)} L${(x + 5).toFixed(1)} ${(y + 5).toFixed(1)} L${(x + 2).toFixed(1)} ${(y + 4).toFixed(1)} L${x.toFixed(1)} ${(y + 6).toFixed(1)} Z" fill="${snow}"/>`;
+    }
+  }
+  return out;
+}
+function hills(seed2, w, base, amp, color) {
+  const r = rng(seed2);
+  let d = `M0 ${base}`;
+  const n = 4;
+  for (let i = 0; i < n; i++) {
+    const x0 = i / n * w;
+    const x1 = (i + 1) / n * w;
+    const cy = base - amp * (0.4 + r() * 0.8);
+    d += ` Q${((x0 + x1) / 2).toFixed(1)} ${cy.toFixed(1)} ${x1.toFixed(1)} ${(base - r() * amp * 0.3).toFixed(1)}`;
+  }
+  return `<path d="${d} L${w} 200 L0 200 Z" fill="${color}"/>`;
+}
+function sea(w, y, deep, light, h = 200) {
+  const g = nextId("sea");
+  let out = `<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${deep}"/></linearGradient></defs>`;
+  out += `<rect x="0" y="${y}" width="${w}" height="${h - y}" fill="url(#${g})"/>`;
+  out += `<g class="wave" opacity="0.55">`;
+  for (let row = 0; row < 4; row++) {
+    const yy = y + 3 + row * 5;
+    let d = `M${-20} ${yy}`;
+    for (let x = -20; x < w + 40; x += 10) d += ` q2.5 -1.6 5 0 t5 0`;
+    out += `<path d="${d}" fill="none" stroke="${light}" stroke-width="0.6" stroke-opacity="${0.8 - row * 0.15}"/>`;
+  }
+  return `${out}</g>`;
+}
+function palm(x, base, s, color, lean = 1) {
+  const top = base - 22 * s;
+  const tx = x + 4 * s * lean;
+  let out = `<path d="M${x} ${base} Q${x + 1 * s * lean} ${base - 12 * s} ${tx} ${top}" stroke="${color}" stroke-width="${1.6 * s}" fill="none"/>`;
+  const fronds = [[-11, 3], [-8, -4], [0, -7], [8, -4], [11, 3], [5, 6], [-5, 6]];
+  for (const [dx, dy] of fronds) {
+    out += `<path d="M${tx} ${top} q${dx * s / 2} ${dy * s / 2 - 3 * s} ${dx * s} ${dy * s}" stroke="${color}" stroke-width="${1.3 * s}" fill="none" stroke-linecap="round"/>`;
+  }
+  return out;
+}
+function pine(x, base, s, color) {
+  return `<path d="M${x} ${base - 18 * s} L${x - 5 * s} ${base - 7 * s} L${x - 2.5 * s} ${base - 7 * s} L${x - 6 * s} ${base} L${x + 6 * s} ${base} L${x + 2.5 * s} ${base - 7 * s} L${x + 5 * s} ${base - 7 * s} Z" fill="${color}"/>`;
+}
+function canopy(seed2, w, base, color, count = 9, size = 9) {
+  const r = rng(seed2);
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    const x = i / (count - 1) * w + (r() - 0.5) * 8;
+    const s = size * (0.7 + r() * 0.6);
+    out += `<circle cx="${x.toFixed(1)}" cy="${(base - s * 0.6).toFixed(1)}" r="${s.toFixed(1)}" fill="${color}"/>`;
+  }
+  return out + `<rect x="0" y="${base - 2}" width="${w}" height="${200 - base}" fill="${color}"/>`;
+}
+function acacia(x, base, s, color) {
+  return `<path d="M${x} ${base} L${x + 1 * s} ${base - 12 * s} L${x - 4 * s} ${base - 16 * s} M${x + 1 * s} ${base - 12 * s} L${x + 5 * s} ${base - 17 * s}" stroke="${color}" stroke-width="${1.3 * s}" fill="none"/>
+    <ellipse cx="${x + 0.5 * s}" cy="${base - 17.5 * s}" rx="${11 * s}" ry="${2.6 * s}" fill="${color}"/>`;
+}
+function reeds(seed2, w, base, color) {
+  const r = rng(seed2);
+  let out = `<g class="sway">`;
+  for (let i = 0; i < 26; i++) {
+    const x = r() * w;
+    const h = 5 + r() * 9;
+    out += `<path d="M${x.toFixed(1)} ${base} q${(r() * 2 - 1).toFixed(1)} ${(-h / 2).toFixed(1)} ${(r() * 3 - 1.5).toFixed(1)} ${(-h).toFixed(1)}" stroke="${color}" stroke-width="0.7" fill="none"/>`;
+  }
+  return `${out}</g>`;
+}
+function ship(x, y, s, color, sail = "#e9dfc6") {
+  return `<g class="bob" transform="translate(${x} ${y}) scale(${s})">
+    <path d="M-14 0 L14 0 L10 5 L-10 5 Z" fill="${color}"/>
+    <path d="M-2 0 L-2 -20 M6 0 L6 -15 M-9 0 L-9 -13" stroke="${color}" stroke-width="0.9"/>
+    <path d="M-2 -19 Q4 -14 -2 -8 Z M-2 -8 Q5 -4 -2 -1 Z M6 -14 Q11 -10 6 -5 Z M-9 -12 Q-5 -8 -9 -4 Z" fill="${sail}" opacity="0.9"/>
+    <path d="M-2 -20 l4 1.2 l-4 1.2 Z" fill="#c8413b"/>
+  </g>`;
+}
+function smoke(x, y, color, n = 5) {
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    out += `<circle class="smoke" style="animation-delay:${(i * 0.7).toFixed(1)}s" cx="${x}" cy="${y}" r="${4 + i}" fill="${color}"/>`;
+  }
+  return out;
+}
+function rain(w, h) {
+  let out = `<g class="rain" stroke="#b8c6d4" stroke-width="0.4" opacity="0.55">`;
+  const r = rng("rain");
+  for (let i = 0; i < 40; i++) {
+    const x = r() * (w + 40) - 20;
+    const y = r() * h;
+    out += `<path d="M${x.toFixed(1)} ${y.toFixed(1)} l-3 8"/>`;
+  }
+  return `${out}</g>`;
+}
+function fogBank(w, y, color = "#cfd8e0", opacity = 0.55) {
+  return `<g class="drift slow" opacity="${opacity}">
+    <ellipse cx="${w * 0.2}" cy="${y}" rx="${w * 0.35}" ry="7" fill="${color}"/>
+    <ellipse cx="${w * 0.7}" cy="${y + 4}" rx="${w * 0.4}" ry="8" fill="${color}"/>
+    <ellipse cx="${w * 0.45}" cy="${y - 6}" rx="${w * 0.3}" ry="5" fill="${color}"/>
+  </g>`;
+}
+var W = 160;
+var H = 100;
+var REGION_SCENES = {
+  "pearl-lagoon": () => skyLayer(SKIES.dawn, W, H) + clouds("pl", W, "#f6c9a4", 0.45) + hills("pl-h", W, 62, 10, "#2b3a4a") + sea(W, 60, "#0f4b5a", "#5fc4c0", H) + `<ellipse cx="80" cy="76" rx="44" ry="8" fill="#7fdad0" opacity="0.35"/><circle class="twinkle" cx="70" cy="74" r="1.2" fill="#fff"/><circle class="twinkle" style="animation-delay:1s" cx="92" cy="78" r="1" fill="#fff"/><path d="M0 72 Q20 64 34 70 L34 100 L0 100 Z" fill="#1d2b22"/>` + palm(14, 72, 1.1, "#0e1712", 1) + palm(26, 72, 0.8, "#0e1712", -1) + `<path d="M120 76 Q140 66 160 70 L160 100 L120 100 Z" fill="#1d2b22"/>` + palm(146, 72, 1, "#0e1712", -1),
+  "mangrove-delta": () => skyLayer(SKIES.jade, W, H) + clouds("md", W, "#e6efe0", 0.35) + canopy("md-c", W, 60, "#1f3b30", 10, 8) + sea(W, 66, "#13302c", "#6e9e86", H) + `<g stroke="#0d1c17" stroke-width="0.9" fill="none">` + [20, 52, 88, 122, 146].map((x) => `<path d="M${x} 74 q-4 -8 0 -14 M${x} 74 q4 -8 0 -14 M${x} 60 v-10"/><ellipse cx="${x}" cy="48" rx="10" ry="5" fill="#183329" stroke="none"/>`).join("") + `</g>`,
+  "highland-mines": () => skyLayer(SKIES.haze, W, H) + ridge("hm1", W, 60, 40, 0.3, "#5a5f6a", "#eef0f2") + ridge("hm2", W, 74, 26, 0.4, "#3a3a40") + `<path d="M88 74 Q100 58 112 74 Z" fill="#14100c"/><path d="M90 74 L110 74 L108 70 L92 70 Z" fill="#5c3b1f"/><path d="M88 74 L60 100 M112 74 L140 100" stroke="#6b4a2a" stroke-width="1"/><rect x="70" y="82" width="10" height="6" fill="#6b4a2a"/><circle cx="72" cy="89" r="1.6" fill="#222"/><circle cx="78" cy="89" r="1.6" fill="#222"/><circle class="twinkle" cx="74" cy="81" r="1.3" fill="#f6d36b"/>` + hills("hm3", W, 92, 6, "#25221f"),
+  "fever-marsh": () => skyLayer(SKIES.haze, W, H) + `<rect width="${W}" height="${H}" fill="#6a7a3a" opacity="0.25"/>` + canopy("fm-c", W, 58, "#2b3a24", 8, 10) + sea(W, 66, "#1e2a18", "#6d7a44", H) + reeds("fm-r", W, 86, "#121a0e") + fogBank(W, 64, "#c9d49a", 0.5) + `<g fill="#d8e27a">${[30, 60, 104, 130].map((x, i) => `<circle class="twinkle" style="animation-delay:${i * 0.6}s" cx="${x}" cy="${50 + i % 2 * 6}" r="0.8"/>`).join("")}</g>`,
+  "storm-cape": () => skyLayer(SKIES.storm, W, H) + clouds("sc", W, "#1b222c", 0.9, 4, 28) + `<path class="bolt" d="M118 6 L110 26 L116 26 L106 46" stroke="#e8f0ff" stroke-width="1.2" fill="none"/>` + sea(W, 58, "#0b1620", "#3d5a70", H) + `<path d="M100 58 L118 30 L130 36 L160 34 L160 100 L96 100 Z" fill="#141a20"/><rect x="136" y="22" width="5" height="14" fill="#2a2f35"/><circle class="twinkle" cx="138.5" cy="21" r="2" fill="#ffd77a"/>` + ship(46, 70, 0.9, "#0c1116", "#9aa4ae") + rain(W, H),
+  "cedar-ridge": () => skyLayer(SKIES.noon, W, H) + clouds("cr", W, "#ffffff", 0.6) + ridge("cr1", W, 58, 26, 0.5, "#3e5a58") + hills("cr2", W, 74, 12, "#24403a") + [10, 22, 36, 50, 64, 80, 96, 112, 126, 140, 154].map((x, i) => pine(x, 80 + i % 3 * 3, 1 + i % 2 * 0.3, "#13261f")).join("") + hills("cr3", W, 94, 6, "#0f1f18"),
+  "golden-savanna": () => skyLayer(SKIES.dusk, W, H) + hills("gs1", W, 70, 8, "#7a4a2a") + `<rect y="70" width="${W}" height="30" fill="#b88a3a"/><g class="sway" stroke="#e0b860" stroke-width="0.5">${Array.from({ length: 50 }, (_, i) => `<path d="M${(i * 3.3).toFixed(1)} 100 l1 -${6 + i % 5}"/>`).join("")}</g>` + acacia(40, 74, 1.3, "#1c120c") + acacia(128, 72, 0.9, "#1c120c") + `<g fill="#1c120c">${[96, 104, 111].map((x) => `<path d="M${x} 72 l1 -3 l1 3 M${x - 1} 69 h4 v-2 h-4 Z"/>`).join("")}</g>`,
+  "ruins-of-the-first-builders": () => skyLayer(SKIES.night, W, H, true) + hills("rf1", W, 70, 14, "#14202a") + canopy("rf-c", W, 82, "#0f1a14", 9, 7) + `<g fill="#5a6a66"><rect x="60" y="44" width="7" height="34"/><rect x="92" y="44" width="7" height="34"/><path d="M56 44 L104 44 L104 38 L80 30 L56 38 Z"/><rect x="76" y="52" width="8" height="26" fill="#0b1014"/><rect x="40" y="62" width="6" height="16"/><rect x="114" y="58" width="6" height="20"/></g><circle class="pulse" cx="80" cy="40" r="2.2" fill="#7ee0d0"/><g stroke="#2c5a3c" stroke-width="0.8" fill="none"><path d="M62 46 q-4 10 0 20"/><path d="M98 46 q4 8 0 18"/></g>`,
+  "whispering-falls": () => skyLayer(SKIES.jade, W, H) + ridge("wf1", W, 66, 44, 0.2, "#2c4a42") + `<rect x="70" y="24" width="18" height="56" fill="#cfeaf0" opacity="0.85"/><g class="fall" stroke="#ffffff" stroke-width="0.6" opacity="0.8">${[72, 76, 80, 84].map((x) => `<path d="M${x} 20 v70"/>`).join("")}</g>` + canopy("wf-c", W, 76, "#1b3a2c", 10, 9) + sea(W, 82, "#18403a", "#8fd0c8", H) + fogBank(W, 82, "#e8f6f4", 0.6),
+  "smugglers-cove": () => skyLayer(SKIES.night, W, H, true) + `<path d="M0 30 Q30 40 40 70 L0 70 Z M160 26 Q128 40 120 70 L160 70 Z" fill="#141c24"/>` + sea(W, 66, "#08121c", "#2c4c6a", H) + ship(80, 74, 1, "#05080c", "#3a4656") + `<circle class="twinkle" cx="26" cy="58" r="1.6" fill="#ffb84d"/><circle class="twinkle" style="animation-delay:1.3s" cx="132" cy="60" r="1.4" fill="#ffb84d"/><path d="M0 84 Q40 78 70 90 L0 100 Z" fill="#1a1a18"/><rect x="18" y="80" width="7" height="5" fill="#5a3a1c"/><rect x="27" y="81" width="6" height="4" fill="#4a2e16"/>`,
+  "jaguar-wilds": () => skyLayer(SKIES.dusk, W, H) + canopy("jw1", W, 52, "#2a2a1a", 9, 12) + canopy("jw2", W, 70, "#16190f", 11, 11) + canopy("jw3", W, 90, "#0a0c07", 12, 10) + `<g class="blink"><circle cx="58" cy="78" r="1.1" fill="#f2c94c"/><circle cx="63" cy="78" r="1.1" fill="#f2c94c"/></g><g class="blink" style="animation-delay:2.2s"><circle cx="112" cy="62" r="0.9" fill="#f2c94c"/><circle cx="116" cy="62" r="0.9" fill="#f2c94c"/></g>`,
+  "spice-terraces": () => skyLayer(SKIES.dawn, W, H) + ridge("st1", W, 50, 30, 0.3, "#5a3a4a") + Array.from({ length: 6 }, (_, i) => `<path d="M0 ${52 + i * 8} Q80 ${46 + i * 8} 160 ${52 + i * 8} L160 ${60 + i * 8} Q80 ${54 + i * 8} 0 ${60 + i * 8} Z" fill="${["#8a4a2a", "#a2602e", "#7a5a24", "#9a4a22", "#6e4a22", "#5a3618"][i]}"/><g fill="${["#d9622b", "#e8a23a", "#c9402a", "#e0b040", "#b8462a", "#d0702a"][i]}">${Array.from({ length: 12 }, (_2, k) => `<circle cx="${6 + k * 13.5}" cy="${54 + i * 8}" r="1.3"/>`).join("")}</g>`).join(""),
+  "great-river-mouth": () => skyLayer(SKIES.noon, W, H) + clouds("gr", W, "#ffffff", 0.55) + canopy("gr-c", W, 58, "#2a4a34", 10, 7) + `<path d="M0 100 L0 70 Q50 58 80 60 Q120 60 160 54 L160 100 Z" fill="#6a8c80"/>` + sea(W, 66, "#2e5a5a", "#a8d4c4", H) + `<path d="M70 60 Q80 75 60 100 L110 100 Q92 76 96 60 Z" fill="#8cbcb0" opacity="0.55"/>` + ship(120, 74, 0.6, "#1a2420"),
+  "smoking-peak": () => skyLayer(SKIES.ember, W, H) + `<path d="M40 100 L74 28 L86 28 L124 100 Z" fill="#2a1612"/><path d="M74 28 L80 40 L86 28 Z" fill="#ff7a2a"/><path d="M78 30 Q72 60 66 100 L72 100 Q78 62 82 32 Z" fill="#ff5a1a" opacity="0.8"/>` + smoke(80, 24, "#3a2a28", 6) + `<g class="ember">${[70, 84, 90, 76].map((x, i) => `<circle style="animation-delay:${i * 0.5}s" cx="${x}" cy="28" r="0.8" fill="#ffb060"/>`).join("")}</g>` + hills("sp", W, 90, 8, "#120a08"),
+  "coral-reefs": () => skyLayer(SKIES.noon, W, H) + clouds("co", W, "#ffffff", 0.5) + sea(W, 46, "#0d4a66", "#58c8d8", H) + `<g opacity="0.9">${[[20, 80, "#e8706a"], [44, 86, "#f0a24a"], [70, 78, "#c85a9a"], [100, 84, "#e8706a"], [128, 80, "#f0c04a"], [148, 88, "#c85a9a"]].map(([x, y, c]) => `<path d="M${x} ${y} v-11 M${x} ${y - 4} l-4 -5 v-3 M${x} ${y - 6} l4 -4 v-3 M${x - 4} ${y - 9} l-2 -2 M${x + 4} ${y - 10} l2 -3" stroke="${c}" stroke-width="1.8" stroke-linecap="round" fill="none"/>`).join("")}</g><path d="M0 66 Q40 60 80 66 Q120 72 160 64" stroke="#ffffff" stroke-width="0.7" fill="none" class="wave" opacity="0.8"/>`,
+  "sandbar-haven": () => skyLayer(SKIES.dawn, W, H) + sea(W, 56, "#1c4a64", "#8ac4d0", H) + `<path d="M10 76 Q80 64 150 76 Q80 80 10 76 Z" fill="#e8d4a2"/>` + palm(60, 72, 0.7, "#2a2418") + `<path d="M88 72 l8 -8 l8 8 Z" fill="#c9a44c"/><path d="M96 64 v-6" stroke="#2a2418" stroke-width="0.7"/>` + ship(126, 66, 0.55, "#2a2418"),
+  "fog-banks": () => skyLayer(SKIES.haze, W, H) + sea(W, 60, "#4a5a64", "#a8b6bc", H) + `<path d="M90 60 L104 40 L120 60 Z" fill="#5a6a70" opacity="0.5"/>` + fogBank(W, 52, "#e8eef0", 0.85) + fogBank(W, 70, "#dfe7ea", 0.75) + fogBank(W, 86, "#eef3f4", 0.65),
+  "old-fortress": () => skyLayer(SKIES.dusk, W, H) + hills("of", W, 74, 16, "#2a1e1e") + `<g fill="#4a3e3a"><rect x="44" y="46" width="72" height="30"/>` + Array.from({ length: 9 }, (_, i) => `<rect x="${44 + i * 8.5}" y="42" width="5" height="5"/>`).join("") + `<rect x="36" y="34" width="14" height="42"/><rect x="110" y="34" width="14" height="42"/><rect x="36" y="30" width="4" height="4"/><rect x="41" y="30" width="4" height="4"/><rect x="46" y="30" width="4" height="4"/><rect x="110" y="30" width="4" height="4"/><rect x="115" y="30" width="4" height="4"/><rect x="120" y="30" width="4" height="4"/></g><path d="M74 76 L74 60 Q80 54 86 60 L86 76 Z" fill="#120c0c"/><path d="M117 30 v-12" stroke="#1a1212" stroke-width="0.8"/><path class="flag" d="M117 18 l9 2 l-9 3 Z" fill="#c8413b"/>` + hills("of2", W, 92, 4, "#1a1212"),
+  "tidal-flats": () => skyLayer(SKIES.dusk, W, H) + `<rect y="58" width="${W}" height="42" fill="#8a6a5a"/>` + Array.from({ length: 6 }, (_, i) => `<path class="wave" d="M-10 ${62 + i * 6} Q40 ${59 + i * 6} 80 ${62 + i * 6} T170 ${62 + i * 6}" stroke="#f0b088" stroke-width="0.7" fill="none" opacity="${0.6 - i * 0.07}"/>`).join("") + `<ellipse cx="80" cy="64" rx="30" ry="3" fill="#ffcf7a" opacity="0.4"/><g fill="#2a1a14"><path d="M30 78 l2 -6 l2 6 Z"/><path d="M118 82 l2 -7 l2 7 Z"/></g>`,
+  "gilded-valley": () => skyLayer(SKIES.dawn, W, H) + ridge("gv1", W, 56, 34, 0.3, "#4a3a54") + ridge("gv2", W, 70, 20, 0.4, "#2e3a2c") + `<path d="M40 100 Q70 76 78 66 Q84 76 120 100 Z" fill="#3a5a34"/><path d="M78 66 Q76 80 70 100 L88 100 Q82 80 80 66 Z" fill="#ffd970" opacity="0.85"/><ellipse cx="80" cy="68" rx="40" ry="10" fill="#ffd36a" opacity="0.25" class="pulse"/><g fill="#ffe08a">${[60, 74, 92, 104].map((x, i) => `<circle class="twinkle" style="animation-delay:${i * 0.8}s" cx="${x}" cy="${84 + i % 2 * 4}" r="0.9"/>`).join("")}</g>`
+};
+function fallbackRegion(region) {
+  const mountain = region.tags.includes("Mountain");
+  const coastal = region.tags.includes("Coastal");
+  return skyLayer(region.hazard ? SKIES.storm : SKIES.noon, W, H) + (mountain ? ridge(region.id, W, 64, 36, 0.3, "#3a4048", "#e8ecef") : hills(region.id, W, 64, 14, "#2c4034")) + (coastal ? sea(W, 70, "#163a4a", "#6aaab8", H) : hills(`${region.id}b`, W, 84, 8, "#18261c"));
+}
+function regionArt(region) {
+  const scene = REGION_SCENES[region.id]?.() ?? fallbackRegion(region);
+  return `<svg class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${scene}</svg>`;
+}
+function chartBack(index) {
+  const r = rng(`coast${index}`);
+  let coast = `M0 ${40 + r() * 20}`;
+  for (let x = 0; x <= W; x += 16) coast += ` L${x} ${(36 + r() * 30).toFixed(1)}`;
+  const g = nextId("parch");
+  return `<svg class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs><radialGradient id="${g}" cx="0.5" cy="0.45" r="0.8"><stop offset="0" stop-color="#2a3a4c"/><stop offset="1" stop-color="#101824"/></radialGradient></defs>
+    <rect width="${W}" height="${H}" fill="url(#${g})"/>
+    <g stroke="#c9a44c" stroke-opacity="0.14" stroke-width="0.4">${Array.from({ length: 9 }, (_, i) => `<path d="M${i * 20} 0 V${H}"/>`).join("")}${Array.from({ length: 6 }, (_, i) => `<path d="M0 ${i * 20} H${W}"/>`).join("")}</g>
+    <path d="${coast} L${W} 0 L0 0 Z" fill="#c9a44c" fill-opacity="0.08" stroke="#c9a44c" stroke-opacity="0.45" stroke-width="0.6" stroke-dasharray="2 1.5"/>
+    <g transform="translate(80 58)" stroke="#c9a44c" stroke-opacity="0.55" fill="none" stroke-width="0.6">
+      <circle r="14"/><circle r="10" stroke-dasharray="1 1.4"/>
+      <path d="M0 -18 L3 0 L0 18 L-3 0 Z M-18 0 L0 3 L18 0 L0 -3 Z" fill="#c9a44c" fill-opacity="0.18"/>
+    </g>
+    ${fogBank(W, 40, "#d9e2ea", 0.28)}${fogBank(W, 78, "#d9e2ea", 0.22)}
+    <text x="80" y="92" text-anchor="middle" font-family="Cormorant Garamond, serif" font-size="8" fill="#c9a44c" fill-opacity="0.75" font-style="italic">terra incognita</text>
+  </svg>`;
+}
+function figure(x, base, s, hat, prop, sash, ink = "#0b0d12", facing = 1) {
+  const head = base - 27 * s;
+  let out = `<g>`;
+  out += `<path d="M${x - 4 * s} ${base} L${x - 3 * s} ${base - 11 * s} L${x - 5.5 * s} ${base - 22 * s} Q${x} ${base - 25 * s} ${x + 5.5 * s} ${base - 22 * s} L${x + 3 * s} ${base - 11 * s} L${x + 4 * s} ${base} L${x + 1 * s} ${base} L${x} ${base - 9 * s} L${x - 1 * s} ${base} Z" fill="${ink}"/>`;
+  out += `<circle cx="${x}" cy="${head}" r="${3.2 * s}" fill="${ink}"/>`;
+  out += `<path d="M${x - 5 * s} ${base - 21 * s} L${x + 5 * s} ${base - 14 * s}" stroke="${sash}" stroke-width="${1.6 * s}"/>`;
+  if (hat === "tricorn") out += `<path d="M${x - 6 * s} ${head - 1.5 * s} Q${x} ${head - 7 * s} ${x + 6 * s} ${head - 1.5 * s} Q${x} ${head - 3 * s} ${x - 6 * s} ${head - 1.5 * s} Z" fill="${ink}"/>`;
+  if (hat === "morion") out += `<path d="M${x - 6 * s} ${head - 1 * s} Q${x} ${head - 9 * s} ${x + 6 * s} ${head - 1 * s} Z M${x} ${head - 7 * s} l0 -${2.5 * s}" fill="${ink}" stroke="${ink}" stroke-width="${0.8 * s}"/>`;
+  if (hat === "bandana") out += `<path d="M${x - 3.4 * s} ${head - 1 * s} Q${x} ${head - 5 * s} ${x + 3.4 * s} ${head - 1 * s} l${2.5 * s * facing} ${2 * s}" fill="${sash}" stroke="${sash}" stroke-width="${0.6 * s}"/>`;
+  if (hat === "cap") out += `<path d="M${x - 3.5 * s} ${head - 1 * s} Q${x} ${head - 5.5 * s} ${x + 3.5 * s} ${head - 1 * s} Z" fill="${ink}"/>`;
+  const hx = x + 5 * s * facing;
+  const hy = base - 17 * s;
+  if (prop === "musket") out += `<path d="M${hx} ${hy + 6 * s} L${hx + 4 * s * facing} ${hy - 18 * s}" stroke="${ink}" stroke-width="${1.2 * s}"/>`;
+  if (prop === "pike") out += `<path d="M${hx} ${base} L${hx + 2 * s * facing} ${base - 46 * s}" stroke="${ink}" stroke-width="${0.9 * s}"/><path d="M${hx + 2 * s * facing} ${base - 46 * s} l-${1.5 * s} ${4 * s} l${3 * s} 0 Z" fill="${ink}"/>`;
+  if (prop === "spyglass") out += `<path d="M${x + 2 * s * facing} ${head + 0.5 * s} L${x + 12 * s * facing} ${head - 2 * s}" stroke="${ink}" stroke-width="${1.6 * s}" stroke-linecap="round"/><circle cx="${x + 12.5 * s * facing}" cy="${head - 2.1 * s}" r="${0.9 * s}" fill="#ffe7a0"/>`;
+  if (prop === "sword") out += `<path d="M${hx} ${hy} L${hx + 9 * s * facing} ${hy - 12 * s}" stroke="#d8dde4" stroke-width="${0.9 * s}"/><path d="M${hx - 1 * s} ${hy - 1 * s} l${2 * s} ${2 * s}" stroke="${ink}" stroke-width="${1.2 * s}"/>`;
+  if (prop === "book") out += `<rect x="${hx - 1 * s}" y="${hy - 2 * s}" width="${5 * s}" height="${4 * s}" fill="#e9dfc6"/>`;
+  if (prop === "flag") out += `<path d="M${hx} ${base} L${hx} ${base - 44 * s}" stroke="${ink}" stroke-width="${0.9 * s}"/><path class="flag" d="M${hx} ${base - 44 * s} q${7 * s * facing} ${2 * s} ${14 * s * facing} 0 v${8 * s} q-${7 * s * facing} ${2 * s} -${14 * s * facing} 0 Z" fill="${sash}"/>`;
+  if (prop === "lantern") out += `<circle cx="${hx}" cy="${hy + 3 * s}" r="${1.6 * s}" fill="#ffc861" class="twinkle"/>`;
+  return out + `</g>`;
+}
+var CW = 100;
+var CH = 80;
+function cardBackdrop(seed2, sky, land) {
+  let out = skyLayer(sky, CW, CH, sky === SKIES.night);
+  out += clouds(`${seed2}c`, CW, "#ffffff", 0.18, 6, 24);
+  if (land === "coast") out += sea(CW, 52, "#10283a", "#5a8aa0", CH) + ship(74, 52, 0.55, "#0c1218");
+  if (land === "hills") out += hills(`${seed2}h`, CW, 56, 10, "#2a2a28") + hills(`${seed2}h2`, CW, 66, 6, "#151513");
+  if (land === "jungle") out += canopy(`${seed2}j`, CW, 54, "#16261c", 8, 9);
+  if (land === "mountain") out += ridge(`${seed2}m`, CW, 54, 30, 0.3, "#3a3e48", "#e6eaee");
+  if (land === "deck") out += sea(CW, 46, "#0c1a26", "#3a6a86", CH) + `<path d="M0 62 L100 58 L100 80 L0 80 Z" fill="#3a2414"/><path d="M0 62 L100 58" stroke="#6a4424" stroke-width="1"/>`;
+  if (land === "camp") out += hills(`${seed2}k`, CW, 60, 6, "#2a2620") + `<path d="M70 60 L80 44 L90 60 Z" fill="#c9b48a"/><path d="M80 44 L80 60" stroke="#6a5a3a" stroke-width="0.6"/>`;
+  return out;
+}
+function ground(color = "#08090c") {
+  return `<path d="M0 70 Q50 64 100 70 L100 80 L0 80 Z" fill="${color}"/>`;
+}
+function musketFlash(x, y) {
+  return `<g class="flash"><circle cx="${x}" cy="${y}" r="3" fill="#ffe08a"/><circle cx="${x}" cy="${y}" r="6" fill="#ffb84d" opacity="0.4"/></g>` + smoke(x + 3, y - 1, "#c8c0b0", 3);
+}
+var CARD_SCENES = {
+  deckhand: (a) => cardBackdrop("dh", SKIES.noon, "deck") + `<path d="M30 20 L36 62 M30 20 L70 30" stroke="#2a1a10" stroke-width="0.8"/>` + figure(40, 72, 1, "bandana", "none", a) + `<path d="M44 52 Q52 40 36 22" stroke="#c9a66a" stroke-width="0.9" fill="none"/><rect x="58" y="60" width="10" height="10" fill="#5a3a1c"/>`,
+  musketeer: (a) => cardBackdrop("mu", SKIES.dusk, "hills") + ground() + figure(42, 72, 1.15, "tricorn", "musket", a) + musketFlash(57, 34),
+  pikeman: (a) => cardBackdrop("pk", SKIES.dawn, "hills") + ground() + figure(30, 72, 0.9, "morion", "pike", a) + figure(50, 74, 1.05, "morion", "pike", a) + figure(70, 72, 0.9, "morion", "pike", a),
+  "dispatch-rider": (a) => cardBackdrop("dr", SKIES.dusk, "hills") + ground() + `<g class="gallop"><path d="M30 60 Q40 52 58 54 L66 46 L70 48 L64 56 L66 66 L62 66 L60 58 L44 60 L40 68 L36 68 L38 60 Z" fill="#0b0d12"/>` + figure(48, 54, 0.6, "tricorn", "none", a) + `</g><path d="M10 66 h14 M14 62 h10" stroke="#d8b080" stroke-width="0.6" opacity="0.6"/>`,
+  pathfinder: (a) => cardBackdrop("pf", SKIES.noon, "mountain") + `<path d="M20 70 L60 40 L100 52 L100 80 L0 80 Z" fill="#1a1c20"/>` + figure(52, 46, 0.9, "cap", "spyglass", a),
+  "ox-cart-teamsters": (a) => cardBackdrop("ox", SKIES.dawn, "hills") + ground() + `<path d="M50 54 h26 v8 h-26 Z" fill="#5a3a1c"/><circle cx="56" cy="64" r="5" fill="none" stroke="#0b0d12" stroke-width="1.2"/><circle cx="72" cy="64" r="5" fill="none" stroke="#0b0d12" stroke-width="1.2"/><path d="M22 60 Q28 52 40 54 L46 50 L48 56 L44 60 L44 68 L40 68 L40 62 L28 62 L28 68 L24 68 Z" fill="#0b0d12"/>` + figure(14, 72, 0.8, "cap", "none", a) + `<rect x="54" y="48" width="6" height="6" fill="#7a5226"/><rect x="62" y="47" width="7" height="7" fill="#8a6230"/>`,
+  "hired-guide": (a) => cardBackdrop("hg", SKIES.jade, "jungle") + ground("#0a120c") + figure(36, 72, 1, "none", "lantern", a) + figure(60, 70, 0.85, "tricorn", "musket", "#4a4a4a") + `<path d="M22 72 L50 60 L80 66" stroke="#c9a44c" stroke-width="0.5" stroke-dasharray="1.5 1.5" fill="none"/>`,
+  "veteran-marine": (a) => cardBackdrop("vm", SKIES.storm, "coast") + rain(CW, CH) + ground() + figure(44, 74, 1.25, "tricorn", "sword", a),
+  "field-surgeon": (a) => cardBackdrop("fs", SKIES.night, "camp") + `<circle cx="30" cy="62" r="10" fill="#ffb84d" opacity="0.18" class="pulse"/>` + ground() + figure(34, 72, 1, "cap", "lantern", a) + `<path d="M48 70 h20 v-3 h-20 Z" fill="#e9dfc6"/>` + figure(58, 72, 0.5, "none", "none", "#7a2a2a"),
+  "forced-march": (a) => cardBackdrop("fm", SKIES.dawn, "hills") + `<path d="M50 80 L44 52 L56 52 Z" fill="#6a5238" opacity="0.6"/>` + [0, 1, 2, 3, 4].map((i) => figure(30 + i * 9, 72 - i * 3, 0.8 - i * 0.1, "tricorn", "musket", a)).join(""),
+  "salted-provisions": () => cardBackdrop("sp", SKIES.noon, "deck") + [[20, 56], [36, 56], [28, 44], [62, 58], [76, 56]].map(([x, y]) => `<ellipse cx="${x + 6}" cy="${y + 6}" rx="7" ry="8" fill="#6a4220"/><path d="M${x} ${y + 2} h12 M${x} ${y + 10} h12" stroke="#2a1a0c" stroke-width="0.8"/>`).join(""),
+  "rally-the-banners": (a) => cardBackdrop("rb", SKIES.dusk, "hills") + ground() + figure(30, 72, 0.9, "tricorn", "musket", a, "#0b0d12", -1) + figure(50, 74, 1.1, "tricorn", "flag", a) + figure(72, 72, 0.9, "tricorn", "musket", a),
+  "musket-volley": (a) => cardBackdrop("mv", SKIES.dusk, "hills") + ground() + [20, 36, 52].map((x) => figure(x, 72, 0.85, "tricorn", "musket", a)).join("") + [24, 40, 56].map((x) => musketFlash(x + 6, 40)).join(""),
+  stockade: () => cardBackdrop("sk", SKIES.dawn, "jungle") + ground("#0a120c") + Array.from({ length: 12 }, (_, i) => `<path d="M${14 + i * 6} 70 V${44 + i % 2 * 3} l3 -4 l3 4 V70 Z" fill="#5a3a1c" stroke="#2a1a0c" stroke-width="0.4"/>`).join("") + `<path d="M50 34 v-10" stroke="#2a1a0c" stroke-width="0.7"/><path class="flag" d="M50 24 l9 2 l-9 3 Z" fill="#c9a44c"/>`,
+  "plant-the-flag": (a) => cardBackdrop("pf2", SKIES.dawn, "coast") + `<path d="M0 80 L0 62 Q40 50 70 60 L100 80 Z" fill="#101410"/>` + figure(44, 60, 1, "tricorn", "flag", a)
+};
+function fallbackCard(card, accent) {
+  const sub = card.subtypes;
+  if (card.type === "crew") {
+    const hat = sub.includes("rogue") ? "bandana" : sub.includes("soldier") ? "morion" : sub.includes("sailor") || sub.includes("officer") ? "tricorn" : "cap";
+    const prop = sub.includes("scout") ? "spyglass" : sub.includes("scholar") ? "book" : sub.includes("rogue") || sub.includes("officer") ? "sword" : sub.includes("soldier") || sub.includes("mercenary") ? "musket" : "none";
+    const land = sub.includes("sailor") ? "coast" : sub.includes("scout") ? "mountain" : "hills";
+    return cardBackdrop(card.id, SKIES.dusk, land) + ground() + figure(46, 72, 1.1, hat, prop, accent);
+  }
+  if (card.type === "order") return cardBackdrop(card.id, SKIES.storm, "hills") + ground() + musketFlash(50, 40);
+  if (card.type === "outpost") return CARD_SCENES.stockade(accent);
+  return CARD_SCENES["plant-the-flag"](accent);
+}
+function cardArt(card, accent) {
+  const scene = CARD_SCENES[card.id]?.(accent) ?? fallbackCard(card, accent);
+  return `<svg class="art" viewBox="0 0 ${CW} ${CH}" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g transform="translate(50 76) scale(1.28) translate(-50 -76)">${scene}</g></svg>`;
+}
+var ICONS = {
+  gold: `<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 9.5v5"/>`,
+  timber: `<rect x="4" y="8" width="16" height="8" rx="4"/><ellipse cx="20" cy="12" rx="1.6" ry="4"/><path d="M8 10.5h7M8 13.5h5"/>`,
+  spice: `<path d="M12 4c4 3 5 8 0 16c-5-8-4-13 0-16z"/><path d="M12 7v10"/>`,
+  sword: `<path d="M5 19L17 7M14 5h5v5M7 14l3 3M4 20l2-2"/>`,
+  shield: `<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9c-4-1.5-7-4.5-7-9V6z"/>`,
+  banner: `<path d="M6 21V4h12l-3 4l3 4H6"/>`,
+  compass: `<circle cx="12" cy="12" r="8.5"/><path d="M12 5l2.2 7L12 19l-2.2-7z"/>`,
+  star: `<path d="M12 3l2.6 5.6l6.1.7l-4.5 4.2l1.2 6l-5.4-3l-5.4 3l1.2-6l-4.5-4.2l6.1-.7z"/>`,
+  boot: `<path d="M8 3h5v9l6 3v4H6l1-5z"/>`,
+  hazard: `<path d="M12 3l9.5 17h-19z"/><path d="M12 9v5M12 16.5v.5"/>`,
+  crate: `<rect x="4" y="6" width="16" height="13" rx="1"/><path d="M4 10h16M10 6v4"/>`,
+  scroll: `<path d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7"/><path d="M6 4a2 2 0 0 0-2 2v1h4M7 20a2 2 0 0 1-2-2v-1h12"/>`,
+  eye: `<path d="M2 12s3.5-6 10-6s10 6 10 6s-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>`,
+  deck: `<rect x="5" y="5" width="11" height="15" rx="1.5"/><path d="M8 3h9.5A1.5 1.5 0 0 1 19 4.5V17"/>`,
+  ship: `<path d="M3 16h18l-3 4H6zM12 3v13M12 4l6 9h-6M12 6l-5 7h5"/>`
+};
+function icon(name, cls = "") {
+  const body = ICONS[name] ?? ICONS.star;
+  return `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}
+function compassRose() {
+  const spokes = Array.from({ length: 32 }, (_, i) => {
+    const a = i / 32 * Math.PI * 2;
+    const long = i % 4 === 0;
+    const r = long ? 260 : i % 2 === 0 ? 200 : 150;
+    return `<path d="M0 0 L${(Math.cos(a) * r).toFixed(1)} ${(Math.sin(a) * r).toFixed(1)}" stroke-width="${long ? 1 : 0.5}"/>`;
+  }).join("");
+  return `<svg viewBox="-300 -300 600 600" aria-hidden="true"><g fill="none" stroke="#c9a44c">${spokes}<circle r="120" stroke-width="0.8"/><circle r="128" stroke-width="0.4"/><circle r="210" stroke-width="0.4" stroke-dasharray="3 6"/></g>
+    <g fill="#c9a44c" fill-opacity="0.5"><path d="M0 -150 L14 0 L0 150 L-14 0 Z"/><path d="M-150 0 L0 14 L150 0 L0 -14 Z"/></g></svg>`;
+}
+
 // apps/table/main.ts
 var seatName = (player) => player === 0 ? "Player 1" : "Player 2";
+var SEAT_COLOR = { 0: "#d4af5a", 1: "#38b6ad" };
 var state = createGame({ seed: 1 });
 var seed = 1;
 var seat = 0;
@@ -6489,8 +6821,12 @@ var picked = /* @__PURE__ */ new Set();
 var hits = {};
 var armConcede = false;
 var error = "";
-var pending = [];
 var note = "";
+var selected = null;
+var fx = null;
+var routes = /* @__PURE__ */ new Map();
+var trayActions = [];
+var inspecting = null;
 function required(id) {
   const node = document.getElementById(id);
   if (!node) throw new Error(`#${id} is missing.`);
@@ -6498,10 +6834,10 @@ function required(id) {
 }
 var table = required("table");
 var cover = required("cover");
-var status = required("status");
 var seedNode = required("seed");
 if (!(seedNode instanceof HTMLInputElement)) throw new Error("#seed is not a field.");
 var seedInput = seedNode;
+required("rose").innerHTML = compassRose();
 function yourDecision() {
   const decision = state.decision;
   if (!decision || decision.player !== seat) return null;
@@ -6510,242 +6846,454 @@ function yourDecision() {
 function esc(value) {
   return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 }
-function cardName(id) {
-  return getCard(id).name;
-}
-function goodName(good) {
-  if (good === "gold") return "Gold";
-  if (good === "timber") return "Timber";
-  return "Spice";
-}
-function view() {
-  return getPlayerView(state, seat);
-}
+var cardName = (id) => getCard(id).name;
+var cap = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+var view = () => getPlayerView(state, seat);
 function coastLabel(index, seen) {
   const region = seen.regions[index];
   if (region?.regionId) return getRegion(region.regionId).name;
   return `Coast ${index + 1}`;
 }
-function crewBy(seen, iid) {
-  return seen.crews.find((crew) => crew.iid === iid);
+function actsOf(seen) {
+  return seen.legal.flatMap((item) => item.kind === "act" && item.action.type !== "concede" ? [item.action] : []);
 }
 function crewLabel(seen, iid) {
-  const crew = crewBy(seen, iid);
+  const crew = seen.crews.find((c) => c.iid === iid);
   if (!crew) return "a crew";
-  const place = crew.where.zone === "harbor" ? "Harbor" : coastLabel(crew.where.index, seen);
-  const twins = seen.crews.filter((other2) => other2.cardId === crew.cardId && JSON.stringify(other2.where) === JSON.stringify(crew.where));
-  const mark = twins.length > 1 ? ` ${twins.findIndex((other2) => other2.iid === iid) + 1}` : "";
-  return `${cardName(crew.cardId)}${mark} in ${place}`;
+  const where = crew.where.zone === "harbor" ? "Harbor" : coastLabel(crew.where.index, seen);
+  return `${cardName(crew.cardId)} (${where})`;
 }
 function actionLabel(action, seen) {
   if (action.type === "end") return "End turn";
   if (action.type === "pass") return "Pass";
-  if (action.type === "concede") return "Concede";
-  if (action.type === "stow") {
-    const card = seen.hand.find((item) => item.iid === action.iid);
-    return `Stow ${card ? cardName(card.cardId) : "card"}`;
-  }
-  if (action.type === "abandon") {
-    const card = seen.ventures[seen.you][action.slot];
-    return `Abandon ${card ? cardName(card.cardId) : "venture"}`;
-  }
-  if (action.type === "march") {
-    const dest = action.dest.zone === "harbor" ? "Harbor" : coastLabel(action.dest.index, seen);
-    return `March ${crewLabel(seen, action.iid)} to ${dest}`;
-  }
+  if (action.type === "stow") return "Stow as Supply";
+  if (action.type === "abandon") return "Abandon";
+  if (action.type === "march") return `March to ${action.dest.zone === "harbor" ? "Harbor" : coastLabel(action.dest.index, seen)}`;
   if (action.type === "play") {
-    const card = seen.hand.find((item) => item.iid === action.iid);
-    const name = card ? cardName(card.cardId) : "card";
-    if (action.dest?.zone === "harbor") return `Deploy ${name} to your Harbor`;
-    if (action.dest?.zone === "region") return `Deploy ${name} to ${coastLabel(action.dest.index, seen)}`;
-    if (action.target) return `Play ${name} on ${crewLabel(seen, action.target)}`;
-    if (action.region != null) return `Play ${name} at ${coastLabel(action.region, seen)}`;
-    return `Play ${name}`;
+    if (action.dest?.zone === "harbor") return "Deploy to Harbor";
+    if (action.dest?.zone === "region") return `Deploy to ${coastLabel(action.dest.index, seen)}`;
+    if (action.target) return `Target ${crewLabel(seen, action.target)}`;
+    if (action.region != null) return `Play at ${coastLabel(action.region, seen)}`;
+    return "Play";
   }
   return "Choose";
 }
-function actsOf(seen) {
-  return seen.legal.flatMap((item) => item.kind === "act" && item.action.type !== "concede" ? [item.action] : []);
+function routeKey(action) {
+  if (action.type === "stow") return "stores";
+  if (action.type === "march") return action.dest.zone === "harbor" ? "harbor" : `r${action.dest.index}`;
+  if (action.type === "play") {
+    if (action.dest) return action.dest.zone === "harbor" ? "harbor" : `r${action.dest.index}`;
+    if (action.target) return `c${action.target}`;
+    if (action.region != null) return `r${action.region}`;
+    return "self";
+  }
+  return null;
 }
-function buttonFor(action, seen, primary = false) {
-  const index = pending.length;
-  pending.push(action);
-  const cls = primary ? "primary" : "";
-  return `<button type="button" class="${cls}" data-act="${index}">${esc(actionLabel(action, seen))}</button>`;
+function selectionActions(seen) {
+  if (!selected) return [];
+  return actsOf(seen).filter((action) => (action.type === "play" || action.type === "stow" || action.type === "march") && action.iid === selected);
+}
+var GOOD_ICON = { gold: "gold", timber: "timber", spice: "spice" };
+var KEYWORD_HELP = {
+  swift: "Can March the turn it is deployed.",
+  entrench: "+1 Might in a Clash where you held the Region at the start of Claim.",
+  hardy: "Prevent all damage from Region traits.",
+  raid: "When you take a Region from your opponent, steal a random Stores card.",
+  scout: "See face-down Regions next to it; from Harbor, see Regions 1 and 5.",
+  escort: "Enemy Orders can't target your other crews here.",
+  ambush: "Can also be played during an Ambush window at Claim."
+};
+function accentOf(owner) {
+  return owner == null ? "#c9a44c" : SEAT_COLOR[owner];
+}
+function rulesText(def) {
+  const keys = def.keywords.map(cap);
+  let body = def.text;
+  for (const key of keys) body = body.replace(new RegExp(`^${key}\\.?\\s*`), "");
+  const keyLine = keys.length ? `<b class="kw" title="${esc(def.keywords.map((k) => `${cap(k)}: ${KEYWORD_HELP[k] ?? ""}`).join(" "))}">${esc(keys.join(" \xB7 "))}</b>` : "";
+  return `${keyLine}${body ? `<span>${esc(body)}</span>` : ""}${def.flavor ? `<i>${esc(def.flavor)}</i>` : ""}`;
+}
+function typeLine(def) {
+  const subs = def.subtypes.map(cap).join(", ");
+  const amb = def.keywords.includes("ambush") && def.type === "order" ? ": Ambush" : "";
+  return `${cap(def.type)}${subs ? `: ${subs}` : amb}`;
+}
+function cardFace(def, opts = {}) {
+  const accent = accentOf(opts.owner ?? null);
+  const goods = def.cost.goods.map((g) => `<span class="good good-${g}" title="Requires ${cap(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
+  const stats = def.type === "crew" ? `<div class="stats"><span class="stat might" title="Might"><b>${def.might}</b></span><span class="stat endure" title="Endurance">${icon("shield")}<b>${def.endurance}</b></span></div>` : "";
+  return `<article class="card type-${def.type} rarity-${def.rarity} ${opts.cls ?? ""}" style="--accent:${accent};${opts.style ?? ""}" ${opts.iid ? `data-card="${esc(opts.iid)}"` : ""} ${opts.attrs ?? ""}>
+    <div class="card-inner">
+      <div class="card-head">
+        <span class="coin" title="Supply cost"><b>${def.cost.supply}</b></span>
+        <div class="goods">${goods}</div>
+        <h3 class="card-name">${esc(def.name)}</h3>
+        <span class="seal" title="${def.faction === "basic" ? "Basic" : cap(def.faction)}">${icon("compass")}</span>
+      </div>
+      <div class="card-art">${cardArt(def, accent)}</div>
+      <div class="type-line">${esc(typeLine(def))}</div>
+      <div class="text-box">${rulesText(def)}</div>
+      ${stats}
+      <div class="card-foot"><span class="gem gem-${def.rarity}"></span><span>${def.set === "basic" ? "Basic" : "FL"}</span><span>Meridian Studio</span></div>
+      <div class="glare"></div>
+      ${opts.badge ?? ""}
+    </div>
+  </article>`;
+}
+function cardBack(cls = "", style = "") {
+  return `<div class="card back ${cls}" style="${style}"><div class="card-inner"><div class="back-face">${icon("compass", "back-rose")}<span>Meridian</span></div></div></div>`;
+}
+function unit(seen, crew) {
+  const def = getCard(crew.cardId);
+  const might = (def.might ?? 0) + crew.mods.reduce((t, m) => t + m.might, 0);
+  const endure = (def.endurance ?? 0) + crew.mods.reduce((t, m) => t + m.endurance, 0);
+  const route = routes.get(`c${crew.iid}`) ? `c${crew.iid}` : "";
+  const mine = crew.owner === seat;
+  const canAct = mine && actsOf(seen).some((a) => a.type === "march" && a.iid === crew.iid);
+  const decision = yourDecision();
+  const assignable = decision?.type === "assign" && decision.targets.includes(crew.iid);
+  const cls = [
+    "unit",
+    `owner-${crew.owner}`,
+    canAct ? "ready" : "",
+    selected === crew.iid ? "selected" : "",
+    route ? "target" : "",
+    assignable ? "assignable" : "",
+    fx?.landed.has(crew.iid) ? "fx-land" : "",
+    fx?.marched.has(crew.iid) ? "fx-march" : "",
+    fx?.damaged.has(crew.iid) ? "fx-hit" : ""
+  ].filter(Boolean).join(" ");
+  const pips = Array.from({ length: endure }, (_, i) => `<i class="${i < crew.damage ? "lost" : ""}"></i>`).join("");
+  const pop = fx?.damaged.get(crew.iid) ? `<span class="pop">\u2212${fx.damaged.get(crew.iid)}</span>` : "";
+  const keys = def.keywords.length ? `<span class="unit-keys">${def.keywords.map((k) => cap(k).slice(0, 1)).join("")}</span>` : "";
+  const stepper = assignable ? `<div class="stepper"><button type="button" data-bump="${esc(crew.iid)}" data-dir="-1" aria-label="Less damage">\u2212</button><b>${hits[crew.iid] ?? 0}</b><button type="button" data-bump="${esc(crew.iid)}" data-dir="1" aria-label="More damage">+</button></div>` : "";
+  const clickable = canAct || route;
+  return `<div class="${cls}" style="--accent:${SEAT_COLOR[crew.owner]}" ${clickable ? `role="button" tabindex="0"` : ""} data-crew="${esc(crew.iid)}" ${route ? `data-route="${route}"` : ""} title="${esc(`${def.name}. Might ${might}, Endurance ${endure}${crew.damage ? `, ${crew.damage} damage` : ""}. ${def.text}`)}">
+    <div class="unit-art">${cardArt(def, SEAT_COLOR[crew.owner])}</div>
+    <div class="unit-name">${esc(def.name)}</div>
+    ${keys}
+    <div class="unit-stats"><span class="might">${might}</span><span class="endure">${endure - crew.damage}</span></div>
+    <div class="pips">${pips}</div>
+    ${pop}${stepper}
+  </div>`;
+}
+function ghost(g) {
+  const def = getCard(g.cardId);
+  return `<div class="unit owner-${g.owner} fx-burn" style="--accent:${SEAT_COLOR[g.owner]}" aria-hidden="true">
+    <div class="unit-art">${cardArt(def, SEAT_COLOR[g.owner])}</div><div class="unit-name">${esc(def.name)}</div></div>`;
+}
+function regionColumn(seen, index) {
+  const spot = seen.regions[index];
+  const known = spot.regionId ? getRegion(spot.regionId) : null;
+  const foe = seat === 0 ? 1 : 0;
+  const route = routes.has(`r${index}`) ? `r${index}` : "";
+  const decision = yourDecision();
+  const surveying = decision && (decision.type === "surveyLook" || decision.type === "surveyFlip") && decision.options.includes(index);
+  const pickedHere = picked.has(String(index));
+  const crewsOf2 = (owner) => seen.crews.filter((c) => c.where.zone === "region" && c.where.index === index && c.owner === owner);
+  const lane = (owner) => {
+    const units = crewsOf2(owner).map((c) => unit(seen, c)).join("") + (fx?.ghosts.filter((g) => g.where === index && g.owner === owner).map(ghost).join("") ?? "");
+    return `<div class="lane lane-${owner === seat ? "you" : "foe"}">${units || `<span class="lane-empty"></span>`}</div>`;
+  };
+  const mFor = (owner) => crewsOf2(owner).reduce((t, c) => t + (getCard(c.cardId).might ?? 0) + c.mods.reduce((s, m) => s + m.might, 0), 0);
+  const contested2 = crewsOf2(0).length > 0 && crewsOf2(1).length > 0;
+  const clashHere = state.claim && state.decision && "region" in state.decision && state.decision.region === index;
+  let face;
+  if (spot.faceUp && known) {
+    const goods = known.goods.map((g) => `<span class="good good-${g}" title="${cap(g)}">${icon(GOOD_ICON[g])}</span>`).join("");
+    const banner = spot.controller != null ? `<span class="flag-banner ${fx?.control.has(index) ? "fx-plant" : ""}" style="--accent:${SEAT_COLOR[spot.controller]}" title="${seatName(spot.controller)} controls">${icon("banner")}</span>` : "";
+    const post = spot.outpost ? `<span class="outpost-chip" style="--accent:${SEAT_COLOR[spot.outpost.owner]}" title="${esc(getCard(spot.outpost.cardId).text)}">${icon("crate")}${esc(cardName(spot.outpost.cardId))}</span>` : "";
+    face = `<div class="region-card ${known.hazard ? "hazard" : ""} ${fx?.flips.has(index) ? "fx-reveal" : ""}">
+      <div class="region-art">${regionArt(known)}</div>
+      <div class="region-head"><h3>${esc(known.name)}</h3><span class="renown-ribbon" title="Renown at each Claim">${icon("star")}<b>${known.renown}</b></span></div>
+      ${banner}
+      <div class="region-goods">${goods}</div>
+      ${post}
+      <p class="trait ${known.hazard ? "hazard" : ""}">${known.hazard ? icon("hazard") : ""}${esc(known.text)}</p>
+    </div>`;
+  } else if (known) {
+    face = `<div class="region-card peeked">
+      <div class="region-art">${regionArt(known)}</div>
+      <div class="region-head"><h3>${esc(known.name)}</h3><span class="renown-ribbon">${icon("star")}<b>${known.renown}</b></span></div>
+      <span class="peek-tag">${icon("eye")} Seen from afar</span>
+      <p class="trait">${esc(known.text)}</p>
+    </div>`;
+  } else {
+    face = `<div class="region-card hidden">
+      <div class="region-art">${chartBack(index)}</div>
+      <div class="region-head"><h3>Coast ${index + 1}</h3><span class="renown-ribbon unknown"><b>?</b></span></div>
+      <p class="trait muted">Unexplored. March in to reveal it.</p>
+    </div>`;
+  }
+  const pick = surveying ? `<button type="button" class="survey-pick ${pickedHere ? "on" : ""}" data-pick="${index}">${icon("eye")}${pickedHere ? "Chosen" : decision.type === "surveyLook" ? "Look" : "Flip"}</button>` : "";
+  const tally = contested2 ? `<div class="tally"><span style="color:${SEAT_COLOR[foe]}">${mFor(foe)}</span>${icon("sword")}<span style="color:${SEAT_COLOR[seat]}">${mFor(seat)}</span></div>` : "";
+  return `<section class="region-col ${route ? "target" : ""} ${contested2 ? "contested" : ""} ${clashHere ? "clashing" : ""} ${pickedHere ? "picked" : ""}" style="--n:${index}" ${route ? `data-route="${route}" role="button" tabindex="0"` : ""} aria-label="${esc(coastLabel(index, seen))}">
+    ${lane(foe)}
+    <div class="region-slot">${face}${pick}${tally}${clashHere ? `<div class="clash-burst">${icon("sword")}</div>` : ""}</div>
+    ${lane(seat)}
+  </section>`;
+}
+function storesPile(seen, player) {
+  const mine = player === seat;
+  const total = mine ? seen.stores.length : seen.foeStores.total;
+  const ready = mine ? seen.stores.filter((c) => !c.exhausted).length : seen.foeStores.ready;
+  const route = mine && routes.has("stores") ? "stores" : "";
+  const stack = Array.from({ length: Math.min(total, 6) }, (_, i) => `<span class="pile-card" style="--i:${i}"></span>`).join("");
+  const pips = Array.from({ length: total }, (_, i) => `<i class="${i < ready ? "lit" : ""}"></i>`).join("");
+  return `<div class="zone stores ${route ? "target" : ""}" ${route ? `data-route="stores" role="button" tabindex="0"` : ""} title="${mine ? esc(seen.stores.map((c) => `${cardName(c.cardId)}${c.exhausted ? " (spent)" : ""}`).join(", ") || "Empty") : "Hidden"}">
+    <div class="pile">${stack || `<span class="pile-empty"></span>`}</div>
+    <div class="zone-label">Stores</div>
+    <div class="supply"><b>${ready}</b><small>/${total}</small></div>
+    <div class="supply-pips">${pips}</div>
+  </div>`;
+}
+function harbor(seen, player) {
+  const route = player === seat && routes.has("harbor") ? "harbor" : "";
+  const units = seen.crews.filter((c) => c.where.zone === "harbor" && c.owner === player).map((c) => unit(seen, c)).join("") + (fx?.ghosts.filter((g) => g.where === "harbor" && g.owner === player).map(ghost).join("") ?? "");
+  return `<div class="zone harbor ${route ? "target" : ""}" ${route ? `data-route="harbor" role="button" tabindex="0"` : ""}>
+    <div class="zone-label">${icon("ship")} Harbor</div>
+    <div class="dock">${units || `<span class="muted small">No crews waiting</span>`}</div>
+  </div>`;
+}
+function ventureSlots(seen, player) {
+  const mine = player === seat;
+  const slots = seen.ventures[player].map((card, slot) => {
+    if (!card) return `<div class="venture-slot empty">${icon("scroll")}<span>Venture</span></div>`;
+    const leave = mine ? actsOf(seen).find((a) => a.type === "abandon" && a.slot === slot) : void 0;
+    const btn = leave ? `<button type="button" class="chip danger" data-act="${trayActions.push(leave) - 1}">Abandon</button>` : "";
+    return `<div class="venture-slot">${cardFace(getCard(card.cardId), { cls: "mini", owner: player })}${btn}</div>`;
+  }).join("");
+  return `<div class="zone ventures"><div class="zone-label">${icon("scroll")} Ventures</div><div class="venture-row">${slots}</div></div>`;
+}
+function deckZone(seen, player) {
+  const mine = player === seat;
+  const deck = mine ? seen.deck : seen.foeDeck;
+  const discard = seen.discard[player];
+  const top = discard.at(-1);
+  return `<div class="zone deckzone">
+    <div class="deck-stack" title="Deck">${cardBack("tiny")}<b>${deck}</b></div>
+    <div class="discard-top" title="${esc(discard.map((c) => cardName(c.cardId)).join(", ") || "Discard is empty")}">${top ? cardFace(getCard(top.cardId), { cls: "tiny", owner: player }) : `<span class="discard-empty"></span>`}<b>${discard.length}</b></div>
+  </div>`;
+}
+function crest(player, seen) {
+  const turn = seen.decision?.player === player;
+  const init = seen.initiative === player;
+  return `<div class="crest ${turn ? "active" : ""}" style="--accent:${SEAT_COLOR[player]}">
+    <div class="crest-badge">${icon("ship")}</div>
+    <div><div class="crest-name">${seatName(player)}${player === seat ? " <small>(you)</small>" : ""}</div>
+    <div class="crest-sub">${icon("star")} ${seen.renown[player]} Renown${init ? ` \xB7 ${icon("compass")} Initiative` : ""}</div></div>
+  </div>`;
+}
+function foeRow(seen) {
+  const foe = seat === 0 ? 1 : 0;
+  const backs = Array.from({ length: seen.foeHand }, (_, i) => cardBack("tiny", `--i:${i};--n:${seen.foeHand}`)).join("");
+  return `<section class="row foe-row">
+    ${crest(foe, seen)}
+    <div class="foe-hand" title="${seen.foeHand} cards in hand">${backs}</div>
+    ${storesPile(seen, foe)}
+    ${harbor(seen, foe)}
+    ${ventureSlots(seen, foe)}
+    ${deckZone(seen, foe)}
+  </section>`;
+}
+function youRow(seen) {
+  return `<section class="row you-row">
+    ${crest(seat, seen)}
+    ${harbor(seen, seat)}
+    ${storesPile(seen, seat)}
+    ${ventureSlots(seen, seat)}
+    ${deckZone(seen, seat)}
+  </section>`;
+}
+function handFan(seen) {
+  const choosing = seen.decision?.type === "mulligan" || seen.decision?.type === "discard";
+  const all = actsOf(seen);
+  const n = seen.hand.length;
+  const cards = seen.hand.map((card, i) => {
+    const def = getCard(card.cardId);
+    const playable = all.some((a) => (a.type === "play" || a.type === "stow") && a.iid === card.iid);
+    const cls = [
+      "in-hand",
+      choosing ? "choosable" : playable ? "playable" : "idle",
+      selected === card.iid ? "selected" : "",
+      picked.has(card.iid) ? "set-aside" : ""
+    ].join(" ");
+    const badge = picked.has(card.iid) ? `<span class="aside-badge">${seen.decision?.type === "discard" ? "Discard" : "Set aside"}</span>` : "";
+    return cardFace(def, {
+      iid: card.iid,
+      owner: seat,
+      cls,
+      style: `--i:${i};--n:${n};`,
+      attrs: `role="button" tabindex="0" ${choosing ? `data-pick="${esc(card.iid)}"` : `data-select="${esc(card.iid)}"`}`,
+      badge
+    });
+  }).join("");
+  return `<section class="hand" style="--n:${n}">${cards || `<p class="muted">Your hand is empty.</p>`}</section>`;
 }
 function prompt(seen) {
   const decision = yourDecision();
   if (seen.over) {
-    if (seen.over.winner == null) return "The voyage is a draw.";
-    const why = seen.over.reason === "renown" ? "15 Renown" : seen.over.reason === "rounds" ? "the long count" : seen.over.reason === "concede" ? "concession" : seen.over.reason;
+    if (seen.over.winner == null) return "The voyage ends in a draw.";
+    const why = seen.over.reason === "renown" ? "reaching 15 Renown" : seen.over.reason === "rounds" ? "the long count" : seen.over.reason === "concede" ? "concession" : seen.over.reason;
     return `${seatName(seen.over.winner)} wins by ${why}.`;
   }
-  if (!decision || decision.player !== seat) return "Waiting.";
-  if (decision.type === "mulligan") return "Set aside any cards you do not want. You draw that many back. You get one mulligan.";
-  if (decision.type === "discard") return "Your hand is over 8. Discard down to 8.";
-  if (decision.type === "surveyLook") return `Look at up to ${decision.max} hidden coasts, then choose which to flip.`;
-  if (decision.type === "surveyFlip") return "Flip any of the coasts you just looked at. Leave the rest face down.";
+  if (!decision) return "Waiting for the other captain.";
+  if (decision.type === "mulligan") return "Click any cards to set aside. You draw that many back, once.";
+  if (decision.type === "discard") return "Your hand is over 8. Choose cards to discard.";
+  if (decision.type === "surveyLook") return `Survey: choose up to ${decision.max} hidden coast${decision.max > 1 ? "s" : ""} to look at.`;
+  if (decision.type === "surveyFlip") return "You see them now. Choose any to flip face up, or none.";
   if (decision.type === "ambush") return `Ambush at ${coastLabel(decision.region, seen)}. Play an Ambush order, or pass.`;
-  if (decision.type === "assign") return `Assign ${decision.amount} strike damage among the enemy crews.`;
-  const ready = seen.stores.filter((card) => !card.exhausted).length;
-  return `Your turn. Ready supply ${ready}. Stows left ${seen.stowLeft}. Play, march, then end the turn.`;
+  if (decision.type === "assign") return `Strike! Split ${decision.amount} damage among the enemy crews at ${coastLabel(decision.region, seen)}.`;
+  if (selected) {
+    const card = seen.hand.find((c) => c.iid === selected);
+    const crew = seen.crews.find((c) => c.iid === selected);
+    if (card) return `${cardName(card.cardId)}: choose where it goes. Glowing spots are legal.`;
+    if (crew) return `${cardName(crew.cardId)}: choose where to March.`;
+  }
+  return "Your turn. Pick a card or a ready crew. Stow one card for Supply.";
 }
 function eventLine(event, viewer) {
-  if (event.type === "draw") {
-    if (event.player === viewer && event.cardIds.length) return `You draw ${event.cardIds.map(cardName).join(", ")}.`;
-    if (event.amount > 0) return `${seatName(event.player)} draws ${event.amount}.`;
-    return "";
-  }
-  if (event.type === "deckout") return `${seatName(event.player)} cannot draw. The other captain gains 2 Renown.`;
-  if (event.type === "renown") return `${seatName(event.player)} gains ${event.amount} Renown.`;
+  const who = (p) => p === viewer ? "You" : seatName(p);
+  if (event.type === "draw") return event.player === viewer && event.cardIds.length ? `You draw ${event.cardIds.map(cardName).join(", ")}.` : event.amount ? `${who(event.player)} draw${event.player === viewer ? "" : "s"} ${event.amount}.` : "";
+  if (event.type === "deckout") return `${who(event.player)} ran out of cards. +2 Renown to the other captain.`;
+  if (event.type === "renown") return `${who(event.player)} gain${event.player === viewer ? "" : "s"} ${event.amount} Renown.`;
   if (event.type === "flip") return `${getRegion(event.regionId).name} is revealed.`;
-  if (event.type === "damage") return event.prevented ? "Hardy stops the damage." : `A crew takes ${event.amount} damage.`;
-  if (event.type === "defeat") return `${cardName(event.cardId)} is defeated.`;
+  if (event.type === "damage") return event.prevented ? "Hardy shrugs off the hazard." : `A crew takes ${event.amount} damage.`;
+  if (event.type === "defeat") return `${cardName(event.cardId)} falls.`;
   if (event.type === "control") {
     const region = state.regions[event.index];
     const where = region?.faceUp ? getRegion(region.regionId).name : `Coast ${event.index + 1}`;
-    return event.player == null ? `${where} is left uncontrolled.` : `${seatName(event.player)} takes ${where}.`;
+    return event.player == null ? `${where} is abandoned.` : `${who(event.player)} take${event.player === viewer ? "" : "s"} ${where}.`;
   }
-  if (event.type === "play") return `${seatName(event.player)} plays ${cardName(event.cardId)}.`;
-  if (event.type === "raid") return `${seatName(event.player)} raids ${cardName(event.cardId)} from ${seatName(event.from)}.`;
-  if (event.type === "gameover") {
-    if (event.winner == null) return "The voyage is a draw.";
-    return `${seatName(event.winner)} wins.`;
-  }
+  if (event.type === "play") return `${who(event.player)} play${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
+  if (event.type === "raid") return `${who(event.player)} raid${event.player === viewer ? "" : "s"} ${cardName(event.cardId)}.`;
+  if (event.type === "gameover") return event.winner == null ? "The voyage is a draw." : `${seatName(event.winner)} wins the coast.`;
   return "";
 }
-function crewBlock(seen, iid, cardId, owner, damage, marchesLeft, mods) {
-  const card = getCard(cardId);
-  const extra = mods.reduce((total, mod) => total + mod.might, 0);
-  const might = (card.might ?? 0) + extra;
-  const buttons = actsOf(seen).filter((action) => action.type === "march" && action.iid === iid).map((action) => buttonFor(action, seen)).join("");
-  const decision = yourDecision();
-  const bump = decision?.type === "assign" && decision.targets.includes(iid) ? `<div class="actions"><button type="button" data-bump="${esc(iid)}" data-dir="-1">\u2212</button><span>${hits[iid] ?? 0}</span><button type="button" data-bump="${esc(iid)}" data-dir="1">+</button></div>` : "";
-  return `<div class="crew owner-${owner}">
-    <h3>${esc(card.name)}</h3>
-    <p class="small">${esc(seatName(owner))} \xB7 Might ${might} \xB7 Endurance ${card.endurance ?? 0}${damage ? ` \xB7 hurt ${damage}` : ""}${marchesLeft > 0 ? " \xB7 can march" : ""}</p>
-    ${buttons || bump ? `<div class="actions">${buttons}${bump}</div>` : ""}
-  </div>`;
+function track(seen) {
+  const ticks = Array.from({ length: 16 }, (_, i) => `<span class="tick ${i % 5 === 0 ? "major" : ""}" style="--v:${i}">${i % 5 === 0 ? i : ""}</span>`).join("");
+  const token = (p) => `<span class="token ${fx && fx.renown[p] ? "fx-rise" : ""}" style="--v:${Math.min(15, seen.renown[p])};--accent:${SEAT_COLOR[p]}" title="${seatName(p)}: ${seen.renown[p]}">${icon("ship")}<b>${seen.renown[p]}</b></span>`;
+  return `<aside class="track" aria-label="Renown race to 15"><div class="track-title">Renown</div><div class="track-bar">${ticks}${token(0)}${token(1)}<span class="goal">15</span></div></aside>`;
 }
-function regionBlock(seen, index) {
-  const spot = seen.regions[index];
-  if (!spot) return "";
-  const known = spot.regionId ? getRegion(spot.regionId) : null;
-  const yours = spot.faceUp && spot.controller === seat;
-  const cls = `region${known?.hazard && spot.faceUp ? " hazard" : ""}${yours ? " yours" : ""}`;
-  const title = known ? known.name : `Coast ${index + 1}`;
-  const facts = known && spot.faceUp ? `<p class="small">Renown ${known.renown}${known.goods.length ? ` \xB7 ${known.goods.map(goodName).join(", ")}` : ""}${known.hazard ? " \xB7 Hazard" : ""}</p><p class="small muted">${esc(known.text)}</p>` : known ? `<p class="small muted">Seen, not entered. ${esc(known.text)}</p>` : `<p class="small muted">Face down.</p>`;
-  const who = spot.faceUp && spot.controller != null ? `<p>${esc(seatName(spot.controller))} controls this.</p>` : "";
-  const post = spot.outpost ? `<p class="small">Outpost: ${esc(cardName(spot.outpost.cardId))}</p>` : "";
-  const decision = yourDecision();
-  const survey = decision && (decision.type === "surveyLook" || decision.type === "surveyFlip") && decision.options.includes(index) ? `<button type="button" data-pick="${index}">${picked.has(String(index)) ? "Chosen" : "Choose"}</button>` : "";
-  const crews = seen.crews.filter((crew) => crew.where.zone === "region" && crew.where.index === index).map((crew) => crewBlock(seen, crew.iid, crew.cardId, crew.owner, crew.damage, crew.marchesLeft, crew.mods)).join("");
-  return `<section class="${cls} ${picked.has(String(index)) ? "picked" : ""}"><h2>${esc(title)}</h2>${facts}${who}${post}${survey}${crews}</section>`;
-}
-function side(seen, player) {
-  const mine = player === seat;
-  const stores = mine ? seen.stores.map((card) => `${cardName(card.cardId)}${card.exhausted ? " (spent)" : ""}`).join(", ") || "empty" : `${seen.foeStores.ready} ready of ${seen.foeStores.total}`;
-  const ventures = seen.ventures[player].map((card, slot) => {
-    if (!card) return "empty";
-    const leave = mine ? actsOf(seen).filter((action) => action.type === "abandon" && action.slot === slot).map((action) => buttonFor(action, seen)).join("") : "";
-    return `${esc(cardName(card.cardId))}${leave ? ` ${leave}` : ""}`;
-  }).join(" \xB7 ");
-  const discard = seen.discard[player].slice(-4).map((card) => cardName(card.cardId)).join(", ") || "empty";
-  const harbor = seen.crews.filter((crew) => crew.where.zone === "harbor" && crew.owner === player).map((crew) => crewBlock(seen, crew.iid, crew.cardId, crew.owner, crew.damage, crew.marchesLeft, crew.mods)).join("");
-  return `<section class="panel owner-${player}">
-    <h2>${esc(seatName(player))}${mine ? " (you)" : ""}</h2>
-    <p>Renown ${seen.renown[player]} \xB7 Ventures completed ${seen.completedVentures[player]}</p>
-    <p class="small">Hand ${mine ? seen.hand.length : seen.foeHand} \xB7 Deck ${mine ? seen.deck : seen.foeDeck} \xB7 Stores ${esc(stores)}</p>
-    <p class="small">Ventures: ${ventures}</p>
-    <p class="small muted">Discard: ${esc(discard)}</p>
-    ${harbor || `<p class="small muted">Harbor is empty.</p>`}
-  </section>`;
-}
-function hand(seen) {
-  const choosing = seen.decision?.type === "mulligan" || seen.decision?.type === "discard";
-  return seen.hand.map((card) => {
-    const def = getCard(card.cardId);
-    const stats = def.type === "crew" ? `Might ${def.might} \xB7 Endurance ${def.endurance} \xB7 ` : "";
-    const cost = `${def.cost.supply} supply${def.cost.goods.length ? ` \xB7 ${def.cost.goods.map(goodName).join(", ")}` : ""}`;
-    const keys = def.keywords.length ? `<p class="small">${esc(def.keywords.join(", "))}</p>` : "";
-    const toggle = choosing ? `<button type="button" data-pick="${esc(card.iid)}">${picked.has(card.iid) ? "Chosen" : "Choose"}</button>` : actsOf(seen).filter((action) => (action.type === "play" || action.type === "stow") && action.iid === card.iid).map((action) => buttonFor(action, seen)).join("");
-    return `<article class="card ${picked.has(card.iid) ? "picked" : ""}">
-      <h3>${esc(def.name)}</h3>
-      <p class="small">${esc(stats + cost)}</p>
-      ${keys}
-      <p class="small">${esc(def.text)}</p>
-      ${def.flavor ? `<p class="small muted">${esc(def.flavor)}</p>` : ""}
-      ${toggle ? `<div class="actions">${toggle}</div>` : ""}
-    </article>`;
-  }).join("");
-}
-function bar(seen) {
-  const end = actsOf(seen).find((action) => action.type === "end");
-  const pass = actsOf(seen).find((action) => action.type === "pass");
+function helm(seen) {
+  const all = actsOf(seen);
+  const end = all.find((a) => a.type === "end");
+  const pass = all.find((a) => a.type === "pass");
   const subset = seen.legal.find((item) => item.kind === "subset");
   const assign = seen.legal.find((item) => item.kind === "assign");
-  const parts = [];
-  if (end) parts.push(buttonFor(end, seen, true));
-  if (pass) parts.push(buttonFor(pass, seen, true));
+  const big = [];
+  if (end) big.push(`<button type="button" class="brass big" data-act="${trayActions.push(end) - 1}">End turn</button>`);
+  if (pass) big.push(`<button type="button" class="brass big" data-act="${trayActions.push(pass) - 1}">Pass</button>`);
   if (subset && subset.kind === "subset") {
-    const ready = picked.size >= subset.min && picked.size <= subset.max;
-    const word = subset.actionType === "mulligan" ? picked.size === 0 ? "Keep all" : `Set aside ${picked.size}` : subset.actionType === "discard" ? `Discard ${picked.size}` : subset.actionType === "surveyLook" ? `Look at ${picked.size}` : `Flip ${picked.size}`;
-    parts.push(`<button type="button" class="primary" data-go="subset" ${ready ? "" : "disabled"}>${word}</button>`);
-    parts.push(`<span class="small muted">Choose ${subset.min === subset.max ? subset.min : `${subset.min} to ${subset.max}`}.</span>`);
+    const ok = picked.size >= subset.min && picked.size <= subset.max;
+    const word = subset.actionType === "mulligan" ? picked.size === 0 ? "Keep hand" : `Set aside ${picked.size}` : subset.actionType === "discard" ? `Discard ${picked.size} of ${subset.min}` : subset.actionType === "surveyLook" ? picked.size ? `Look at ${picked.size}` : "Look at none" : picked.size ? `Flip ${picked.size}` : "Flip none";
+    big.push(`<button type="button" class="brass big" data-go="subset" ${ok ? "" : "disabled"}>${word}</button>`);
   }
   if (assign && assign.kind === "assign") {
-    const sum = assign.targets.reduce((total, iid) => total + (hits[iid] ?? 0), 0);
-    parts.push(`<button type="button" class="primary" data-go="assign" ${sum === assign.amount ? "" : "disabled"}>Assign ${sum} of ${assign.amount}</button>`);
+    const sum = assign.targets.reduce((t, iid) => t + (hits[iid] ?? 0), 0);
+    big.push(`<button type="button" class="brass big" data-go="assign" ${sum === assign.amount ? "" : "disabled"}>Strike ${sum} / ${assign.amount}</button>`);
   }
-  if (!seen.over) {
-    parts.push(`<button type="button" class="${armConcede ? "danger" : "quiet"}" data-go="concede">${armConcede ? "Concede? Click again" : "Concede"}</button>`);
+  const tray = selectionActions(seen).map((a) => `<button type="button" class="chip" data-act="${trayActions.push(a) - 1}">${esc(actionLabel(a, seen))}</button>`).join("");
+  const orders = seen.decision?.type === "ambush" ? all.filter((a) => a.type === "play" && !selected) : [];
+  const ambushHint = orders.length ? `<p class="small muted">Pick an Ambush order from your hand.</p>` : "";
+  const phase = state.claim ? "Claim" : seen.decision?.type === "mulligan" ? "Mulligan" : "Command";
+  const lines = (fx?.lines.length ? fx.lines : redactEvents(log, seat).slice(-6).map((e) => eventLine(e, seat)).filter(Boolean)).slice(-7);
+  return `<aside class="helm">
+    <div class="helm-top">
+      <div class="round"><small>Round</small><b>${seen.round}</b></div>
+      <div class="phase"><small>Phase</small><b>${phase}</b></div>
+      <div class="init" style="--accent:${SEAT_COLOR[seen.initiative]}" title="Initiative">${icon("compass")}<small>${seatName(seen.initiative)}</small></div>
+    </div>
+    <p class="prompt">${esc(prompt(seen))}</p>
+    ${error ? `<p class="alert">${esc(error)}</p>` : ""}
+    ${note ? `<p class="small muted note">${esc(note)}</p>` : ""}
+    ${ambushHint}
+    ${tray ? `<div class="tray">${tray}<button type="button" class="chip quiet" data-go="deselect">Cancel</button></div>` : ""}
+    <div class="big-row">${big.join("")}</div>
+    <ol class="log">${lines.map((l, i) => `<li style="--d:${i}" class="${fx ? "fx-line" : ""}">${esc(l)}</li>`).join("") || `<li class="muted">The voyage begins.</li>`}</ol>
+    ${seen.over ? "" : `<button type="button" class="chip ${armConcede ? "danger" : "quiet"} concede" data-go="concede">${armConcede ? "Concede? Click again" : "Concede"}</button>`}
+  </aside>`;
+}
+function computeRoutes(seen) {
+  routes = /* @__PURE__ */ new Map();
+  for (const action of selectionActions(seen)) {
+    const key = routeKey(action);
+    if (key && !routes.has(key)) routes.set(key, action);
   }
-  return parts.join("");
+}
+function inspectOverlay() {
+  if (!inspecting) return "";
+  return `<div class="inspect" data-go="close-inspect"><div class="inspect-card">${cardFace(getCard(inspecting), { cls: "huge", owner: seat })}
+    <div class="inspect-keys">${getCard(inspecting).keywords.map((k) => `<p><b>${cap(k)}.</b> ${esc(KEYWORD_HELP[k] ?? "")}</p>`).join("")}<p class="muted small">Click anywhere to close.</p></div></div></div>`;
 }
 function render() {
   const seen = view();
-  pending = [];
-  const lines = redactEvents(log, seat).map((event) => eventLine(event, seat)).filter(Boolean).slice(-8);
-  status.textContent = seen.over ? prompt(seen) : `Round ${seen.round} \xB7 Renown ${seen.renown[0]}\u2013${seen.renown[1]} \xB7 Initiative ${seatName(seen.initiative)}`;
+  trayActions = [];
+  computeRoutes(seen);
+  document.body.dataset.hour = ["dawn", "noon", "dusk", "night"][Math.floor((seen.round - 1) / 3) % 4];
   if (covered && !seen.over) {
     table.innerHTML = "";
     cover.hidden = false;
-    const waiting = seen.decision?.type === "mulligan" ? "Mulligan." : seen.decision?.type === "ambush" ? "Ambush." : seen.decision?.type === "assign" ? "Assign the strike." : "Your turn.";
-    cover.innerHTML = `<section class="cover-card">
+    const waiting = seen.decision?.type === "mulligan" ? "Choose your opening hand." : seen.decision?.type === "ambush" ? "An Ambush window is open." : seen.decision?.type === "assign" ? "Assign your strike." : seen.decision?.type?.startsWith("survey") ? "Survey the coast." : "Your turn to command.";
+    cover.innerHTML = `<section class="cover-card" style="--accent:${SEAT_COLOR[seat]}">
+      <div class="cover-ship">${icon("ship")}</div>
       <p class="kicker">Hand the screen across</p>
       <h2>${esc(seatName(seat))}</h2>
-      <p>${esc(waiting)} The other hand stays covered.</p>
-      <p class="muted">Renown ${seen.renown[0]}\u2013${seen.renown[1]} \xB7 Round ${seen.round}</p>
-      <button type="button" class="primary" data-go="sit">I'm ${esc(seatName(seat))}</button>
+      <p>${esc(waiting)}</p>
+      <p class="muted">Round ${seen.round} \xB7 Renown ${seen.renown[0]} to ${seen.renown[1]}</p>
+      <button type="button" class="brass big" data-go="sit">Take the helm</button>
     </section>`;
     return;
   }
   cover.hidden = true;
   cover.innerHTML = "";
+  const over = seen.over ? `<div class="victory" style="--accent:${seen.over.winner == null ? "#c9a44c" : SEAT_COLOR[seen.over.winner]}"><div><p class="kicker">The voyage is over</p><h2>${esc(prompt(seen))}</h2><button type="button" class="brass big" data-go="again">Sail again</button></div></div>` : "";
   table.innerHTML = `
-    <details class="how">
-      <summary>How a turn works</summary>
-      <p>Stow once, play cards by spending ready Stores, and march each crew once. Goods come from Regions you control and are not spent. After both turns the round is claimed: hazards, clashes, then control and Renown. First to 15 Renown at that count wins.</p>
-    </details>
-    <div class="board">${[0, 1, 2, 3, 4].map((index) => regionBlock(seen, index)).join("")}</div>
-    <div class="row">${side(seen, 0)}${side(seen, 1)}</div>
-    <h2 class="kicker" style="margin-top:1rem">Your hand</h2>
-    <p>${esc(prompt(seen))}</p>
-    ${error ? `<p class="alert">${esc(error)}</p>` : ""}
-    ${note ? `<p class="muted">${esc(note)}</p>` : ""}
-    <div class="bar">${bar(seen)}</div>
-    <div class="hand">${hand(seen)}</div>
-    <section class="log"><ul>${lines.map((line) => `<li>${esc(line)}</li>`).join("") || "<li class='muted'>The log is empty.</li>"}</ul></section>
-  `;
+    <div class="stage ${selected ? "selecting" : ""}">
+      ${track(seen)}
+      ${foeRow(seen)}
+      <section class="map">${[0, 1, 2, 3, 4].map((i) => regionColumn(seen, i)).join("")}</section>
+      ${youRow(seen)}
+      ${helm(seen)}
+      ${handFan(seen)}
+    </div>
+    ${over}${inspectOverlay()}`;
+  fx = null;
+}
+function collectFx(before, after, events) {
+  const out = { flips: /* @__PURE__ */ new Set(), damaged: /* @__PURE__ */ new Map(), landed: /* @__PURE__ */ new Set(), marched: /* @__PURE__ */ new Set(), control: /* @__PURE__ */ new Set(), renown: [0, 0], ghosts: [], lines: [] };
+  const prev = new Map(before.crews.map((c) => [c.iid, c]));
+  for (const crew of after.crews) {
+    const was = prev.get(crew.iid);
+    if (!was) out.landed.add(crew.iid);
+    else if (JSON.stringify(was.where) !== JSON.stringify(crew.where)) out.marched.add(crew.iid);
+  }
+  for (const event of events) {
+    if (event.type === "flip") out.flips.add(event.index);
+    if (event.type === "damage" && !event.prevented) out.damaged.set(event.iid, (out.damaged.get(event.iid) ?? 0) + event.amount);
+    if (event.type === "control") out.control.add(event.index);
+    if (event.type === "renown") out.renown[event.player] += event.amount;
+    if (event.type === "defeat") {
+      const was = prev.get(event.iid);
+      if (was) out.ghosts.push({ cardId: was.cardId, owner: was.owner, where: was.where.zone === "harbor" ? "harbor" : was.where.index });
+    }
+  }
+  return out;
 }
 function send(action) {
-  const prev = state.decision?.player ?? null;
+  const prevPlayer = state.decision?.player ?? null;
+  const before = state;
   try {
     const result = applyAction(state, action);
     state = result.state;
     log.push(...result.events);
     actions.push(action);
     error = "";
+    const next2 = state.decision?.player ?? null;
+    const viewer = next2 ?? seat;
+    const batch = collectFx(before, state, result.events);
+    batch.lines = redactEvents(result.events, viewer).map((e) => eventLine(e, viewer)).filter(Boolean);
+    fx = batch;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
     render();
@@ -6755,7 +7303,8 @@ function send(action) {
   picked = /* @__PURE__ */ new Set();
   hits = {};
   armConcede = false;
-  if (next != null && next !== prev) {
+  selected = null;
+  if (next != null && next !== prevPlayer) {
     covered = true;
     seat = next;
   }
@@ -6774,11 +7323,12 @@ function boot(nextSeed) {
   armConcede = false;
   error = "";
   note = "";
+  selected = null;
+  fx = null;
+  inspecting = null;
   render();
 }
-document.body.addEventListener("click", (event) => {
-  const target = event.target instanceof Element ? event.target.closest("[data-act], [data-pick], [data-bump], [data-go]") : null;
-  if (!(target instanceof HTMLElement)) return;
+function activate(target) {
   if (target.dataset.go === "concede") {
     if (!armConcede) {
       armConcede = true;
@@ -6789,9 +7339,39 @@ document.body.addEventListener("click", (event) => {
     return;
   }
   armConcede = false;
+  if (target.dataset.go === "close-inspect") {
+    inspecting = null;
+    render();
+    return;
+  }
   if (target.dataset.act != null) {
-    const action = pending[Number(target.dataset.act)];
+    const action = trayActions[Number(target.dataset.act)];
     if (action) send(action);
+    return;
+  }
+  if (target.dataset.route != null) {
+    const action = routes.get(target.dataset.route);
+    if (action) send(action);
+    return;
+  }
+  if (target.dataset.select != null) {
+    const iid = target.dataset.select;
+    selected = selected === iid ? null : iid;
+    const only = selectionActions(view());
+    if (selected && only.length === 1 && routeKey(only[0]) === "self") {
+      send(only[0]);
+      return;
+    }
+    render();
+    return;
+  }
+  if (target.dataset.crew != null) {
+    const iid = target.dataset.crew;
+    const seen = view();
+    if (actsOf(seen).some((a) => a.type === "march" && a.iid === iid)) {
+      selected = selected === iid ? null : iid;
+      render();
+    }
     return;
   }
   if (target.dataset.pick != null) {
@@ -6817,8 +7397,7 @@ document.body.addEventListener("click", (event) => {
   }
   if (target.dataset.go === "subset") {
     const spec = view().legal.find((item) => item.kind === "subset");
-    if (!spec || spec.kind !== "subset") return;
-    if (picked.size < spec.min || picked.size > spec.max) return;
+    if (!spec || spec.kind !== "subset" || picked.size < spec.min || picked.size > spec.max) return;
     const values = [...picked];
     if (spec.actionType === "mulligan" || spec.actionType === "discard") send({ type: spec.actionType, iids: values });
     else send({ type: spec.actionType, indices: values.map(Number) });
@@ -6832,11 +7411,69 @@ document.body.addEventListener("click", (event) => {
     send({ type: "assign", hits: payload });
     return;
   }
+  if (target.dataset.go === "deselect") {
+    selected = null;
+    render();
+    return;
+  }
+  if (target.dataset.go === "again") {
+    boot(1 + Math.floor(Math.random() * 999999));
+    return;
+  }
   if (target.dataset.go === "sit") {
     covered = false;
     picked = /* @__PURE__ */ new Set();
     hits = {};
+    selected = null;
     render();
+  }
+}
+var HOT = "[data-act], [data-route], [data-pick], [data-bump], [data-go], [data-select], [data-crew]";
+document.body.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target.closest(HOT) : null;
+  if (target instanceof HTMLElement) activate(target);
+});
+document.body.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    if (inspecting) inspecting = null;
+    else selected = null;
+    render();
+    return;
+  }
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const target = event.target instanceof HTMLElement && !(event.target instanceof HTMLButtonElement) ? event.target.closest(HOT) : null;
+  if (target instanceof HTMLElement) {
+    event.preventDefault();
+    activate(target);
+  }
+});
+document.body.addEventListener("contextmenu", (event) => {
+  const el = event.target instanceof Element ? event.target.closest("[data-card], [data-crew]") : null;
+  if (!(el instanceof HTMLElement)) return;
+  const iid = el.dataset.card ?? el.dataset.crew;
+  const s = state;
+  const cardId = s.players[seat].hand.find((c) => c.iid === iid)?.cardId ?? s.crews.find((c) => c.iid === iid)?.cardId;
+  if (!cardId) return;
+  event.preventDefault();
+  inspecting = cardId;
+  render();
+});
+document.body.addEventListener("pointermove", (event) => {
+  const card = event.target instanceof Element ? event.target.closest(".card:not(.back)") : null;
+  if (!(card instanceof HTMLElement)) return;
+  const box = card.getBoundingClientRect();
+  const x = (event.clientX - box.left) / box.width;
+  const y = (event.clientY - box.top) / box.height;
+  card.style.setProperty("--rx", `${((0.5 - y) * 14).toFixed(2)}deg`);
+  card.style.setProperty("--ry", `${((x - 0.5) * 16).toFixed(2)}deg`);
+  card.style.setProperty("--gx", `${(x * 100).toFixed(1)}%`);
+  card.style.setProperty("--gy", `${(y * 100).toFixed(1)}%`);
+});
+document.body.addEventListener("pointerout", (event) => {
+  const card = event.target instanceof Element ? event.target.closest(".card") : null;
+  if (card instanceof HTMLElement && !card.contains(event.relatedTarget)) {
+    card.style.removeProperty("--rx");
+    card.style.removeProperty("--ry");
   }
 });
 document.querySelector("#new")?.addEventListener("click", () => {
@@ -6847,7 +7484,7 @@ document.querySelector("#replay")?.addEventListener("click", async () => {
   const text = JSON.stringify({ seed, actions });
   try {
     await navigator.clipboard.writeText(text);
-    note = "Replay copied.";
+    note = "Replay copied to the clipboard.";
   } catch {
     note = text;
   }
